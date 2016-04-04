@@ -2,6 +2,7 @@ package mode_s
 
 import (
 	"math"
+	"fmt"
 )
 
 const (
@@ -17,13 +18,6 @@ const (
 	DF17_FRAME_STATE_STATUS = "Target State and Status Message"
 	DF17_FRAME_AIRCRAFT_OPER = "Aircraft Operational Status Message"
 )
-
-
-/**
-  Debug printing of information to screen
-*/
-func (df *Frame) DescribeDf17() {
-}
 
 func (df *Frame) MessageTypeString() string {
 	var name string
@@ -45,8 +39,12 @@ func (df *Frame) MessageTypeString() string {
 		name = DF17_FRAME_EXT_SQUIT_EMERG
 	} else if df.messageType == 28 && df.messageSubType == 2 {
 		name = DF17_FRAME_EXT_SQUIT_STATUS
-	} else if df.messageType == 29 && (df.messageSubType == 0 || df.messageSubType == 1) {
-		name = DF17_FRAME_STATE_STATUS
+	} else if df.messageType == 29 {
+		if (df.messageSubType == 0 || df.messageSubType == 1) {
+			name = DF17_FRAME_STATE_STATUS
+		} else {
+			name = fmt.Sprintf("%s (Unknown Sub Message %d)", DF17_FRAME_STATE_STATUS, df.messageSubType);
+		}
 	} else if df.messageType == 31 && (df.messageSubType == 0 || df.messageSubType == 1) {
 		name = DF17_FRAME_AIRCRAFT_OPER
 	}
@@ -83,9 +81,9 @@ func (f *Frame) decodeDF17() {
 			f.heading = float64(((((f.message[5] << 4) | (f.message[6] >> 4)) & 0x007F) * 45) >> 4)
 		}
 
-	} else if f.messageType >= 9 && f.messageType <= 18 {
+	} else if (f.messageType >= 9 && f.messageType <= 18) {
 		/* Airborne position Message */
-		f.fFlag = int(f.message[6] & (1 << 2)) >> 2
+		f.cprFlagOddEven = int(f.message[6] & 4) >> 2
 		f.timeFlag = int(f.message[6] & (1 << 3))
 		f.decodeAC12AltitudeField() // decode altitude and unit
 
@@ -134,6 +132,9 @@ func (f *Frame) decodeDF17() {
 			f.headingIsValid = int(f.message[5] & (1 << 2))
 			f.heading = (360.0 / 128.0) * float64(((f.message[5] & 3) << 5) | (f.message[6] >> 3))
 		}
+	} else if f.messageType == 28 && f.messageSubType == 1 {
+		// EMERGENCY, EMERGENCY, THERE'S AN EMERGENCY GOING ON
+		f.decodeIdentity(5, 6)
 	}
 }
 
@@ -141,8 +142,9 @@ func (df *Frame) MessageType() byte {
 	return df.messageType
 }
 
+// Whether or not this frame is even or odd, for CPR Location
 func (df *Frame) IsEven() bool {
-	return df.fFlag == 0
+	return df.cprFlagOddEven == 0
 }
 
 func (df *Frame) GetFlight() string {

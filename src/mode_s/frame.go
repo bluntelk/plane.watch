@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"time"
+	"strconv"
 )
 
 const MODES_UNIT_FEET = 0
@@ -31,13 +32,11 @@ type Position struct {
 
 type df11 struct {
 	capability byte //  DF11 Capability Sub Type
-
 }
 type df4_5_20_21 struct {
 	flightStatus int
 	dr           int /* Request extraction of down link request. */
 	um           int /* Request extraction of down link request. */
-	identity     int
 }
 
 type df17 struct {
@@ -47,7 +46,7 @@ type df17 struct {
 	headingIsValid int
 	heading        float64
 	aircraftType   int
-	fFlag          int    /* 1 = Odd, 0 = Even CPR message. */
+	cprFlagOddEven int    /* 1 = Odd, 0 = Even CPR message. */
 	timeFlag       int    /* UTC synchronized? */
 	flight         []byte /* 8 chars flight number. */
 }
@@ -67,8 +66,8 @@ type Frame struct {
 	identity       uint32
 	flightId       []byte
 
-	// if we have trouble decoding our frame, the message ends up here
-	err error
+						// if we have trouble decoding our frame, the message ends up here
+	err            error
 }
 
 var downlinkFormatTable = map[byte]string{
@@ -113,21 +112,25 @@ var aisCharset string = "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456
 // prints out a nice debug message
 func (f *Frame) Describe(output io.Writer) {
 	fmt.Fprintln(output, "----------------------------------------------------")
-	fmt.Fprintf(output, "MODE S Packet: ICAO = %x\n", f.icao)
-	fmt.Fprintf(output, "Frame mode  : %s\n", f.mode)
-	fmt.Fprintf(output, "Time Stamp  : %s\n", f.timeStamp.Format(time.RFC3339Nano))
-	fmt.Fprintf(output, "Frame Type  : %d (%s)\n", f.downLinkFormat, f.GetDownLinkFormat())
+	fmt.Fprintf(output, "MODE S Packet:\n")
+	fmt.Fprintf(output, "Downlink Format : %d (%s)\n", f.downLinkFormat, f.DownLinkFormat())
+	fmt.Fprintf(output, "Frame           : %s\n", f.raw)
+	fmt.Fprintf(output, "ICAO            : %6x (%d)\n", f.icao, f.icao)
+	fmt.Fprintf(output, "Frame mode      : %s\n", f.mode)
+	fmt.Fprintf(output, "Time Stamp      : %s\n", f.timeStamp.Format(time.RFC3339Nano))
 	if 17 == f.downLinkFormat {
-		fmt.Printf("ADSB Frame  : %d (%s)\n", f.messageType, f.MessageTypeString())
+		fmt.Printf("ADS-B Frame   : %d (%s)\n", f.messageType, f.MessageTypeString())
+		fmt.Printf("ADS-B Sub Type: %d\n", f.messageSubType)
 		if f.messageType >= 1 && f.messageType <= 4 {
 			fmt.Printf("      Flight: %s", string(f.flight))
 		} else if f.messageType >= 9 && f.messageType <= 18 {
 			var oddEven string = "Odd"
-			if 0 == f.fFlag {
+			if 0 == f.cprFlagOddEven {
 				oddEven = "Even"
 			}
-			fmt.Printf("   LAT LONG : ?? (%s frame)\n", oddEven)
+			fmt.Printf("   CPR FRAME : %s\n", oddEven)
 		}
+		fmt.Fprintf(output, f.BitString())
 	} else if 11 == f.downLinkFormat {
 		fmt.Fprintf(output, "Capability  : %d (%s)\n", f.df11.capability, f.DownLinkCapability())
 	}
@@ -138,7 +141,7 @@ func (f *Frame) Describe(output io.Writer) {
 }
 
 // determines what type of mode S Message this frame is
-func (f *Frame) GetDownLinkFormat() string {
+func (f *Frame) DownLinkFormat() string {
 
 	if description, ok := downlinkFormatTable[f.downLinkFormat]; ok {
 		return description
@@ -197,4 +200,47 @@ func (f *Frame) Heading() float64 {
 
 func (f *Frame) Flight() string {
 	return string(f.flightId)
+}
+
+func (f *Frame) SquawkIdentity() uint32 {
+	return f.identity
+}
+
+//| DF    | CA  | ICAO24 ADDRESS           | DATA                                                                              | CRC                      |
+//|                                        | TC    | SS | NICsb | ALT          | T | F | LAT-CPR           | LON-CPR           |                          |
+//|-------|-----|--------------------------|-------|----|-------|--------------|---|---|-------------------|-------------------|--------------------------|
+//| 10001 | 101 | 010000000110001000011101 | 01011 | 00 | 0     | 110000111000 | 0 | 0 | 10110101101001000 | 01100100010101100 | 001010000110001110100111 |
+//| 10001 | 101 | 010000000110001000011101 | 01011 | 00 | 0     | 110000111000 | 0 | 1 | 10010000110101110 | 01100010000010010 | 011010010010101011010110 |
+func (f *Frame) BitString() string {
+
+	if !(f.downLinkFormat == 17 && f.messageType == 11) {
+		return ""
+	}
+	var header, bits, rawBits string
+
+	header += " DF   | CA  | ICAO 24bit addr          | DATA                                                                              | CRC                      |\n"
+	header += "                                       | TC    | SS | NICsb | ALT          | T | F | LAT-CPR           | LON-CPR           |                          |\n"
+	header += "------+-----+--------------------------+-------+----+-------+--------------+---+---+-------------------+-------------------+--------------------------+\n"
+
+	for _, i := range f.message {
+		rawBits += fmt.Sprintf("%08s", strconv.FormatUint(uint64(i), 2))
+	}
+
+	bits += rawBits[0:5] + " | " // Downlink Format
+	bits += rawBits[5:8] + " | " // Capability
+	bits += rawBits[8:32] + " | " // ICAO
+	// now we are into the packet data
+
+	bits += rawBits[32:37] + " | "
+	bits += rawBits[37:39] + " | "
+	bits += rawBits[39:40] + "     | "
+	bits += rawBits[40:52] + " | "
+	bits += rawBits[52:53] + " | "
+	bits += rawBits[53:54] + " | "
+	bits += rawBits[54:71] + " | "
+	bits += rawBits[71:88] + " | "
+	bits += rawBits[88:] + " | "
+	bits += "\n"
+
+	return header+bits
 }

@@ -52,7 +52,7 @@ func TestDecodeString_DF17_EVEN_LAT(t *testing.T) {
 		t.Errorf("Expected time flag to not be be UTC")
 	}
 
-	if 0 != frame.fFlag {
+	if 0 != frame.cprFlagOddEven {
 		t.Errorf("Expected the F Flag to be EVEN (0) - was odd instead")
 	}
 
@@ -108,7 +108,7 @@ func TestDecodeString_DF17_ODD_LAT(t *testing.T) {
 		t.Errorf("Expected time flag to not be be UTC")
 	}
 
-	if 1 != frame.fFlag {
+	if 1 != frame.cprFlagOddEven {
 		t.Errorf("Expected the F Flag to be ODD (1) - was even instead")
 	}
 

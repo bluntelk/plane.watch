@@ -124,7 +124,7 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 		frame.decode13BitAltitudeField()
 	case 5: //DF_5
 		frame.decodeFlightStatus()
-		frame.decodeIdentity() // gillham encoded squawk
+		frame.decodeIdentity(2, 3) // gillham encoded squawk
 	case 11: //DF_11
 		frame.decodeICAO()
 		frame.decodeCapability()
@@ -138,12 +138,13 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	case 18: //DF_18
 		frame.decodeICAO()
 		frame.decodeCapability() // control field
+		frame.decodeDF17()
 	case 20: //DF_20
 		frame.decodeFlightStatus()
 		frame.decode13BitAltitudeField()
 	case 21: //DF_21
 		frame.decodeFlightStatus()
-		frame.decodeIdentity() // gillham encoded squawk
+		frame.decodeIdentity(2, 3) // gillham encoded squawk
 	}
 
 	return frame, err
@@ -245,12 +246,12 @@ func (f *Frame) decodeICAO() {
 	}
 }
 
-func (f *Frame) decodeIdentity() {
+func (f *Frame) decodeIdentity(byte1, byte2 int) {
 	var a, b, c, d uint32
 	var msg2, msg3 uint32
 
-	msg2 = uint32(f.message[2])
-	msg3 = uint32(f.message[3])
+	msg2 = uint32(f.message[byte1])
+	msg3 = uint32(f.message[byte2])
 
 	/* In the squawk (identity) field bits are interleaved like that
 	* (message bit 20 to bit 32):

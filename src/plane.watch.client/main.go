@@ -7,6 +7,7 @@ import (
 	"mode_s"
 	"encoding/json"
 	"time"
+	"tracker"
 )
 
 var (
@@ -62,7 +63,7 @@ func main() {
 		},
 		cli.StringFlag{
 			Name: "dump1090_port",
-			Value: "30001",
+			Value: "30002",
 			Usage: "The port to read dump1090 from",
 			Destination: &dump1090_port,
 			EnvVar: "DUMP1090_PORT",
@@ -109,13 +110,19 @@ func run(c *cli.Context) {
 	}
 
 	d1090.SetHandler(func(msg string) {
+		log.Println("Decoding: ", msg)
 		frame, err := mode_s.DecodeString(msg, time.Now())
 		if nil != err {
 			log.Println(err)
 		}
-		b, err := json.Marshal(frame);
+		plane := tracker.HandleModeSFrame(frame)
 
-		println(string(b))
+		if nil != plane {
+			b, _ := json.Marshal(plane);
+			println(string(b))
+		}
+
+		tracker.CleanPlanes()
 	})
 
 	select{}
