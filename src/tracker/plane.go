@@ -44,6 +44,7 @@ type Flight struct {
 type Plane struct {
 	lastSeen        time.Time
 	IcaoIdentifier  uint32
+	Icao            string
 	SquawkIdentity  uint32
 	Flight          Flight
 	LocationHistory []PlaneLocation
@@ -52,7 +53,7 @@ type Plane struct {
 	Special         string
 }
 
-type PlaneList map[uint32]*Plane
+type PlaneList map[uint32]Plane
 
 var (
 	planeList PlaneList
@@ -123,34 +124,53 @@ var NLTable = map[int32]float64{
 func init() {
 	planeList = make(PlaneList, 2000)
 }
-
-func GetPlane(ICAO uint32) *Plane {
+// NOT WORKING *cry* Instead of fetching an existing entry in the map, it creates a new one
+func GetPlane(ICAO uint32) Plane {
 	planeAccessMutex.Lock()
-	var plane *Plane
-	var ok bool
-	if plane, ok = planeList[ICAO]; !ok {
-		plane = new(Plane)
-		plane.IcaoIdentifier = ICAO
-		plane.LocationHistory = make([]PlaneLocation, 0)
-		plane.ZeroCpr()
-		planeList[ICAO] = plane
+
+	if plane, ok := planeList[ICAO]; ok {
+		planeAccessMutex.Unlock()
+		return plane
 	}
+	var p Plane
+	p.IcaoIdentifier = ICAO
+	p.Icao = fmt.Sprintf("%6X", ICAO)
+	p.LocationHistory = make([]PlaneLocation, 0)
+	p.ZeroCpr()
+	planeList[ICAO] = p
 
 	planeAccessMutex.Unlock()
-	return plane
+	return p
 }
 
-func SetPlane(p *Plane) {
+func SetPlane(p Plane) {
 	planeAccessMutex.Lock()
 	p.lastSeen = time.Now()
+	delete(planeList, p.IcaoIdentifier)
 	planeList[p.IcaoIdentifier] = p
 	planeAccessMutex.Unlock()
 }
 
+func CleanPlanes() {
+	//remove planes that have not been seen for a while
+	planeAccessMutex.Lock()
+	//
+	//// go through the list and remove planes
+	//var cutOff, planeCutOff time.Time
+	//cutOff = time.Now().Add(5 * time.Minute)
+	//for i, plane := range planeList {
+	//	planeCutOff = plane.lastSeen.Add(5 * time.Minute)
+	//	if planeCutOff.Before(cutOff) {
+	//		delete(planeList, i)
+	//	}
+	//}
+
+	planeAccessMutex.Unlock()
+}
 func (p *Plane) String() string {
 	var id, alt, position, direction string
 
-	id = fmt.Sprintf("\033[0;97mPlane (\033[38;5;118m%6x %-8s\033[0;97m) ", p.IcaoIdentifier, p.Flight.Identifier)
+	id = fmt.Sprintf("\033[0;97mPlane (\033[38;5;118m%s %-8s\033[0;97m) ", p.Icao, p.Flight.Identifier)
 
 	if p.Location.onGround {
 		position += " is on the ground. "
@@ -175,10 +195,18 @@ func (p *Plane) AddLatLong(lat, lon float64) {
 	}
 	p.LocationHistory = append(p.LocationHistory, p.Location)
 
-	newLocation := p.Location
-	newLocation.TimeStamp = time.Now()
+	var newLocation PlaneLocation
+
+	newLocation.Altitude = p.Location.Altitude
+	newLocation.AltitudeUnits = p.Location.AltitudeUnits
+	newLocation.hasHeading = p.Location.hasHeading
+	newLocation.hasLatLon = true
+	newLocation.Heading = p.Location.Heading
 	newLocation.Latitude = lat
 	newLocation.Longitude = lon
+	newLocation.onGround = p.Location.onGround
+	newLocation.TimeStamp = time.Now()
+	newLocation.Velocity = p.Location.Velocity
 
 	p.Location = newLocation
 }

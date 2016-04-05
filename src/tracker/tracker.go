@@ -4,7 +4,6 @@ import (
 	"log"
 	"fmt"
 	"mode_s"
-	"time"
 	"os"
 )
 
@@ -147,26 +146,9 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 	}
 	SetPlane(plane)
 	if hasChanged {
-		log.Println(plane)
-		return plane
+		log.Println(plane.String())
+		return &plane
 	} else {
 		return nil
 	}
-}
-
-func CleanPlanes() {
-	//remove planes that have not been seen for a while
-	planeAccessMutex.Lock()
-
-	// go through the list and remove planes
-	var cutOff, planeCutOff time.Time
-	cutOff = time.Now().Add(5 * time.Minute)
-	for i, plane := range planeList {
-		planeCutOff = plane.lastSeen.Add(5 * time.Minute)
-		if planeCutOff.Before(cutOff) {
-			delete(planeList, i)
-		}
-	}
-
-	planeAccessMutex.Unlock()
 }
