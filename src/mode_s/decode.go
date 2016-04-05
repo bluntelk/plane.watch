@@ -166,6 +166,10 @@ func (f *Frame) SetTimeStamp(timeStamp string) {
 	}
 }
 
+func (f *Frame) TimeStamp() time.Time {
+	return f.timeStamp
+}
+
 // call after frame.raw is set. does the preparing
 func (f *Frame) parseRawToMessage() error {
 	frameLen := len(f.raw)

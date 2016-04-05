@@ -8,11 +8,13 @@ import (
 	"encoding/json"
 	"time"
 	"tracker"
+	"fmt"
+	"github.com/streadway/amqp"
 )
 
 var (
-	pw_host, pw_user, pw_pass string
-	pw_port string
+	pw_host, pw_user, pw_pass, pw_vHost string
+	pw_port int
 	dump1090_host string
 	dump1090_port string
 )
@@ -28,7 +30,7 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name: "pw_host",
-			Value: "plane.watch",
+			Value: "mq.plane.watch",
 			Usage: "How we connect to plane.watch",
 			Destination: &pw_host,
 			EnvVar: "PW_HOST",
@@ -47,12 +49,19 @@ func main() {
 			Destination: &pw_pass,
 			EnvVar: "PW_PASS",
 		},
-		cli.StringFlag{
+		cli.IntFlag{
 			Name: "pw_port",
-			Value: "1001",
+			Value: 5672,
 			Usage: "How we connect to plane.watch",
 			Destination: &pw_port,
 			EnvVar: "PW_PORT",
+		},
+		cli.StringFlag{
+			Name: "pw_vhost",
+			Value: "/pw_feedin",
+			Usage: "the virtual host on the plane watch rabbit server",
+			Destination: &pw_vHost,
+			EnvVar: "PW_VHOST",
 		},
 		cli.StringFlag{
 			Name: "dump1090_host",
@@ -86,6 +95,40 @@ func main() {
 	app.Run(os.Args)
 }
 
+func getRabbitConnection(timeout int64) (*RabbitMQ, error) {
+	if "" == pw_user {
+		log.Fatalln("No User Specified For Plane.Watch Rabbit Connection")
+	}
+	if "" == pw_pass {
+		log.Fatalln("No Password Specified For Plane.Watch Rabbit Connection")
+	}
+
+	var rabbitConfig RabbitMQConfig
+	rabbitConfig.Host = pw_host
+	rabbitConfig.Port = pw_port
+	rabbitConfig.User = pw_user
+	rabbitConfig.Password = pw_pass
+	rabbitConfig.Vhost = pw_vHost
+
+	log.Printf("Connecting to plane.watch RabbitMQ @ %s", rabbitConfig)
+	rabbit := NewRabbitMQ(rabbitConfig)
+	connected := make(chan bool)
+	go rabbit.Connect(connected)
+	select {
+	case <-connected:
+		return rabbit, nil
+	case <-time.After(time.Duration(timeout) * time.Second):
+		return nil, fmt.Errorf("Failed to connect to rabbit in a timely manner")
+	}
+}
+
+func failOnError(err error, msg string) {
+	if err != nil {
+		log.Fatalf("%s: %s", msg, err)
+		panic(fmt.Sprintf("%s: %s", msg, err))
+	}
+}
+
 func test(c *cli.Context) {
 	log.Printf("Testing connection to dump1090 @ %s:%s", dump1090_host, dump1090_port)
 	d1090 := NewDump1090Reader(dump1090_host, dump1090_port)
@@ -96,7 +139,9 @@ func test(c *cli.Context) {
 		d1090.Stop()
 	}
 
-	log.Printf("Connecting to plane.watch @ %s: %s", pw_host, pw_port)
+	rabbit, err := getRabbitConnection(10)
+	defer rabbit.Disconnect()
+	failOnError(err, "Unable to connect to rabbit")
 
 	log.Printf("Success. You are ready to go");
 }
@@ -109,23 +154,41 @@ func run(c *cli.Context) {
 		return
 	}
 
+	rabbit, err := getRabbitConnection(60)
+	failOnError(err, "Unable to connect to rabbit")
+	defer rabbit.Disconnect()
+	err = rabbit.ExchangeDeclare("planes", "topic")
+	failOnError(err, "Failed to declare a topic exchange")
+
 	d1090.SetHandler(func(msg string) {
+		var publishError error
 		log.Println("Decoding: ", msg)
 		frame, err := mode_s.DecodeString(msg, time.Now())
 		if nil != err {
 			log.Println(err)
 		}
-		plane := tracker.HandleModeSFrame(frame)
+		plane := tracker.HandleModeSFrame(frame, false)
 
 		if nil != plane {
-			b, _ := json.Marshal(plane);
-			println(string(b))
+			planeJson, _ := json.Marshal(plane);
+
+			icao := fmt.Sprintf("%6x", plane.IcaoIdentifier);
+			msg := amqp.Publishing{
+				ContentType: "application/json",
+				Body: planeJson,
+			}
+			log.Println("Sending message to plane.watch for plane:", icao)
+			publishError = rabbit.Publish("planes", icao, msg)
+			if nil != publishError {
+				log.Println("Failed to publish message to plane.watch for plane", icao)
+			}
+
 		}
 
 		tracker.CleanPlanes()
 	})
 
-	select{}
+	select {}
 
 	d1090.Stop()
 }

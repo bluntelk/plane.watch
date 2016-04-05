@@ -3,6 +3,7 @@ package tracker
 import (
 	"fmt"
 	"testing"
+	"time"
 )
 
 func TestFunkyLatLon(t *testing.T) {
@@ -10,14 +11,14 @@ func TestFunkyLatLon(t *testing.T) {
 	var err error
 	plane = GetPlane(7777)
 
-	plane.SetCprEvenLocation(92095, 39846)
+	plane.SetCprEvenLocation(92095, 39846, time.Now())
 	_, err = plane.cprLocation.decode()
 	if nil == err {
 		t.Error("We should fail CPR decode with only an even location set")
 	}
 	plane.ZeroCpr();
 
-	plane.SetCprOddLocation(88385, 125818)
+	plane.SetCprOddLocation(88385, 125818, time.Now())
 	_, err = plane.cprLocation.decode()
 	if nil == err {
 		t.Error("We should fail CPR decode with only an odd location set")
@@ -25,8 +26,8 @@ func TestFunkyLatLon(t *testing.T) {
 	plane.ZeroCpr();
 
 	plane = GetPlane(7777)
-	plane.SetCprEvenLocation(92095, 39846)
-	plane.SetCprOddLocation(88385, 125818)
+	plane.SetCprEvenLocation(92095, 39846, time.Now())
+	plane.SetCprOddLocation(88385, 125818, time.Now())
 
 	_, err = plane.cprLocation.decode()
 	if nil != err {
@@ -49,7 +50,7 @@ func TestGetPlane(t *testing.T) {
 		t.Errorf("Expected planes ICAO identifier to be moo, got %d", plane.IcaoIdentifier)
 	}
 
-	plane.SetCprEvenLocation(92095, 39846)
+	plane.SetCprEvenLocation(92095, 39846, time.Now())
 
 	if 92095 != plane.cprLocation.lat0 {
 		t.Errorf("Even Lat not recorded properly. expected 92095, got: %0.2f", plane.cprLocation.lat0)
@@ -61,7 +62,7 @@ func TestGetPlane(t *testing.T) {
 
 	plane = GetPlane(1234)
 
-	plane.SetCprOddLocation(88385, 125818)
+	plane.SetCprOddLocation(88385, 125818, time.Now())
 
 	if 88385 != plane.cprLocation.lat1 {
 		t.Errorf("Even Lat not recorded properly. expected 88385, got: %0.2f", plane.cprLocation.lat1)
@@ -103,8 +104,8 @@ func TestGetPlane(t *testing.T) {
 
 func TestDecodeFailsOnBadData(t *testing.T) {
 	plane := GetPlane(1233)
-	plane.SetCprEvenLocation(1, 2)
-	plane.SetCprOddLocation(888888, 888888)
+	plane.SetCprEvenLocation(1, 2, time.Now())
+	plane.SetCprOddLocation(888888, 888888, time.Now())
 
 	location, err := plane.cprLocation.decode()
 
@@ -119,7 +120,7 @@ func TestDecodeFailsOnBadData(t *testing.T) {
 
 func TestDecodeFailsOnNoOddLoc(t *testing.T) {
 	plane := GetPlane(1235)
-	plane.SetCprEvenLocation(92095, 39846)
+	plane.SetCprEvenLocation(92095, 39846, time.Now())
 
 	location, err := plane.cprLocation.decode()
 
@@ -133,7 +134,7 @@ func TestDecodeFailsOnNoOddLoc(t *testing.T) {
 }
 func TestDecodeFailsOnNoEvenLoc(t *testing.T) {
 	plane := GetPlane(1236)
-	plane.SetCprOddLocation(88385, 125818)
+	plane.SetCprOddLocation(88385, 125818, time.Now())
 
 	location, err := plane.cprLocation.decode()
 

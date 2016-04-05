@@ -26,10 +26,13 @@ type CprLocation struct {
 }
 
 type PlaneLocation struct {
-	Latitude, Longitude float64
-	Velocity, Altitude  int32
-	Heading             float64
-	TimeStamp           time.Time
+	Latitude, Longitude  float64
+	Altitude             int32
+	AltitudeUnits        string
+	Heading, Velocity    float64
+	TimeStamp            time.Time
+	onGround, hasHeading bool
+	hasLatLon            bool
 }
 
 type Flight struct {
@@ -46,11 +49,6 @@ type Plane struct {
 	LocationHistory []PlaneLocation
 	Location        PlaneLocation
 	cprLocation     CprLocation
-	Altitude        int32
-	AltitudeUnits   string
-	Heading         float64
-	Track           float64
-	Velocity        float64
 	Special         string
 }
 
@@ -149,15 +147,35 @@ func SetPlane(p *Plane) {
 	planeAccessMutex.Unlock()
 }
 
-func (p *Plane) AddLatLong(lat, lon float64) {
-	var newLocation PlaneLocation
+func (p *Plane) String() string {
+	var id, alt, position, direction string
 
+	id = fmt.Sprintf("\033[0;97mPlane (\033[38;5;118m%6x %-8s\033[0;97m) ", p.IcaoIdentifier, p.Flight.Identifier)
+
+	if p.Location.onGround {
+		position += " is on the ground. "
+	} else if p.Location.Altitude > 0 {
+		alt = fmt.Sprintf(" is at %d %s.", p.Location.Altitude, p.Location.AltitudeUnits)
+	}
+
+	if p.Location.hasLatLon {
+		position += fmt.Sprintf(" at: \033[38;5;122m%+03.13f\033[0;97m, \033[38;5;122m%+03.13f\033[0;97m,", p.Location.Latitude, p.Location.Longitude)
+	}
+
+	if p.Location.hasHeading {
+		direction += fmt.Sprintf(" Has heading %0.2f and is travelling at %0.2f knots", p.Location.Heading, p.Location.Velocity)
+	}
+
+	return id + alt + position + direction + "\033[0m";
+}
+
+func (p *Plane) AddLatLong(lat, lon float64) {
 	if len(p.LocationHistory) >= 10 {
 		p.LocationHistory = p.LocationHistory[1:]
 	}
 	p.LocationHistory = append(p.LocationHistory, p.Location)
 
-	newLocation.Altitude = p.Altitude
+	newLocation := p.Location
 	newLocation.TimeStamp = time.Now()
 	newLocation.Latitude = lat
 	newLocation.Longitude = lon
@@ -178,7 +196,7 @@ func (p *Plane) ZeroCpr() {
 	p.cprLocation.oddFrame = false
 }
 
-func (p *Plane) SetCprEvenLocation(lat, lon float64) {
+func (p *Plane) SetCprEvenLocation(lat, lon float64, t time.Time) {
 
 	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
 	if lat > MAX_17_BITS || lat < 0 || lon > MAX_17_BITS || lon < 0 {
@@ -187,11 +205,11 @@ func (p *Plane) SetCprEvenLocation(lat, lon float64) {
 
 	p.cprLocation.lat0 = lat
 	p.cprLocation.lon0 = lon
-	p.cprLocation.time0 = time.Now()
+	p.cprLocation.time0 = t
 	p.cprLocation.evenFrame = true
 }
 
-func (p *Plane) SetCprOddLocation(lat, lon float64) {
+func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) {
 
 	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
 	if lat > MAX_17_BITS || lat < 0 || lon > MAX_17_BITS || lon < 0 {
@@ -199,21 +217,21 @@ func (p *Plane) SetCprOddLocation(lat, lon float64) {
 	}
 
 	// only set the odd frame after the even frame is set
-	if !p.cprLocation.evenFrame {
-		return
-	}
+	//if !p.cprLocation.evenFrame {
+	//	return
+	//}
 
 	p.cprLocation.lat1 = lat
 	p.cprLocation.lon1 = lon
-	p.cprLocation.time1 = time.Now()
+	p.cprLocation.time1 = t
 	p.cprLocation.oddFrame = true
 }
 
 func (p *Plane) DecodeCpr(altitude int32, altitude_units string) error {
 
 	// set the current altitude
-	p.Altitude = altitude
-	p.AltitudeUnits = altitude_units
+	p.Location.Altitude = altitude
+	p.Location.AltitudeUnits = altitude_units
 
 	// attempt to decode the CPR LAT/LON
 	loc, err := p.cprLocation.decode()
@@ -221,7 +239,7 @@ func (p *Plane) DecodeCpr(altitude int32, altitude_units string) error {
 	if nil != err {
 		return err
 	}
-
+	p.Location.hasLatLon = true
 	p.AddLatLong(loc.Latitude, loc.Longitude)
 
 	p.ZeroCpr()

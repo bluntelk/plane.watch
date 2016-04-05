@@ -219,8 +219,8 @@ func (f *Frame) BitString() string {
 	var header, bits, rawBits string
 
 	header += " DF   | CA  | ICAO 24bit addr          | DATA                                                                              | CRC                      |\n"
-	header += "                                       | TC    | SS | NICsb | ALT          | T | F | LAT-CPR           | LON-CPR           |                          |\n"
-	header += "------+-----+--------------------------+-------+----+-------+--------------+---+---+-------------------+-------------------+--------------------------+\n"
+	header += "                                       | TC    | SS | NICsb | ALT     Q      | T | F | LAT-CPR           | LON-CPR           |                          |\n"
+	header += "------+-----+--------------------------+-------+----+-------+----------------+---+---+-------------------+-------------------+--------------------------+\n"
 
 	for _, i := range f.message {
 		rawBits += fmt.Sprintf("%08s", strconv.FormatUint(uint64(i), 2))
@@ -231,15 +231,17 @@ func (f *Frame) BitString() string {
 	bits += rawBits[8:32] + " | " // ICAO
 	// now we are into the packet data
 
-	bits += rawBits[32:37] + " | "
-	bits += rawBits[37:39] + " | "
-	bits += rawBits[39:40] + "     | "
-	bits += rawBits[40:52] + " | "
-	bits += rawBits[52:53] + " | "
-	bits += rawBits[53:54] + " | "
-	bits += rawBits[54:71] + " | "
-	bits += rawBits[71:88] + " | "
-	bits += rawBits[88:] + " | "
+	bits += rawBits[32:37] + " | " // TC - Type code
+	bits += rawBits[37:39] + " | " // SS - Surveillance status
+	bits += rawBits[39:40] + "     | " // NIC supplement-B
+	bits += rawBits[40:47] + " "   // Altitude
+	bits += rawBits[47:48] + " "   // Altitude Q Bit
+	bits += rawBits[48:52] + " | " // Altitude
+	bits += rawBits[52:53] + " | " // Time
+	bits += rawBits[53:54] + " | " // F - CPR odd/even frame flag
+	bits += rawBits[54:71] + " | " // Latitude in CPR format
+	bits += rawBits[71:88] + " | " // Longitude in CPR format
+	bits += rawBits[88:] + " | "   // CRC
 	bits += "\n"
 
 	return header+bits
