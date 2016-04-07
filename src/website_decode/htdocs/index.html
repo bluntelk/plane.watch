@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mode S Packet Decoder</title>
+    <link rel="stylesheet" href="css/foundation.css">
+    <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="callout large primary">
+    <div class="row column text-center">
+        <h1>Mode S Packet Decoder</h1>
+        <h2 class="subheader">Decoding your Mode S (and ADS-B) packets</h2>
+    </div>
+</div>
+
+<div class="row medium-8 large-7 columns">
+    <form action="#" method="POST" id="input-form">
+        <div class="input-group">
+            <input class="input-group-field" name="packet" title="packet" type="text" id="packet"/>
+            <div class="input-group-button">
+                <input class="button" type="submit" value="Decode Packet!">
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="row medium-8 large-7 columns">
+    <pre id="result">
+
+    </pre>
+</div>
+
+<script type="application/javascript" src="js/vendor/jquery.js"></script>
+
+<script>
+    $(document).ready(function () {
+        $('#packet').val("*A028009F96887B05FFA000413602;");
+        $('#input-form').submit(function (event) {
+            var packet = $('#packet').val();
+            $.get("/decode", {'packet' :packet})
+                    .done(function(data) {
+                        $('#result').html(data)
+                    })
+                    .fail(function() {
+                        $('#result').html("Failed to get data")
+                    });
+            event.preventDefault();
+        });
+    });
+</script>
+</body>
+</html>

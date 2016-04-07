@@ -172,15 +172,14 @@ func run(c *cli.Context) {
 		if nil != plane {
 			planeJson, _ := json.Marshal(plane);
 
-			icao := fmt.Sprintf("%6x", plane.IcaoIdentifier);
 			msg := amqp.Publishing{
 				ContentType: "application/json",
 				Body: planeJson,
 			}
-			log.Println("Sending message to plane.watch for plane:", icao)
-			publishError = rabbit.Publish("planes", icao, msg)
+			log.Println("Sending message to plane.watch for plane:", plane.Icao)
+			publishError = rabbit.Publish("planes", plane.Icao, msg)
 			if nil != publishError {
-				log.Println("Failed to publish message to plane.watch for plane", icao)
+				log.Println("Failed to publish message to plane.watch for plane", plane.Icao)
 			}
 
 		}

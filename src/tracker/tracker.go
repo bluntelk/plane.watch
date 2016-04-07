@@ -17,7 +17,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 	var hasChanged bool
 
 	plane := GetPlane(icao)
-	planeFormat = fmt.Sprintf("DF%02d - \033[0;97mPlane (\033[38;5;118m%6x %-8s\033[0;97m)", frame.DownLinkType(), plane.IcaoIdentifier, plane.Flight.Identifier)
+	planeFormat = fmt.Sprintf("DF%02d - \033[0;97mPlane (\033[38;5;118m%s %-8s\033[0;97m)", frame.DownLinkType(), plane.Icao, plane.Flight.Identifier)
 
 	// determine what to do with our given frame
 	switch frame.DownLinkType() {

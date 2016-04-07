@@ -151,6 +151,7 @@ func SetPlane(p Plane) {
 	planeAccessMutex.Unlock()
 }
 
+// todo: fix this. it deletes everything
 func CleanPlanes() {
 	//remove planes that have not been seen for a while
 	planeAccessMutex.Lock()
