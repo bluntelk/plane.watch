@@ -5,10 +5,7 @@ package mode_s
 */
 
 import (
-	"fmt"
-	"io"
 	"time"
-	"strconv"
 )
 
 const MODES_UNIT_FEET = 0
@@ -79,7 +76,7 @@ var downlinkFormatTable = map[byte]string{
 	17: "ADS-B",
 	18: "TIS-B - Ground Traffic", // ground traffic
 	19: "Military Ext. Squitter",
-	20: "Roll Call Reply - Altitude (~25ft accuracy)",
+	20: "Airborne position, GNSS HAE",
 	21: "Roll Call Reply - Identity",
 	22: "Military",
 }
@@ -108,55 +105,6 @@ var flightStatusTable = map[int]string{
 }
 
 var aisCharset string = "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456789??????"
-
-// prints out a nice debug message
-func (f *Frame) Describe(output io.Writer) {
-	fmt.Fprintln(output, "----------------------------------------------------")
-	fmt.Fprintf(output, "MODE S Packet:\n")
-	fmt.Fprintf(output, "Downlink Format : %d (%s)\n", f.downLinkFormat, f.DownLinkFormat())
-	fmt.Fprintf(output, "Frame           : %s\n", f.raw)
-	fmt.Fprintf(output, "ICAO            : %6x (%d)\n", f.icao, f.icao)
-	fmt.Fprintf(output, "Frame mode      : %s\n", f.mode)
-	fmt.Fprintf(output, "Time Stamp      : %s\n", f.timeStamp.Format(time.RFC3339Nano))
-	if 17 == f.downLinkFormat {
-		fmt.Printf("ADS-B Frame   : %d (%s)\n", f.messageType, f.MessageTypeString())
-		fmt.Printf("ADS-B Sub Type: %d\n", f.messageSubType)
-		if f.messageType >= 1 && f.messageType <= 4 {
-			fmt.Printf("      Flight: %s", string(f.flight))
-		} else if f.messageType >= 9 && f.messageType <= 18 {
-			var oddEven string = "Odd"
-			if 0 == f.cprFlagOddEven {
-				oddEven = "Even"
-			}
-			fmt.Printf("   CPR FRAME : %s\n", oddEven)
-		}
-		fmt.Fprintf(output, f.BitString())
-	} else if 11 == f.downLinkFormat {
-		fmt.Fprintf(output, "Capability  : %d (%s)\n", f.df11.capability, f.DownLinkCapability())
-	}
-
-	fmt.Fprintln(output, "Position:")
-	fmt.Fprintf(output, "    Altitude: %d feet", f.altitude)
-	fmt.Fprintln(output, "")
-}
-
-// determines what type of mode S Message this frame is
-func (f *Frame) DownLinkFormat() string {
-
-	if description, ok := downlinkFormatTable[f.downLinkFormat]; ok {
-		return description
-	}
-	return "Unknown Downlink Format"
-}
-
-// for when mode is 4,5,20,21
-func (f *Frame) DownLinkCapability() string {
-
-	if description, ok := capabilityTable[f.df11.capability]; ok {
-		return description
-	}
-	return "Unknown Downlink Capability"
-}
 
 func (f *Frame) DownLinkType() byte {
 	return f.downLinkFormat
@@ -197,6 +145,9 @@ func (f *Frame) Velocity() float64 {
 func (f *Frame) Heading() float64 {
 	return f.heading
 }
+func (f *Frame) VerticalRate() int {
+	return f.verticalRate
+}
 
 func (f *Frame) Flight() string {
 	return string(f.flightId)
@@ -206,43 +157,3 @@ func (f *Frame) SquawkIdentity() uint32 {
 	return f.identity
 }
 
-//| DF    | CA  | ICAO24 ADDRESS           | DATA                                                                              | CRC                      |
-//|                                        | TC    | SS | NICsb | ALT          | T | F | LAT-CPR           | LON-CPR           |                          |
-//|-------|-----|--------------------------|-------|----|-------|--------------|---|---|-------------------|-------------------|--------------------------|
-//| 10001 | 101 | 010000000110001000011101 | 01011 | 00 | 0     | 110000111000 | 0 | 0 | 10110101101001000 | 01100100010101100 | 001010000110001110100111 |
-//| 10001 | 101 | 010000000110001000011101 | 01011 | 00 | 0     | 110000111000 | 0 | 1 | 10010000110101110 | 01100010000010010 | 011010010010101011010110 |
-func (f *Frame) BitString() string {
-
-	if !(f.downLinkFormat == 17 && f.messageType == 11) {
-		return ""
-	}
-	var header, bits, rawBits string
-
-	header += " DF   | CA  | ICAO 24bit addr          | DATA                                                                              | CRC                      |\n"
-	header += "                                       | TC    | SS | NICsb | ALT     Q      | T | F | LAT-CPR           | LON-CPR           |                          |\n"
-	header += "------+-----+--------------------------+-------+----+-------+----------------+---+---+-------------------+-------------------+--------------------------+\n"
-
-	for _, i := range f.message {
-		rawBits += fmt.Sprintf("%08s", strconv.FormatUint(uint64(i), 2))
-	}
-
-	bits += rawBits[0:5] + " | " // Downlink Format
-	bits += rawBits[5:8] + " | " // Capability
-	bits += rawBits[8:32] + " | " // ICAO
-	// now we are into the packet data
-
-	bits += rawBits[32:37] + " | " // TC - Type code
-	bits += rawBits[37:39] + " | " // SS - Surveillance status
-	bits += rawBits[39:40] + "     | " // NIC supplement-B
-	bits += rawBits[40:47] + " "   // Altitude
-	bits += rawBits[47:48] + " "   // Altitude Q Bit
-	bits += rawBits[48:52] + " | " // Altitude
-	bits += rawBits[52:53] + " | " // Time
-	bits += rawBits[53:54] + " | " // F - CPR odd/even frame flag
-	bits += rawBits[54:71] + " | " // Latitude in CPR format
-	bits += rawBits[71:88] + " | " // Longitude in CPR format
-	bits += rawBits[88:] + " | "   // CRC
-	bits += "\n"
-
-	return header+bits
-}

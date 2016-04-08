@@ -116,12 +116,12 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 
 	// decode the specific DF type
 	switch frame.downLinkFormat {
-	case 0: //DF_0
+	case 0: // Airborne position, baro altitude only
 		frame.decodeVSBit()
 		frame.decode13BitAltitudeField()
-	case 4: //DF_4
+	case 1, 2, 3, 4: // Aircraft Identification and Category
 		frame.decodeFlightStatus()
-		frame.decode13BitAltitudeField()
+		frame.decodeFlightId()
 	case 5: //DF_5
 		frame.decodeFlightStatus()
 		frame.decodeIdentity(2, 3) // gillham encoded squawk
@@ -138,7 +138,10 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	case 18: //DF_18
 		frame.decodeICAO()
 		frame.decodeCapability() // control field
-		frame.decodeDF17()
+		if 0 == frame.capability {
+			frame.decodeICAO()
+			frame.decodeDF17()
+		}
 	case 20: //DF_20
 		frame.decodeFlightStatus()
 		frame.decode13BitAltitudeField()
@@ -204,7 +207,7 @@ func (f *Frame) decodeCapability() {
 func (f *Frame) decodeFlightStatus() {
 	// first 5 bits are the downlink format
 	// bits 5,6,7 are the flight status
-	f.df4_5_20_21.flightStatus = int(f.message[0] & 7)
+	f.flightStatus = int(f.message[0] & 7)
 }
 
 // VS == Vertical Status
@@ -231,8 +234,8 @@ func (f *Frame) decodeFlightId() {
 //func (f *Frame) decodeDF4_5_20_21() error {
 //
 //	// bits 8,9,10,11,12 (5 bits) are the DR flag
-//	f.df4_5_20_21.dr = int(f.message[1]) >> 3 & 31
-//	f.df4_5_20_21.um = int(((f.message[1] & 7) << 3) | f.message[2]>>5)
+//	f.dr = int(f.message[1]) >> 3 & 31
+//	f.um = int(((f.message[1] & 7) << 3) | f.message[2]>>5)
 //	return nil
 //}
 
@@ -380,6 +383,7 @@ func (f *Frame) decodeModeSChecksum() {
 	f.crc = (a << 16) | (b << 8) | c
 
 }
+
 
 //func (list *icaoAddressWhiteList)updateLastSeen(addr uint32) {
 // look for our addr

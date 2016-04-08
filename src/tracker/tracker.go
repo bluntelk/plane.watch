@@ -27,7 +27,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		log.Printf(planeFormat + " is at %d %s \033[0m", plane.Location.Altitude, plane.Location.AltitudeUnits)
 		hasChanged = true
 
-	case 1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 19, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31:
+	case 1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31:
 		//log.Printf(planeFormat + " \033[38;5;52mIgnoring Mode S Frame: %d (%s)\033[0m\n", frame.DownLinkType(), frame.DownLinkFormat())
 		break
 	case 4, 5, 20, 21:
@@ -97,6 +97,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 			{
 				plane.Location.Heading = frame.Heading()
 				plane.Location.Velocity = frame.Velocity()
+				plane.Location.VerticalRate = frame.VerticalRate()
 				plane.Location.onGround = false
 				plane.Location.hasHeading = true
 				log.Printf(planeFormat + " has heading %0.2f and is travelling at %0.2f knots\033[0m", plane.Location.Heading, plane.Location.Velocity)

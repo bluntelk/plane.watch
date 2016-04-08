@@ -1,5 +1,7 @@
 package mode_s
 
+// extended squitter decoding
+
 import (
 	"math"
 	"fmt"

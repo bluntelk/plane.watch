@@ -28,6 +28,7 @@ type CprLocation struct {
 type PlaneLocation struct {
 	Latitude, Longitude  float64
 	Altitude             int32
+	VerticalRate         int
 	AltitudeUnits        string
 	Heading, Velocity    float64
 	TimeStamp            time.Time

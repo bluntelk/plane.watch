@@ -15,18 +15,22 @@
     </div>
 </div>
 
-<div class="row medium-8 large-7 columns">
-    <form action="#" method="POST" id="input-form">
-        <div class="input-group">
-            <input class="input-group-field" name="packet" title="packet" type="text" id="packet"/>
-            <div class="input-group-button">
-                <input class="button" type="submit" value="Decode Packet!">
+<div class="row medium-12 columns">
+    <div class="column small-4">
+    </div>
+    <div class="column small-8">
+        <form action="#" method="POST" id="input-form">
+            <div class="input-group">
+                <input class="input-group-field" name="packet" title="packet" type="text" id="packet"/>
+                <div class="input-group-button">
+                    <input class="button" type="submit" value="Decode Packet!">
+                </div>
             </div>
-        </div>
-    </form>
+        </form>
+    </div>
 </div>
 
-<div class="row medium-8 large-7 columns">
+<div class="row medium-12 large-12 columns">
     <pre id="result">
 
     </pre>
@@ -39,11 +43,11 @@
         $('#packet').val("*A028009F96887B05FFA000413602;");
         $('#input-form').submit(function (event) {
             var packet = $('#packet').val();
-            $.get("/decode", {'packet' :packet})
-                    .done(function(data) {
+            $.get("/decode", {'packet': packet})
+                    .done(function (data) {
                         $('#result').html(data)
                     })
-                    .fail(function() {
+                    .fail(function () {
                         $('#result').html("Failed to get data")
                     });
             event.preventDefault();
