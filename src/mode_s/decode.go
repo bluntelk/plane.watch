@@ -60,6 +60,10 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	var frame Frame
 	var err error
 
+	if "" == rawFrame {
+		return frame, fmt.Errorf("Cannot Decode Empty String")
+	}
+
 	encodedFrame := strings.TrimRight(rawFrame, "; \n")
 
 	// determine what type of frame we are dealing with
@@ -117,11 +121,14 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	// decode the specific DF type
 	switch frame.downLinkFormat {
 	case 0: // Airborne position, baro altitude only
-		frame.decodeVSBit()
+		frame.decodeVerticalStatus()
 		frame.decode13BitAltitudeField()
-	case 1, 2, 3, 4: // Aircraft Identification and Category
+	case 1, 2, 3: // Aircraft Identification and Category
 		frame.decodeFlightStatus()
 		frame.decodeFlightId()
+	case 4:
+		frame.decodeFlightStatus()
+		frame.decode13BitAltitudeField()
 	case 5: //DF_5
 		frame.decodeFlightStatus()
 		frame.decodeIdentity(2, 3) // gillham encoded squawk
@@ -129,14 +136,13 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 		frame.decodeICAO()
 		frame.decodeCapability()
 	case 16: //DF_16
-		frame.decodeVSBit()
+		frame.decodeVerticalStatus()
 		frame.decode13BitAltitudeField()
 	case 17: //DF_17
 		frame.decodeICAO()
 		frame.decodeCapability()
 		frame.decodeDF17()
 	case 18: //DF_18
-		frame.decodeICAO()
 		frame.decodeCapability() // control field
 		if 0 == frame.capability {
 			frame.decodeICAO()
@@ -145,9 +151,11 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	case 20: //DF_20
 		frame.decodeFlightStatus()
 		frame.decode13BitAltitudeField()
+		frame.decodeCommB()
 	case 21: //DF_21
 		frame.decodeFlightStatus()
 		frame.decodeIdentity(2, 3) // gillham encoded squawk
+		frame.decodeCommB()
 	}
 
 	return frame, err
@@ -202,33 +210,41 @@ func (f *Frame) parseRawToMessage() error {
 
 func (f *Frame) decodeCapability() {
 	f.capability = f.message[0] & 7
+
+	switch f.capability {
+	case 4:
+		f.onGround = true
+	default:
+		f.onGround = false
+	}
 }
 
 func (f *Frame) decodeFlightStatus() {
 	// first 5 bits are the downlink format
 	// bits 5,6,7 are the flight status
 	f.flightStatus = int(f.message[0] & 7)
+	if f.flightStatus == 0 || f.flightStatus == 2 {
+		f.onGround = false
+	}
+	if f.flightStatus == 1 || f.flightStatus == 3 {
+		f.onGround = true
+	}
+	if f.flightStatus == 4 || f.flightStatus == 5 {
+		// special pos
+		f.onGround = false // assume in the air
+		f.special = flightStatusTable[f.flightStatus]
+	}
+	if f.flightStatus == 2 || f.flightStatus == 3 || f.flightStatus == 4 {
+		// ALERT!
+		f.alert = true
+	}
 }
 
 // VS == Vertical Status
-func (f *Frame) decodeVSBit() {
-	// f.message[0] & 4 // VS bit
-}
-
-func (f *Frame) decodeFlightId() {
-	if (f.message[4] == 32) {
-		// Aircraft Identification
-
-		f.flightId[0] = aisCharset[f.message[5] >> 2]
-		f.flightId[1] = aisCharset[((f.message[5] & 3) << 4) | (f.message[6] >> 4)]
-		f.flightId[2] = aisCharset[((f.message[6] & 15) << 2) | (f.message[7] >> 6)]
-		f.flightId[3] = aisCharset[f.message[7] & 63]
-		f.flightId[4] = aisCharset[f.message[8] >> 2]
-		f.flightId[5] = aisCharset[((f.message[8] & 3) << 4) | (f.message[9] >> 4)]
-		f.flightId[6] = aisCharset[((f.message[9] & 15) << 2) | (f.message[10] >> 6)]
-		f.flightId[7] = aisCharset[f.message[10] & 63]
+func (f *Frame) decodeVerticalStatus() {
+	if f.message[0] & 4 != 0 {
+		f.onGround = true
 	}
-
 }
 
 //func (f *Frame) decodeDF4_5_20_21() error {
@@ -382,6 +398,33 @@ func (f *Frame) decodeModeSChecksum() {
 
 	f.crc = (a << 16) | (b << 8) | c
 
+}
+
+func (f *Frame) decodeFlightNumber() {
+	f.flight = make([]byte, 8)
+	f.aircraftType = int(f.messageType) - 1
+	f.flight[0] = aisCharset[f.message[5] >> 2]
+	f.flight[1] = aisCharset[((f.message[5] & 3) << 4) | (f.message[6] >> 4)]
+	f.flight[2] = aisCharset[((f.message[6] & 15) << 2) | (f.message[7] >> 6)]
+	f.flight[3] = aisCharset[f.message[7] & 63]
+	f.flight[4] = aisCharset[f.message[8] >> 2]
+	f.flight[5] = aisCharset[((f.message[8] & 3) << 4) | (f.message[9] >> 4)]
+	f.flight[6] = aisCharset[((f.message[9] & 15) << 2) | (f.message[10] >> 6)]
+	f.flight[7] = aisCharset[f.message[10] & 63]
+}
+
+func (f *Frame) decodeCommB() {
+	if f.message[4] == 0x20 {
+		// BDS 2,0 Aircraft Identification
+		f.decodeFlightNumber()
+	}
+}
+
+func (f *Frame) decodeFlightId() {
+	if f.message[4] == 32 && len(f.message) >= 10 {
+		// Aircraft Identification
+		f.decodeFlightNumber()
+	}
 }
 
 

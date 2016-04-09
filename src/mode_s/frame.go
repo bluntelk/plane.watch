@@ -21,10 +21,10 @@ type Position struct {
 	northSouthDirection int     /* 0 = North, 1 = South. */
 	northSouthVelocity  int     /* N/S velocity. */
 	verticalRateSource  int     /* Vertical rate source. */
-	verticalRateSign    int     /* Vertical rate sign. */
 	verticalRate        int     /* Vertical rate. */
 	velocity            float64 /* Computed from EW and NS velocity. */
 	unit                int
+	onGround            bool    /* VS Bit */
 }
 
 type df11 struct {
@@ -40,7 +40,7 @@ type df17 struct {
 	messageType    byte   // DF17 Extended Squitter Message Type
 	messageSubType byte   // DF17 Extended Squitter Message Sub Type
 
-	headingIsValid int
+	//headingIsValid int
 	heading        float64
 	aircraftType   int
 	cprFlagOddEven int    /* 1 = Odd, 0 = Even CPR message. */
@@ -62,7 +62,8 @@ type Frame struct {
 	crc, checkSum  uint32
 	identity       uint32
 	flightId       []byte
-
+	special        string
+	alert          bool
 						// if we have trouble decoding our frame, the message ends up here
 	err            error
 }
@@ -150,10 +151,20 @@ func (f *Frame) VerticalRate() int {
 }
 
 func (f *Frame) Flight() string {
-	return string(f.flightId)
+	flight := string(f.flightId)
+	if "" == flight {
+		flight = "??????"
+	}
+	return flight
 }
 
 func (f *Frame) SquawkIdentity() uint32 {
 	return f.identity
 }
 
+func (f *Frame) OnGround() bool {
+	return f.onGround
+}
+func (f *Frame) Alert() bool {
+	return f.alert
+}

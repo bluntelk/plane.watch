@@ -14,6 +14,7 @@ const (
 	DF17_FRAME_AIR_VELOCITY = "Airborne Velocity"
 	DF17_FRAME_AIR_POS_GNSS = "Airborne Position (with GNSS Height)"
 	DF17_FRAME_TEST_MSG = "Test Message"
+	DF17_FRAME_TEST_MSG_SQUAWK = "Test Message with Squawk"
 	DF17_FRAME_SURFACE_SYS_STATUS = "Surface System Status"
 	DF17_FRAME_EXT_SQUIT_EMERG = "Extended Squitter Aircraft Status (Emergency)"
 	DF17_FRAME_EXT_SQUIT_STATUS = "Extended Squitter Aircraft Status (1090ES TCAS RA)"
@@ -22,7 +23,7 @@ const (
 )
 
 func (df *Frame) MessageTypeString() string {
-	var name string
+	var name string = "Unknown"
 	if df.messageType >= 1 && df.messageType <= 4 {
 		name = DF17_FRAME_ID_CAT
 	} else if df.messageType >= 5 && df.messageType <= 8 {
@@ -33,8 +34,12 @@ func (df *Frame) MessageTypeString() string {
 		name = DF17_FRAME_AIR_VELOCITY
 	} else if df.messageType >= 20 && df.messageType <= 22 {
 		name = DF17_FRAME_AIR_POS_GNSS
-	} else if df.messageType == 23 && df.messageSubType == 0 {
-		name = DF17_FRAME_TEST_MSG
+	} else if df.messageType == 23 {
+		if df.messageSubType == 7 {
+			name = DF17_FRAME_TEST_MSG_SQUAWK
+		} else {
+			name = DF17_FRAME_TEST_MSG
+		}
 	} else if df.messageType == 24 && df.messageSubType == 1 {
 		name = DF17_FRAME_SURFACE_SYS_STATUS
 	} else if df.messageType == 28 && df.messageSubType == 1 {
@@ -61,22 +66,13 @@ func (f *Frame) decodeDF17() {
 
 	if f.messageType >= 1 && f.messageType <= 4 {
 		/* Aircraft Identification and Category */
-		f.flight = make([]byte, 8)
-		f.aircraftType = int(f.messageType) - 1
-		f.flight[0] = aisCharset[f.message[5] >> 2]
-		f.flight[1] = aisCharset[((f.message[5] & 3) << 4) | (f.message[6] >> 4)]
-		f.flight[2] = aisCharset[((f.message[6] & 15) << 2) | (f.message[7] >> 6)]
-		f.flight[3] = aisCharset[f.message[7] & 63]
-		f.flight[4] = aisCharset[f.message[8] >> 2]
-		f.flight[5] = aisCharset[((f.message[8] & 3) << 4) | (f.message[9] >> 4)]
-		f.flight[6] = aisCharset[((f.message[9] & 15) << 2) | (f.message[10] >> 6)]
-		f.flight[7] = aisCharset[f.message[10] & 63]
-
+		f.decodeFlightNumber()
 	} else if f.messageType >= 5 && f.messageType <= 8 {
 		// surface position
 		movement := uint64(((f.message[4] << 4) | (f.message[5] >> 4)) & 0x007F)
 		if (movement > 0) && (movement < 125) {
 			f.velocity = decodeMovementField(movement)
+			f.onGround = true
 		}
 
 		if f.message[5] & 0x08 != 0 {
@@ -100,16 +96,27 @@ func (f *Frame) decodeDF17() {
 
 	} else if f.messageType == 19 && f.messageSubType >= 1 && f.messageSubType <= 4 {
 		/* Airborne Velocity Message */
+		if f.messageSubType >= 1 && f.messageSubType <= 4 {
+			var verticalRateSign int = int((f.message[8] & 0x8) >> 3)
+			f.verticalRate = int(((f.message[8] & 7) << 6) | ((f.message[9] & 0xfc) >> 2))
+			if f.verticalRate != 0 {
+				f.verticalRate--
+				if verticalRateSign != 0 {
+					f.verticalRate = 0 - f.verticalRate
+				}
+				f.verticalRate = f.verticalRate * 64
+			}
+
+		}
 		if f.messageSubType == 1 || f.messageSubType == 2 {
 			f.eastWestDirection = int((f.message[5] & 4) >> 2)
 			f.eastWestVelocity = int(((f.message[5] & 3) << 8) | f.message[6])
 			f.northSouthDirection = int((f.message[7] & 0x80) >> 7)
 			f.northSouthVelocity = int(((f.message[7] & 0x7f) << 3) | ((f.message[8] & 0xe0) >> 5))
 			f.verticalRateSource = int((f.message[8] & 0x10) >> 4)
-			f.verticalRateSign = int((f.message[8] & 0x8) >> 3)
-			f.verticalRate = int(((f.message[8] & 7) << 6) | ((f.message[9] & 0xfc) >> 2))
 			/* Compute velocity and angle from the two speed components. */
-			f.velocity = math.Sqrt(float64(f.northSouthVelocity * f.northSouthVelocity + f.eastWestVelocity * f.eastWestVelocity))
+
+			f.velocity = math.Sqrt(float64((f.northSouthVelocity * f.northSouthVelocity) + (f.eastWestVelocity * f.eastWestVelocity)))
 			if f.velocity != 0 {
 				var ewv float64 = float64(f.eastWestVelocity)
 				var nsv float64 = float64(f.northSouthVelocity)
@@ -131,9 +138,23 @@ func (f *Frame) decodeDF17() {
 				f.heading = 0
 			}
 		} else if f.messageSubType == 3 || f.messageSubType == 4 {
-			f.headingIsValid = int(f.message[5] & (1 << 2))
-			f.heading = (360.0 / 128.0) * float64(((f.message[5] & 3) << 5) | (f.message[6] >> 3))
+			var airspeed int = int(((f.message[7] & 0x7f) << 3) | (f.message[8] >> 5));
+			if airspeed != 0 {
+				airspeed--;
+				if f.messageSubType == 4 {
+					// If (supersonic) unit is 4 kts
+					airspeed = airspeed << 2;
+				}
+				f.velocity = float64(airspeed);
+			}
+
+			if f.message[5] & 4 != 0 {
+				f.heading = (360.0 / 128.0) * float64(((f.message[5] & 3) << 5) | (f.message[6] >> 3))
+			}
 		}
+	} else if f.messageType == 23 && f.messageSubType == 7 {
+		// TEST MESSAGE with  squawk - decode it!
+		f.decodeIdentity(5, 6)
 	} else if f.messageType == 28 && f.messageSubType == 1 {
 		// EMERGENCY, EMERGENCY, THERE'S AN EMERGENCY GOING ON
 		f.decodeIdentity(5, 6)
@@ -149,6 +170,6 @@ func (df *Frame) IsEven() bool {
 	return df.cprFlagOddEven == 0
 }
 
-func (df *Frame) GetFlight() string {
+func (df *Frame) FlightNumber() string {
 	return string(df.flight)
 }
