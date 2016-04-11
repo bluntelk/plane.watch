@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mode_s"
 	"os"
+	"time"
 )
 
 func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
@@ -25,12 +26,14 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		// grab the altitude
 		plane.Location.Altitude = frame.Altitude()
 		plane.Location.onGround = frame.OnGround()
+		plane.Location.TimeStamp = time.Now()
 		log.Printf(planeFormat + " is at %d %s \033[0m", plane.Location.Altitude, plane.Location.AltitudeUnits)
 		hasChanged = true
 
 	case 1, 2, 3:
 		hasChanged = true
 		plane.Location.onGround = frame.OnGround()
+		plane.Location.TimeStamp = time.Now()
 		if frame.Alert() {
 			plane.Special = "Alert"
 		}
@@ -46,6 +49,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		plane.Location.Altitude = frame.Altitude()
 		plane.Location.onGround = false
 		plane.Location.AltitudeUnits = frame.AltitudeUnits()
+		plane.Location.TimeStamp = time.Now()
 		plane.Flight.Status = frame.FlightStatusString()
 		plane.Flight.StatusId = frame.FlightStatusInt()
 		if 5 == frame.DownLinkType() || 21 == frame.DownLinkType() {
@@ -59,6 +63,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		hasChanged = true
 		plane.Location.Altitude = frame.Altitude()
 		plane.Location.onGround = frame.OnGround()
+		plane.Location.TimeStamp = time.Now()
 
 	case 17, 18: // ADS-B
 		if debug {
@@ -81,6 +86,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				plane.Location.Velocity = frame.Velocity()
 				plane.Location.onGround = true
 				plane.Location.hasHeading = true
+				plane.Location.TimeStamp = time.Now()
 
 				log.Printf(planeFormat + " is on the ground and has heading %0.2f and is travelling at %0.2f knots\033[0m", plane.Location.Heading, plane.Location.Velocity)
 				hasChanged = true
@@ -89,6 +95,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		case mode_s.DF17_FRAME_AIR_POS_BARO:// "Airborne Position (with Barometric Altitude)"
 			{
 				plane.Location.onGround = false
+				plane.Location.TimeStamp = time.Now()
 				hasChanged = true
 
 				if frame.IsEven() {
@@ -117,6 +124,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				plane.Location.VerticalRate = frame.VerticalRate()
 				plane.Location.onGround = false
 				plane.Location.hasHeading = true
+				plane.Location.TimeStamp = time.Now()
 				log.Printf(planeFormat + " has heading %0.2f and is travelling at %0.2f knots\033[0m", plane.Location.Heading, plane.Location.Velocity)
 				hasChanged = true
 				break

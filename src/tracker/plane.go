@@ -13,16 +13,16 @@ const (
 
 // meanings: 0 is even frame, 1 is odd frame
 type CprLocation struct {
-	lat0, lat1, lon0, lon1           float64
+	even_lat, odd_lat, even_lon, odd_lon float64
 
-	time0, time1                     time.Time
+	time0, time1                         time.Time
 
 	// working out values
-	rlat0, rlat1, airDLat0, airDLat1 float64
+	rlat0, rlat1, airDLat0, airDLat1     float64
 
-	latitudeIndex                    int32
+	latitudeIndex                        int32
 
-	oddFrame, evenFrame              bool
+	oddFrame, evenFrame                  bool
 }
 
 type PlaneLocation struct {
@@ -52,6 +52,7 @@ type Plane struct {
 	Location        PlaneLocation
 	cprLocation     CprLocation
 	Special         string
+	NumUpdates      int
 }
 
 type PlaneList map[uint32]Plane
@@ -125,7 +126,6 @@ var NLTable = map[int32]float64{
 func init() {
 	planeList = make(PlaneList, 2000)
 }
-// NOT WORKING *cry* Instead of fetching an existing entry in the map, it creates a new one
 func GetPlane(ICAO uint32) Plane {
 	planeAccessMutex.Lock()
 
@@ -147,6 +147,7 @@ func GetPlane(ICAO uint32) Plane {
 func SetPlane(p Plane) {
 	planeAccessMutex.Lock()
 	p.lastSeen = time.Now()
+	p.NumUpdates++
 	delete(planeList, p.IcaoIdentifier)
 	planeList[p.IcaoIdentifier] = p
 	planeAccessMutex.Unlock()
@@ -214,10 +215,11 @@ func (p *Plane) AddLatLong(lat, lon float64) {
 }
 
 func (p *Plane) ZeroCpr() {
-	p.cprLocation.lat0 = 0
-	p.cprLocation.lon0 = 0
-	p.cprLocation.lat1 = 0
-	p.cprLocation.lon1 = 0
+	fmt.Println("ZERO CPR")
+	p.cprLocation.even_lat = 0
+	p.cprLocation.even_lon = 0
+	p.cprLocation.odd_lat = 0
+	p.cprLocation.odd_lon = 0
 	p.cprLocation.rlat0 = 0
 	p.cprLocation.rlat1 = 0
 	p.cprLocation.time0 = time.Unix(0, 0)
@@ -226,24 +228,25 @@ func (p *Plane) ZeroCpr() {
 	p.cprLocation.oddFrame = false
 }
 
-func (p *Plane) SetCprEvenLocation(lat, lon float64, t time.Time) {
+func (p *Plane) SetCprEvenLocation(lat, lon float64, t time.Time) error {
 
 	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
 	if lat > MAX_17_BITS || lat < 0 || lon > MAX_17_BITS || lon < 0 {
-		return
+		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %d,%d",MAX_17_BITS, lat, lon)
 	}
 
-	p.cprLocation.lat0 = lat
-	p.cprLocation.lon0 = lon
+	p.cprLocation.even_lat = lat
+	p.cprLocation.even_lon = lon
 	p.cprLocation.time0 = t
 	p.cprLocation.evenFrame = true
+	return nil
 }
 
-func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) {
+func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) error {
 
 	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
 	if lat > MAX_17_BITS || lat < 0 || lon > MAX_17_BITS || lon < 0 {
-		return
+		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %d,%d",MAX_17_BITS, lat, lon)
 	}
 
 	// only set the odd frame after the even frame is set
@@ -251,10 +254,11 @@ func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) {
 	//	return
 	//}
 
-	p.cprLocation.lat1 = lat
-	p.cprLocation.lon1 = lon
+	p.cprLocation.odd_lat = lat
+	p.cprLocation.odd_lon = lon
 	p.cprLocation.time1 = t
 	p.cprLocation.oddFrame = true
+	return nil
 }
 
 func (p *Plane) DecodeCpr(altitude int32, altitude_units string) error {
@@ -291,13 +295,13 @@ func (cpr *CprLocation) decode() (PlaneLocation, error) {
 	}
 
 	// 1. Compute the latitude index (J):
-	cpr.latitudeIndex = int32((((59 * cpr.lat0) - (60 * cpr.lat1)) / 131072) + 0.5)
+	cpr.latitudeIndex = int32((((59 * cpr.even_lat) - (60 * cpr.odd_lat)) / 131072) + 0.5)
 
 	// 2. Compute the values of rlat0 and rlat1:
 	cpr.airDLat0 = 360 / 60.0
 	cpr.airDLat1 = 360 / 59.0
-	cpr.rlat0 = cpr.airDLat0 * (cprModFunction(cpr.latitudeIndex, 60) + (cpr.lat0 / 131072))
-	cpr.rlat1 = cpr.airDLat1 * (cprModFunction(cpr.latitudeIndex, 59) + (cpr.lat1 / 131072))
+	cpr.rlat0 = cpr.airDLat0 * (cprModFunction(cpr.latitudeIndex, 60) + (cpr.even_lat / 131072))
+	cpr.rlat1 = cpr.airDLat1 * (cprModFunction(cpr.latitudeIndex, 59) + (cpr.odd_lat / 131072))
 
 	// Note: Southern hemisphere values are 270° to 360°. Subtract 360°.
 	if cpr.rlat0 > 270 {
@@ -321,8 +325,9 @@ func (cpr *CprLocation) decode() (PlaneLocation, error) {
 	// this assumes we are using the odd packet to decode
 	/* Compute ni and the longitude index 'm' */
 	ni := cprNFunction(cpr.rlat1, 1)
-	m := math.Floor((((cpr.lon0 * float64(nl1 - 1)) - (cpr.lon1 * float64(nl1))) / 131072.0) + 0.5)
-	loc.Longitude = cprDlonFunction(cpr.rlat1, 1) * (cprModFunction(int32(m), ni) + (cpr.lon1 / 131072))
+	m := math.Floor((((cpr.even_lon * float64(nl1 - 1)) - (cpr.odd_lon * float64(nl1))) / 131072.0) + 0.5)
+
+	loc.Longitude = cprDlonFunction(cpr.rlat1, 1) * (cprModFunction(int32(m), ni) + (cpr.odd_lon / 131072))
 	loc.Latitude = cpr.rlat1
 
 	if loc.Longitude > 180.0 {
@@ -338,7 +343,7 @@ func getNumLongitudeZone(lat float64) int32 {
 		lat = math.Abs(lat)
 	}
 
-	for i := int32(59); i > 2; i-- {
+	for i := int32(59); i >= 2; i-- {
 		// cannot use range, it does not guarantee order
 		if lat < NLTable[i] {
 			return i
@@ -365,7 +370,8 @@ func cprModFunction(a, b int32) float64 {
 	if res < 0 {
 		res += float64(b)
 	}
-	return math.Floor(res)
+	//return math.Floor(res)
+	return res
 }
 
 func (pl *PlaneLocation) SetDirection(heading float64, speed int32) {

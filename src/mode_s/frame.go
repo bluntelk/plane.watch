@@ -6,6 +6,7 @@ package mode_s
 
 import (
 	"time"
+	"strings"
 )
 
 const MODES_UNIT_FEET = 0
@@ -155,7 +156,7 @@ func (f *Frame) Flight() string {
 	if "" == flight {
 		flight = "??????"
 	}
-	return flight
+	return strings.Trim(flight, " ")
 }
 
 func (f *Frame) SquawkIdentity() uint32 {
