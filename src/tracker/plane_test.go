@@ -36,7 +36,7 @@ func TestFunkyLatLon(t *testing.T) {
 }
 
 func TestGetPlane(t *testing.T) {
-	fmt.Println("TestGetPlane")
+	//fmt.Println("TestGetPlane")
 
 	planeListLen := len(planeList)
 	var plane Plane
@@ -54,24 +54,6 @@ func TestGetPlane(t *testing.T) {
 
 	SetPlane(plane)
 
-
-
-	err = plane.SetCprEvenLocation(92095, 39846, time.Now())
-	if nil != err {
-		// there was an error
-		t.Errorf("Unexpected error when decoding CPR: %s", err)
-	}
-
-	if 92095 != plane.cprLocation.even_lat {
-		t.Errorf("Even Lat not recorded properly. expected 92095, got: %0.2f", plane.cprLocation.even_lat)
-	}
-
-	if 39846 != plane.cprLocation.even_lon {
-		t.Errorf("Even Lon not recorded properly. expected 39846, got: %0.2f", plane.cprLocation.even_lon)
-	}
-	SetPlane(plane)
-
-
 	plane = GetPlane(1234)
 	err = plane.SetCprOddLocation(88385, 125818, time.Now())
 	if nil != err {
@@ -86,6 +68,22 @@ func TestGetPlane(t *testing.T) {
 	if 125818 != plane.cprLocation.odd_lon {
 		t.Errorf("Even Lon not recorded properly. expected 125818, got: %0.2f", plane.cprLocation.odd_lon)
 	}
+	SetPlane(plane)
+
+	err = plane.SetCprEvenLocation(92095, 39846, time.Now())
+	if nil != err {
+		// there was an error
+		t.Errorf("Unexpected error when decoding CPR: %s", err)
+	}
+
+	if 92095 != plane.cprLocation.even_lat {
+		t.Errorf("Even Lat not recorded properly. expected 92095, got: %0.2f", plane.cprLocation.even_lat)
+	}
+
+	if 39846 != plane.cprLocation.even_lon {
+		t.Errorf("Even Lon not recorded properly. expected 39846, got: %0.2f", plane.cprLocation.even_lon)
+	}
+
 	SetPlane(plane)
 
 	plane = GetPlane(1234)

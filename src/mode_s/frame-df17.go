@@ -91,6 +91,7 @@ func (f *Frame) decodeDF17() {
 		var msg9 = int(f.message[9])
 		var msg10 = int(f.message[10])
 
+		// CPR LAT/LON
 		f.rawLatitude = ((msg6 & 3) << 15) | (msg7 << 7) | (msg8 >> 1)
 		f.rawLongitude = ((msg8 & 1) << 16) | (msg9 << 8) | msg10
 

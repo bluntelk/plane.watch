@@ -80,7 +80,50 @@ func TestAltitudeDecode(t *testing.T) {
 	if nil != err {
 		t.Error(err)
 	}
-	if 7000 != frame.Altitude() {
-		t.Errorf("Expected an altitude of 7000 feet, got %d", frame.Altitude())
+	if 600 != frame.Altitude() {
+		t.Errorf("Expected an altitude of 600 feet, got %d", frame.Altitude())
+	}
+}
+
+func TestCprDecode(t *testing.T) {
+	type testDataType struct {
+		raw      string
+		icoa     string
+		isEven   bool
+		alt      int32
+		lat, lon string
+	}
+	testData := []testDataType{
+		{raw: "*8d7c4516581f76e48d95e8ab20ca;", icoa:"7c4516", isEven: false, alt:5175, lat:"+0.000000", lon:"+0.000000"},
+		{raw: "*8d7c4516581f6288f83ade534ae1;", icoa:"7c4516", isEven: true, alt:5150, lat:"-32.197449", lon:"+116.027820"},
+
+		{raw: "*8d7c4516580f06fc6d8f25d8669d;", icoa:"7c4516", isEven: false, alt:1800, lat:"-32.055219", lon:"+115.931602"},
+		{raw: "*8d7c4516580df2a168340b32212a;", icoa:"7c4516", isEven: true, alt:1775, lat:"-32.054260", lon:"+115.931854"},
+	}
+
+	for i, d := range testData {
+		frame, err := mode_s.DecodeString(d.raw, time.Now())
+		if nil != err {
+			t.Error(err)
+		}
+		plane := tracker.HandleModeSFrame(frame, false)
+
+		if nil == plane {
+			t.Errorf("Plane data should have been updated")
+		}
+
+		if plane.Location.Altitude != d.alt {
+			t.Errorf("Plane Altitude is wrong for packet %d: should be %d, was %d", i, d.alt, plane.Location.Altitude)
+		}
+
+		lat := fmt.Sprintf("%+0.6f", plane.Location.Latitude);
+		lon := fmt.Sprintf("%+0.6f", plane.Location.Longitude);
+
+		if lat != d.lat {
+			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.lat, lat)
+		}
+		if lon != d.lon {
+			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.lon, lon)
+		}
 	}
 }

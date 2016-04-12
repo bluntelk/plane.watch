@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 	"sync"
+	//"log"
 )
 
 const (
@@ -215,7 +216,6 @@ func (p *Plane) AddLatLong(lat, lon float64) {
 }
 
 func (p *Plane) ZeroCpr() {
-	fmt.Println("ZERO CPR")
 	p.cprLocation.even_lat = 0
 	p.cprLocation.even_lon = 0
 	p.cprLocation.odd_lat = 0
@@ -276,7 +276,7 @@ func (p *Plane) DecodeCpr(altitude int32, altitude_units string) error {
 	p.Location.hasLatLon = true
 	p.AddLatLong(loc.Latitude, loc.Longitude)
 
-	p.ZeroCpr()
+	//p.ZeroCpr()
 	return nil
 }
 
@@ -322,17 +322,35 @@ func (cpr *CprLocation) decode() (PlaneLocation, error) {
 		return loc, fmt.Errorf("Unable to decode this CPR Pair. they are too far apart in time (%s, %s)", cpr.time0.Format(time.RFC822Z), cpr.time1.Format(time.RFC822Z))
 	}
 
-	// this assumes we are using the odd packet to decode
-	/* Compute ni and the longitude index 'm' */
-	ni := cprNFunction(cpr.rlat1, 1)
-	m := math.Floor((((cpr.even_lon * float64(nl1 - 1)) - (cpr.odd_lon * float64(nl1))) / 131072.0) + 0.5)
 
-	loc.Longitude = cprDlonFunction(cpr.rlat1, 1) * (cprModFunction(int32(m), ni) + (cpr.odd_lon / 131072))
-	loc.Latitude = cpr.rlat1
+	if cpr.time1.Before(cpr.time0) {
+		//log.Println("Odd Decode")
+		// this assumes we are using the odd packet to decode
+		/* Compute ni and the longitude index 'm' */
+		ni := cprNFunction(cpr.rlat1, 1)
+		//log.Printf("ni = %d", ni)
+		m := math.Floor((((cpr.even_lon * float64(nl1 - 1)) - (cpr.odd_lon * float64(nl1))) / 131072.0) + 0.5)
+		//log.Printf("m = %0.2f", m)
+
+		loc.Longitude = cprDlonFunction(cpr.rlat1, 1) * (cprModFunction(int32(m), ni) + (cpr.odd_lon / 131072))
+		loc.Latitude = cpr.rlat1
+		//log.Printf("rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
+	} else {
+		// do even decode
+		//log.Println("Even Decode")
+		ni := cprNFunction(cpr.rlat0,0);
+		//log.Printf("ni = %d", ni)
+		m := math.Floor((((cpr.even_lon * float64(nl0-1)) - (cpr.odd_lon * float64(nl0))) / 131072) + 0.5);
+		//log.Printf("m = %0.2f", m)
+		loc.Longitude = cprDlonFunction(cpr.rlat0, 0) * (cprModFunction(int32(m), ni)+cpr.even_lon/131072);
+		loc.Latitude = cpr.rlat0;
+		//log.Printf("rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
+	}
 
 	if loc.Longitude > 180.0 {
 		loc.Longitude -= 180.0
 	}
+	//log.Printf("post normalise rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
 
 	return loc, nil
 }

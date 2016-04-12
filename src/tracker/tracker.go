@@ -6,7 +6,16 @@ import (
 	"mode_s"
 	"os"
 	"time"
+	"io"
 )
+
+func SetDebugOutput(out io.Writer) {
+	log.SetOutput(out)
+}
+
+func init() {
+	SetDebugOutput(os.Stdout)
+}
 
 func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 	//		frame.Describe(output)
@@ -28,6 +37,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		plane.Location.onGround = frame.OnGround()
 		plane.Location.TimeStamp = time.Now()
 		log.Printf(planeFormat + " is at %d %s \033[0m", plane.Location.Altitude, plane.Location.AltitudeUnits)
+
 		hasChanged = true
 
 	case 1, 2, 3:

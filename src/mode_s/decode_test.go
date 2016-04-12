@@ -36,7 +36,8 @@ func TestDecodeString_DF17_EVEN_LAT(t *testing.T) {
 		t.Errorf("Downlink format not correct. expected 17, got %d", frame.downLinkFormat)
 	}
 
-	if 7700555 != frame.icao { // 0x75804B
+	if 7700555 != frame.icao {
+		// 0x75804B
 		t.Errorf("Failed to decode ICAO address correctly, expected 7700555, got: %d", frame.icao)
 	}
 
@@ -92,7 +93,8 @@ func TestDecodeString_DF17_ODD_LAT(t *testing.T) {
 		t.Errorf("Downlink format not correct. expected 17, got %d", frame.downLinkFormat)
 	}
 
-	if 7700555 != frame.icao { // 0x75804B
+	if 7700555 != frame.icao {
+		// 0x75804B
 		t.Errorf("Failed to decode ICAO address correctly, expected 7700555, got: %d", frame.icao)
 	}
 
@@ -177,7 +179,7 @@ type tIcaoMessage struct {
 
 func TestIcaoDecode(t *testing.T) {
 	valid := []tIcaoMessage{
-		{"@00141275CC0A000014a0a20605;", "000000", "DF0"},  // make sure we get a 0 value if we do not know this plane yet
+		{"@00141275CC0A000014a0a20605;", "000000", "DF0"}, // make sure we get a 0 value if we do not know this plane yet
 		{"@0014191B25325d7c2f75b6b2cb;", "7c2f75", "DF11"}, // DF11 has an ICAO address field that we remember
 		{"@00141275CC0A000014a0a20605;", "000000", "DF0"},
 		{"@0014195109D8200010a21a4a41;", "000000", "DF4"},
@@ -198,6 +200,42 @@ func TestIcaoDecode(t *testing.T) {
 		decodedIcao := fmt.Sprintf("%06x", frame.ICAOAddr())
 		if sut.expectedIcao != decodedIcao {
 			t.Errorf("%s: Bad ICAO Decode: expected %s != %s actual", sut.df, sut.expectedIcao, decodedIcao)
+		}
+	}
+}
+
+func TestCprDecode(t *testing.T) {
+	type testDataType struct {
+		raw    string
+		icoa   string
+		isEven bool
+		alt    int32
+		raw_lat, raw_lon int
+	}
+	testData := []testDataType{
+		{raw: "*8d7c4516581f76e48d95e8ab20ca;", icoa:"7c4516", isEven: false, alt:5175, raw_lat:94790, raw_lon:103912},
+		{raw: "*8d7c4516581f6288f83ade534ae1;", icoa:"7c4516", isEven: true, alt:5150, raw_lat:83068, raw_lon:15070},
+
+		{raw: "*8d7c4516580f06fc6d8f25d8669d;", icoa:"7c4516", isEven: false, alt:1800, raw_lat:97846, raw_lon:102181},
+		{raw: "*8d7c4516580df2a168340b32212a;", icoa:"7c4516", isEven: true, alt:1775, raw_lat:86196, raw_lon:13323},
+	}
+
+	for i, d := range testData {
+		frame, err := DecodeString(d.raw, time.Now());
+		if nil != err {
+			t.Error(err)
+		}
+		if frame.IsEven() != d.isEven {
+			t.Errorf("Failed to decode %d DF17/11 CPR Even/Odd. Should be %t, but is %t", i, d.isEven, frame.IsEven())
+		}
+		if frame.altitude != d.alt {
+			t.Errorf("Failed to decode %d DF17/11 Alt. Should be %d, but is %d", i, d.alt, frame.altitude)
+		}
+		if frame.rawLatitude != d.raw_lat {
+			t.Errorf("Failed to decode %d DF17/11 CPR Lat. Should be %d, but is %d", i, d.raw_lat, frame.rawLatitude)
+		}
+		if frame.rawLongitude != d.raw_lon {
+			t.Errorf("Failed to decode %d DF17/11 CPR Lat. Should be %d, but is %d", i, d.raw_lon, frame.rawLongitude)
 		}
 	}
 }

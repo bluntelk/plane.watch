@@ -14,7 +14,6 @@ const MODES_UNIT_METRES = 1
 
 type Position struct {
 	altitude            int32
-	lat, lon            int
 	rawLatitude         int     /* Non decoded latitude */
 	rawLongitude        int     /* Non decoded longitude */
 	eastWestDirection   int     /* 0 = East, 1 = West. */
