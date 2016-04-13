@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 	"sync"
-	//"log"
+//"log"
 )
 
 const (
@@ -232,7 +232,7 @@ func (p *Plane) SetCprEvenLocation(lat, lon float64, t time.Time) error {
 
 	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
 	if lat > MAX_17_BITS || lat < 0 || lon > MAX_17_BITS || lon < 0 {
-		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %d,%d",MAX_17_BITS, lat, lon)
+		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %d,%d", MAX_17_BITS, lat, lon)
 	}
 
 	p.cprLocation.even_lat = lat
@@ -246,7 +246,7 @@ func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) error {
 
 	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
 	if lat > MAX_17_BITS || lat < 0 || lon > MAX_17_BITS || lon < 0 {
-		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %d,%d",MAX_17_BITS, lat, lon)
+		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %d,%d", MAX_17_BITS, lat, lon)
 	}
 
 	// only set the odd frame after the even frame is set
@@ -295,13 +295,14 @@ func (cpr *CprLocation) decode() (PlaneLocation, error) {
 	}
 
 	// 1. Compute the latitude index (J):
-	cpr.latitudeIndex = int32((((59 * cpr.even_lat) - (60 * cpr.odd_lat)) / 131072) + 0.5)
+	cpr.latitudeIndex = int32(math.Floor((((59 * cpr.even_lat) - (60 * cpr.odd_lat)) / 131072) + 0.5))
 
 	// 2. Compute the values of rlat0 and rlat1:
 	cpr.airDLat0 = 360 / 60.0
 	cpr.airDLat1 = 360 / 59.0
 	cpr.rlat0 = cpr.airDLat0 * (cprModFunction(cpr.latitudeIndex, 60) + (cpr.even_lat / 131072))
 	cpr.rlat1 = cpr.airDLat1 * (cprModFunction(cpr.latitudeIndex, 59) + (cpr.odd_lat / 131072))
+	//log.Printf("j=%d rlat0=%0.6f rlat1=%0.6f", cpr.latitudeIndex, cpr.rlat0, cpr.rlat1)
 
 	// Note: Southern hemisphere values are 270° to 360°. Subtract 360°.
 	if cpr.rlat0 > 270 {
@@ -322,29 +323,28 @@ func (cpr *CprLocation) decode() (PlaneLocation, error) {
 		return loc, fmt.Errorf("Unable to decode this CPR Pair. they are too far apart in time (%s, %s)", cpr.time0.Format(time.RFC822Z), cpr.time1.Format(time.RFC822Z))
 	}
 
-
 	if cpr.time1.Before(cpr.time0) {
 		//log.Println("Odd Decode")
 		// this assumes we are using the odd packet to decode
 		/* Compute ni and the longitude index 'm' */
 		ni := cprNFunction(cpr.rlat1, 1)
-		//log.Printf("ni = %d", ni)
+		//log.Printf("	ni = %d", ni)
 		m := math.Floor((((cpr.even_lon * float64(nl1 - 1)) - (cpr.odd_lon * float64(nl1))) / 131072.0) + 0.5)
-		//log.Printf("m = %0.2f", m)
+		//log.Printf("	m = %0.2f", m)
 
 		loc.Longitude = cprDlonFunction(cpr.rlat1, 1) * (cprModFunction(int32(m), ni) + (cpr.odd_lon / 131072))
 		loc.Latitude = cpr.rlat1
-		//log.Printf("rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
+		//log.Printf("	rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
 	} else {
 		// do even decode
 		//log.Println("Even Decode")
-		ni := cprNFunction(cpr.rlat0,0);
-		//log.Printf("ni = %d", ni)
-		m := math.Floor((((cpr.even_lon * float64(nl0-1)) - (cpr.odd_lon * float64(nl0))) / 131072) + 0.5);
-		//log.Printf("m = %0.2f", m)
-		loc.Longitude = cprDlonFunction(cpr.rlat0, 0) * (cprModFunction(int32(m), ni)+cpr.even_lon/131072);
+		ni := cprNFunction(cpr.rlat0, 0);
+		//log.Printf("	ni = %d", ni)
+		m := math.Floor((((cpr.even_lon * float64(nl0 - 1)) - (cpr.odd_lon * float64(nl0))) / 131072) + 0.5);
+		//log.Printf("	m = %0.2f", m)
+		loc.Longitude = cprDlonFunction(cpr.rlat0, 0) * (cprModFunction(int32(m), ni) + cpr.even_lon / 131072);
 		loc.Latitude = cpr.rlat0;
-		//log.Printf("rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
+		//log.Printf("	rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
 	}
 
 	if loc.Longitude > 180.0 {

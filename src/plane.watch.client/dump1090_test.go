@@ -6,6 +6,7 @@ import (
 	"time"
 	"tracker"
 	"fmt"
+	"os"
 )
 
 func TestTracking(t *testing.T) {
@@ -20,13 +21,13 @@ func TestTracking(t *testing.T) {
 		t.Error("Plane should be at 38000 feet")
 	}
 
-	lat := "+52.2657801741261"
-	lon := "+3.9389125279018";
+	lat := "+52.2572021484375"
+	lon := "+3.9193725585938";
 	if lon != fmt.Sprintf("%+03.13f", plane.Location.Longitude) {
-		t.Errorf("Longitude Calculation was incorrect: expected %s, got %0.12f", lon, plane.Location.Longitude)
+		t.Errorf("Longitude Calculation was incorrect: expected %s, got %+0.13f", lon, plane.Location.Longitude)
 	}
 	if lat != fmt.Sprintf("%+03.13f", plane.Location.Latitude) {
-		t.Errorf("Latitude Calculation was incorrect: expected %s, got %0.13f", lat, plane.Location.Latitude)
+		t.Errorf("Latitude Calculation was incorrect: expected %s, got %+0.13f", lat, plane.Location.Latitude)
 	}
 }
 
@@ -66,12 +67,14 @@ func TestTracking2(t *testing.T) {
 }
 
 func performTrackingTest(frames []string, t *testing.T) {
+	f, _ := os.Open(os.DevNull)
+	tracker.SetDebugOutput(f)
 	for _, msg := range frames {
 		frame, err := mode_s.DecodeString(msg, time.Now())
 		if nil != err {
 			t.Errorf("%s", err)
 		}
-		tracker.HandleModeSFrame(frame, true)
+		tracker.HandleModeSFrame(frame, false)
 	}
 }
 
@@ -95,13 +98,14 @@ func TestCprDecode(t *testing.T) {
 	}
 	testData := []testDataType{
 		{raw: "*8d7c4516581f76e48d95e8ab20ca;", icoa:"7c4516", isEven: false, alt:5175, lat:"+0.000000", lon:"+0.000000"},
-		{raw: "*8d7c4516581f6288f83ade534ae1;", icoa:"7c4516", isEven: true, alt:5150, lat:"-32.197449", lon:"+116.027820"},
+		{raw: "*8d7c4516581f6288f83ade534ae1;", icoa:"7c4516", isEven: true, alt:5150, lat:"-32.197483", lon:"+116.028629"},
 
-		{raw: "*8d7c4516580f06fc6d8f25d8669d;", icoa:"7c4516", isEven: false, alt:1800, lat:"-32.055219", lon:"+115.931602"},
-		{raw: "*8d7c4516580df2a168340b32212a;", icoa:"7c4516", isEven: true, alt:1775, lat:"-32.054260", lon:"+115.931854"},
+		//{raw: "*8d7c4516580f06fc6d8f25d8669d;", icoa:"7c4516", isEven: false, alt:1800, lat:"-0.000000", lon:"+0.000000"},
+		//{raw: "*8d7c4516580df2a168340b32212a;", icoa:"7c4516", isEven: true, alt:1775, lat:"-32.054260", lon:"+115.931854"},
 	}
 
 	for i, d := range testData {
+		time.Sleep(1)
 		frame, err := mode_s.DecodeString(d.raw, time.Now())
 		if nil != err {
 			t.Error(err)
@@ -120,10 +124,10 @@ func TestCprDecode(t *testing.T) {
 		lon := fmt.Sprintf("%+0.6f", plane.Location.Longitude);
 
 		if lat != d.lat {
-			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.lat, lat)
+			t.Errorf("Plane Latitude is wrong for packet %d: should be %s was %s", i, d.lat, lat)
 		}
 		if lon != d.lon {
-			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.lon, lon)
+			t.Errorf("Plane Latitude is wrong for packet %d: should be %s was %s", i, d.lon, lon)
 		}
 	}
 }

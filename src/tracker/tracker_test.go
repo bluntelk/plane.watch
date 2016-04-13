@@ -27,10 +27,10 @@ func TestCprDecode(t *testing.T) {
 	}
 	testData := []testDataType{
 		//odd *8d7c4516581f76e48d95e8ab20ca; even *8d7c4516581f6288f83ade534ae1;
-		//{even_lat:83068, even_lon:15070, odd_lat:94790, odd_lon:103912, even_rlat:"-32.197483", even_rlon:"+116.028629", odd_rlat:"-32.197449", odd_rlon:"+116.027820"},
+		{even_lat:83068, even_lon:15070, odd_lat:94790, odd_lon:103912, odd_rlat:"-32.197483", odd_rlon:"+116.028629", even_rlat:"-32.197449", even_rlon:"+116.027820"},
 
 		// odd *8d7c4516580f06fc6d8f25d8669d; even *8d7c4516580df2a168340b32212a;
-		{even_lat:86196, even_lon:13323, odd_lat:97846, odd_lon:102181, even_rlat:"-32.055219", even_rlon:"+115.931602", odd_rlat:"-32.054260", odd_rlon:"+115.931854"},
+		{even_lat:86196, even_lon:13323, odd_lat:97846, odd_lon:102181, odd_rlat:"-32.055219", odd_rlon:"+115.931602", even_rlat:"-32.054260", even_rlon:"+115.931854"},
 
 		// test data from cprtest.c from mutability dump1090
 		{even_lat:80536, even_lon:9432, odd_lat:61720, odd_lon:9192, even_rlat:"+51.686646", even_rlon:"+0.700156", odd_rlat:"+51.686763", odd_rlon:"+0.701294"},
