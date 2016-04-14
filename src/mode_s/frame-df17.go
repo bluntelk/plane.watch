@@ -155,10 +155,13 @@ func (f *Frame) decodeDF17() {
 		}
 	} else if f.messageType == 23 && f.messageSubType == 7 {
 		// TEST MESSAGE with  squawk - decode it!
-		f.decodeIdentity(5, 6)
+		f.decodeSquawkIdentity(5, 6)
 	} else if f.messageType == 28 && f.messageSubType == 1 {
 		// EMERGENCY, EMERGENCY, THERE'S AN EMERGENCY GOING ON
-		f.decodeIdentity(5, 6)
+		f.decodeSquawkIdentity(5, 6)
+		f.alert = true
+		var emergencyId int = int((f.message[5] & 0xE0) >> 5)
+		f.special = emergencyStateTable[emergencyId]
 	}
 }
 

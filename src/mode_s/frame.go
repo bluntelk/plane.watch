@@ -40,7 +40,7 @@ type df17 struct {
 	messageType    byte   // DF17 Extended Squitter Message Type
 	messageSubType byte   // DF17 Extended Squitter Message Sub Type
 
-	//headingIsValid int
+						  //headingIsValid int
 	heading        float64
 	aircraftType   int
 	cprFlagOddEven int    /* 1 = Odd, 0 = Even CPR message. */
@@ -104,6 +104,17 @@ var flightStatusTable = map[int]string{
 	6: "Value 6 is not assigned",
 	7: "Value 7 is not assigned",
 }
+
+var emergencyStateTable = map[int]string{
+	0:  "No emergency",
+	1:  "General emergency (squawk 7700)",
+	2:  "Lifeguard/Medical",
+	3:  "Minimum fuel",
+	4:  "No communications (squawk 7600)",
+	5:  "Unlawful interference (squawk 7500)",
+	6:  "Reserved",
+	7:  "Reserved",
+};
 
 var aisCharset string = "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456789??????"
 

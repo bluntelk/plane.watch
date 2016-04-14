@@ -131,7 +131,7 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 		frame.decode13BitAltitudeField()
 	case 5: //DF_5
 		frame.decodeFlightStatus()
-		frame.decodeIdentity(2, 3) // gillham encoded squawk
+		frame.decodeSquawkIdentity(2, 3) // gillham encoded squawk
 	case 11: //DF_11
 		frame.decodeICAO()
 		frame.decodeCapability()
@@ -154,7 +154,7 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 		frame.decodeCommB()
 	case 21: //DF_21
 		frame.decodeFlightStatus()
-		frame.decodeIdentity(2, 3) // gillham encoded squawk
+		frame.decodeSquawkIdentity(2, 3) // gillham encoded squawk
 		frame.decodeCommB()
 	}
 
@@ -269,7 +269,7 @@ func (f *Frame) decodeICAO() {
 	}
 }
 
-func (f *Frame) decodeIdentity(byte1, byte2 int) {
+func (f *Frame) decodeSquawkIdentity(byte1, byte2 int) {
 	var a, b, c, d uint32
 	var msg2, msg3 uint32
 
@@ -285,7 +285,7 @@ func (f *Frame) decodeIdentity(byte1, byte2 int) {
 	* from 0 to 7.
 	*
 	* The actual meaning is just 4 octal numbers, but we convert it
-	* into a base ten number tha happens to represent the four
+	* into a base ten number that happens to represent the four
 	* octal numbers.
 	*
 	* For more info: http://en.wikipedia.org/wiki/Gillham_code */
