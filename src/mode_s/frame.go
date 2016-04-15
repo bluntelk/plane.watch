@@ -80,6 +80,7 @@ var downlinkFormatTable = map[byte]string{
 	20: "Airborne position, GNSS HAE",
 	21: "Roll Call Reply - Identity",
 	22: "Military",
+	24: "Comm. D Extended Length Message (ELM)",
 }
 
 // DownLink Format Sub Type Capability CA

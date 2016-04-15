@@ -103,7 +103,7 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	// get the down link format (DF) - first 5 bits
 	frame.downLinkFormat = frame.message[0] >> 3
 
-	frame.decodeModeSChecksum()
+	//frame.decodeModeSChecksum()
 
 	if frame.checkSum != frame.crc {
 		// todo: make sure we have the right messages that we can check the crc vs checksum
@@ -355,7 +355,11 @@ func (f *Frame) decode13BitAltitudeField() error {
 }
 
 func (f *Frame) getMessageLengthBits() uint32 {
+	//if f.downLinkFormat & 0x10 != 0 {
 	if f.downLinkFormat & 0x10 != 0 {
+		if len(f.raw) ==14 {
+			return MODES_SHORT_MSG_BITS
+		}
 		return MODES_LONG_MSG_BITS
 	} else {
 		return MODES_SHORT_MSG_BITS

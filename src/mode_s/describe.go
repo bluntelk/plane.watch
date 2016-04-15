@@ -146,18 +146,26 @@ var frameFeatures = map[byte][]featureBreakdown{
 	},
 	17: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "??", start:5, end: 88},
+		{name: "CRC", start:88, end: 112},
 	},
 	18: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "??", start:5, end: 88},
+		{name: "CRC", start:88, end: 112},
 	},
 	19: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
 	},
 	20: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "??", start:5, end: 88},
+		{name: "CRC", start:88, end: 112},
 	},
 	21: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "??", start:5, end: 88},
+		{name: "CRC", start:88, end: 112},
 	},
 	22: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
@@ -179,6 +187,8 @@ var frameFeatures = map[byte][]featureBreakdown{
 	},
 	28: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "??", start:5, end: 32},
+		{name: "CRC", start:32, end: 56},
 	},
 	29: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
