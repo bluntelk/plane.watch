@@ -73,6 +73,7 @@ func (f *Frame) decodeDF17() {
 		if (movement > 0) && (movement < 125) {
 			f.velocity = decodeMovementField(movement)
 			f.onGround = true
+			f.validVerticalStatus = true
 		}
 
 		if f.message[5] & 0x08 != 0 {
@@ -84,6 +85,8 @@ func (f *Frame) decodeDF17() {
 		f.cprFlagOddEven = int(f.message[6] & 4) >> 2
 		f.timeFlag = int(f.message[6] & (1 << 3))
 		f.decodeAC12AltitudeField() // decode altitude and unit
+		f.onGround = false
+		f.validVerticalStatus = true
 
 		var msg6 = int(f.message[6])
 		var msg7 = int(f.message[7])
@@ -97,6 +100,8 @@ func (f *Frame) decodeDF17() {
 
 	} else if f.messageType == 19 && f.messageSubType >= 1 && f.messageSubType <= 4 {
 		/* Airborne Velocity Message */
+		f.onGround = false
+		f.validVerticalStatus = true
 		if f.messageSubType >= 1 && f.messageSubType <= 4 {
 			var verticalRateSign int = int((f.message[8] & 0x8) >> 3)
 			f.verticalRate = int(((f.message[8] & 7) << 6) | ((f.message[9] & 0xfc) >> 2))
@@ -159,8 +164,8 @@ func (f *Frame) decodeDF17() {
 	} else if f.messageType == 28 && f.messageSubType == 1 {
 		// EMERGENCY, EMERGENCY, THERE'S AN EMERGENCY GOING ON
 		f.decodeSquawkIdentity(5, 6)
-		f.alert = true
 		var emergencyId int = int((f.message[5] & 0xE0) >> 5)
+		f.alert = emergencyId != 0
 		f.special = emergencyStateTable[emergencyId]
 	}
 }

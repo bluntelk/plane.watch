@@ -28,6 +28,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 
 	plane := GetPlane(icao)
 	planeFormat = fmt.Sprintf("DF%02d - \033[0;97mPlane (\033[38;5;118m%s %-8s\033[0;97m)", frame.DownLinkType(), plane.Icao, plane.Flight.Identifier)
+	plane.MarkFrameTime()
 
 	// determine what to do with our given frame
 	switch frame.DownLinkType() {
@@ -36,7 +37,9 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		plane.Location.Altitude = frame.Altitude()
 		plane.Location.onGround = frame.OnGround()
 		plane.Location.TimeStamp = time.Now()
-		//log.Printf(planeFormat + " is at %d %s \033[0m", plane.Location.Altitude, plane.Location.AltitudeUnits)
+		if debug {
+			log.Printf(planeFormat + " is at %d %s \033[0m", plane.Location.Altitude, plane.Location.AltitudeUnits)
+		}
 
 		hasChanged = true
 
@@ -47,9 +50,16 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		if frame.Alert() {
 			plane.Special = "Alert"
 		}
-	case 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31:
-		//log.Printf(planeFormat + " \033[38;5;52mIgnoring Mode S Frame: %d (%s)\033[0m\n", frame.DownLinkType(), frame.DownLinkFormat())
+	case 6, 7, 8, 9, 10, 12, 13, 14, 15, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31:
+		if debug {
+			log.Printf(planeFormat + " \033[38;5;52mIgnoring Mode S Frame: %d (%s)\033[0m\n", frame.DownLinkType(), frame.DownLinkFormat())
+		}
 		break
+	case 11:
+		if frame.ValidVerticalStatus() {
+			hasChanged = plane.Location.onGround != frame.OnGround()
+			plane.Location.onGround = frame.OnGround()
+		}
 	case 4, 5, 20, 21:
 		hasChanged = true
 		plane.Location.onGround = frame.OnGround()
@@ -66,8 +76,10 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 			plane.SquawkIdentity = frame.SquawkIdentity()
 		}
 		hasChanged = true
-		//log.Printf(planeFormat + " is at %d %s and flight status is: %s. \033[2mMode S Frame: %d \033[0m",
-		//	plane.Location.Altitude, plane.Location.AltitudeUnits, plane.Flight.Status, frame.DownLinkType())
+		if debug {
+			log.Printf(planeFormat + " is at %d %s and flight status is: %s. \033[2mMode S Frame: %d \033[0m",
+				plane.Location.Altitude, plane.Location.AltitudeUnits, plane.Flight.Status, frame.DownLinkType())
+		}
 		break
 	case 16:
 		hasChanged = true
@@ -98,7 +110,9 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				plane.Location.hasHeading = true
 				plane.Location.TimeStamp = time.Now()
 
-				//log.Printf(planeFormat + " is on the ground and has heading %0.2f and is travelling at %0.2f knots\033[0m", plane.Location.Heading, plane.Location.Velocity)
+				if debug {
+					log.Printf(planeFormat + " is on the ground and has heading %0.2f and is travelling at %0.2f knots\033[0m", plane.Location.Heading, plane.Location.Velocity)
+				}
 				hasChanged = true
 				break
 			}
@@ -126,7 +140,9 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				plane.Location.onGround = false
 				plane.Location.hasHeading = true
 				plane.Location.TimeStamp = time.Now()
-				//log.Printf(planeFormat + " has heading %0.2f and is travelling at %0.2f knots\033[0m", plane.Location.Heading, plane.Location.Velocity)
+				if debug {
+					log.Printf(planeFormat + " has heading %0.2f and is travelling at %0.2f knots\033[0m", plane.Location.Heading, plane.Location.Velocity)
+				}
 				hasChanged = true
 				break
 			}
@@ -159,7 +175,9 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 			}
 		case mode_s.DF17_FRAME_EXT_SQUIT_EMERG: //, "Extended Squitter Aircraft Status (Emergency)":
 			{
-				//log.Printf(planeFormat + "\033[2m %s\033[0m", messageType)
+				if debug {
+					log.Printf(planeFormat + "\033[2m %s\033[0m", messageType)
+				}
 				plane.Special = "Emergency"
 				plane.SquawkIdentity = frame.SquawkIdentity()
 				hasChanged = true

@@ -15,6 +15,7 @@ import (
 var (
 	pw_host, pw_user, pw_pass, pw_vHost string
 	pw_port int
+	showDebug bool
 	dump1090_host string
 	dump1090_port string
 )
@@ -76,6 +77,12 @@ func main() {
 			Usage: "The port to read dump1090 from",
 			Destination: &dump1090_port,
 			EnvVar: "DUMP1090_PORT",
+		},
+		cli.BoolFlag{
+			Name: "debug",
+			Usage: "Show Extra Debug Information",
+			Destination: &showDebug,
+			EnvVar: "DEBUG",
 		},
 	}
 
@@ -162,12 +169,14 @@ func run(c *cli.Context) {
 
 	d1090.SetHandler(func(msg string) {
 		var publishError error
-		log.Println("Decoding: ", msg)
+		if showDebug {
+			log.Println("Decoding: ", msg)
+		}
 		frame, err := mode_s.DecodeString(msg, time.Now())
 		if nil != err {
 			log.Println(err)
 		}
-		plane := tracker.HandleModeSFrame(frame, false)
+		plane := tracker.HandleModeSFrame(frame, showDebug)
 
 		if nil != plane {
 			planeJson, _ := json.Marshal(plane);
@@ -176,7 +185,9 @@ func run(c *cli.Context) {
 				ContentType: "application/json",
 				Body: planeJson,
 			}
-			log.Println("Sending message to plane.watch for plane:", plane.Icao)
+			if showDebug {
+				log.Println("Sending message to plane.watch for plane:", plane.Icao)
+			}
 			publishError = rabbit.Publish("planes", plane.Icao, msg)
 			if nil != publishError {
 				log.Println("Failed to publish message to plane.watch for plane", plane.Icao)

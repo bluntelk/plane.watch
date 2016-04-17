@@ -213,9 +213,12 @@ func (f *Frame) decodeCapability() {
 
 	switch f.capability {
 	case 4:
+		f.validVerticalStatus = true
 		f.onGround = true
-	default:
+	case 5:
+		f.validVerticalStatus = true
 		f.onGround = false
+	default:
 	}
 }
 
@@ -224,13 +227,16 @@ func (f *Frame) decodeFlightStatus() {
 	// bits 5,6,7 are the flight status
 	f.flightStatus = int(f.message[0] & 7)
 	if f.flightStatus == 0 || f.flightStatus == 2 {
+		f.validVerticalStatus = true
 		f.onGround = false
 	}
 	if f.flightStatus == 1 || f.flightStatus == 3 {
+		f.validVerticalStatus = true
 		f.onGround = true
 	}
 	if f.flightStatus == 4 || f.flightStatus == 5 {
 		// special pos
+		f.validVerticalStatus = true
 		f.onGround = false // assume in the air
 		f.special = flightStatusTable[f.flightStatus]
 	}
@@ -245,6 +251,7 @@ func (f *Frame) decodeVerticalStatus() {
 	if f.message[0] & 4 != 0 {
 		f.onGround = true
 	}
+	f.validVerticalStatus = true
 }
 
 //func (f *Frame) decodeDF4_5_20_21() error {
@@ -357,7 +364,7 @@ func (f *Frame) decode13BitAltitudeField() error {
 func (f *Frame) getMessageLengthBits() uint32 {
 	//if f.downLinkFormat & 0x10 != 0 {
 	if f.downLinkFormat & 0x10 != 0 {
-		if len(f.raw) ==14 {
+		if len(f.raw) == 14 {
 			return MODES_SHORT_MSG_BITS
 		}
 		return MODES_LONG_MSG_BITS

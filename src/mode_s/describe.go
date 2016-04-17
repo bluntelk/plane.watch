@@ -254,6 +254,9 @@ func (frame *Frame) Describe(output io.Writer) {
 }
 
 func (f *Frame) showVerticalStatus(output io.Writer) {
+	if !f.validVerticalStatus {
+		return
+	}
 	if f.onGround {
 		fmt.Fprintf(output, "Vertical Status : On The Ground");
 	} else {

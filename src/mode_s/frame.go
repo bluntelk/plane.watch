@@ -25,6 +25,7 @@ type Position struct {
 	velocity            float64 /* Computed from EW and NS velocity. */
 	unit                int
 	onGround            bool    /* VS Bit */
+	validVerticalStatus bool
 }
 
 type df11 struct {
@@ -176,6 +177,9 @@ func (f *Frame) SquawkIdentity() uint32 {
 
 func (f *Frame) OnGround() bool {
 	return f.onGround
+}
+func (f *Frame) ValidVerticalStatus() bool {
+	return f.validVerticalStatus
 }
 func (f *Frame) Alert() bool {
 	return f.alert

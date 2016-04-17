@@ -44,16 +44,18 @@ type Flight struct {
 }
 
 type Plane struct {
-	lastSeen        time.Time
-	IcaoIdentifier  uint32
-	Icao            string
-	SquawkIdentity  uint32
-	Flight          Flight
-	LocationHistory []PlaneLocation
-	Location        PlaneLocation
-	cprLocation     CprLocation
-	Special         string
-	NumUpdates      int
+	lastSeen         time.Time
+	IcaoIdentifier   uint32
+	Icao             string
+	SquawkIdentity   uint32
+	Flight           Flight
+	locationHistory  []PlaneLocation
+	Location         PlaneLocation
+	cprLocation      CprLocation
+	Special          string
+	NumUpdates       int
+	frameTimes       []time.Time
+	RecentFrameCount int
 }
 
 type PlaneList map[uint32]Plane
@@ -137,7 +139,7 @@ func GetPlane(ICAO uint32) Plane {
 	var p Plane
 	p.IcaoIdentifier = ICAO
 	p.Icao = fmt.Sprintf("%6X", ICAO)
-	p.LocationHistory = make([]PlaneLocation, 0)
+	p.locationHistory = make([]PlaneLocation, 0)
 	p.ZeroCpr()
 	planeList[ICAO] = p
 
@@ -172,32 +174,58 @@ func CleanPlanes() {
 	planeAccessMutex.Unlock()
 }
 func (p *Plane) String() string {
-	var id, alt, position, direction string
+	var id, alt, position, direction, special, strength string
 
-	id = fmt.Sprintf("\033[0;97mPlane (\033[38;5;118m%s %-8s\033[0;97m) ", p.Icao, p.Flight.Identifier)
+	white := "\033[0;97m"
+	lime := "\033[38;5;118m"
+	orange := "\033[38;5;226m"
+	blue := "\033[38;5;122m"
+	red := "\033[38;5;160m"
+
+	id = fmt.Sprintf("%sPlane (%s%s %-8s%s)", white, lime, p.Icao, p.Flight.Identifier, white)
 
 	if p.Location.onGround {
-		position += " is on the ground. "
+		position += " is on the ground."
 	} else if p.Location.Altitude > 0 {
-		alt = fmt.Sprintf(" is at %d %s.", p.Location.Altitude, p.Location.AltitudeUnits)
+		alt = fmt.Sprintf(" %s%d%s %s,", orange, p.Location.Altitude, white, p.Location.AltitudeUnits)
 	}
 
 	if p.Location.hasLatLon {
-		position += fmt.Sprintf(" at: \033[38;5;122m%+03.13f\033[0;97m, \033[38;5;122m%+03.13f\033[0;97m,", p.Location.Latitude, p.Location.Longitude)
+		position += fmt.Sprintf(" %s%+03.13f%s, %s%+03.13f%s,", blue, p.Location.Latitude, white, blue, p.Location.Longitude, white)
 	}
 
 	if p.Location.hasHeading {
-		direction += fmt.Sprintf(" Has heading %0.2f and is travelling at %0.2f knots", p.Location.Heading, p.Location.Velocity)
+		direction += fmt.Sprintf(" heading %s%0.2f%s, speed %s%0.2f%s knots", orange, p.Location.Heading, white, orange, p.Location.Velocity, white)
 	}
 
-	return id + alt + position + direction + "\033[0m";
+	strength = fmt.Sprintf(" %0.2f pps", float64(p.RecentFrameCount) / 10.0)
+
+	if "" != p.Special {
+		special = " " + red + p.Special + white + ", "
+	}
+
+	return id + alt + position + direction + special + strength + "\033[0m";
+}
+
+func (p *Plane) MarkFrameTime() {
+	// cull anything older than 10 seconds
+	frameTimes := make([]time.Time, 0)
+	cutOff := time.Now().Add(time.Second * -10)
+	for _, t := range p.frameTimes {
+		if t.After(cutOff) {
+			frameTimes = append(frameTimes, t)
+		}
+	}
+	frameTimes = append(frameTimes, time.Now())
+	p.frameTimes = frameTimes
+	p.RecentFrameCount = len(p.frameTimes)
 }
 
 func (p *Plane) AddLatLong(lat, lon float64) {
-	if len(p.LocationHistory) >= 10 {
-		p.LocationHistory = p.LocationHistory[1:]
+	if len(p.locationHistory) >= 10 {
+		p.locationHistory = p.locationHistory[1:]
 	}
-	p.LocationHistory = append(p.LocationHistory, p.Location)
+	p.locationHistory = append(p.locationHistory, p.Location)
 
 	var newLocation PlaneLocation
 
