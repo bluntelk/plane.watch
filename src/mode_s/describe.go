@@ -14,6 +14,7 @@ type featureDescriptionType struct {
 type featureBreakdown struct {
 	name       string
 	start, end int
+	subFields  map[byte][]featureBreakdown
 }
 
 var featureDescription = map[string]featureDescriptionType{
@@ -52,6 +53,85 @@ var featureDescription = map[string]featureDescriptionType{
 	"VS":{field: "Vertical Status", meaning: "aircraft status, airborne (0) or on the ground (1)"},
 	"??":{field: "???", meaning:"Unknown"},
 	"CRC":{field: "CRC", meaning:"CRC Checksum"},
+	"TC":{field:"DF 17 Message Type", meaning:"Message Category"},
+	"SUB":{field:"DF 17 Message Sub Type", meaning:"Message Sub Type"},
+	"DATA":{field:"ADS-B Data", meaning:"ADS-B Data"},
+	"CHAR":{field:"Flight Number", meaning:"1 character of the AIS charset"},
+	"TI":{field:"Time Bit", meaning:"UTC Time"},
+	"CPR":{field:"CPR Odd/Even", meaning:"CPR Odd/Even Frame Type"},
+	"LAT":{field:"CPR Latitude", meaning:"1 of 4 sets of data required to decode planes lat/lon"},
+	"LON":{field:"CPR Longitude", meaning:"1 of 4 sets of data required to decode planes lat/lon"},
+	"CAT":{field:"Aircraft Category", meaning:"Category field includes DF field"},
+	"MOV":{field:"Movement Field", meaning:"Ground Speed"},
+	"HB":{field:"Heading Bit", meaning:"There is a heading available"},
+	"HD":{field:"Heading Field", meaning:"The direction the plane is facing"},
+	"VR":{field:"Vertical Rate", meaning:"How fast the plane is going up or down"},
+	"VRS":{field:"Vertical Rate Sign", meaning:"0=up 1=down"},
+}
+
+var featureDF17FlightName = []featureBreakdown{
+	{name: "CAT", start:37, end: 40},
+	{name: "CHAR", start: 40, end: 46},
+	{name: "CHAR", start: 46, end: 52},
+	{name: "CHAR", start: 52, end: 58},
+	{name: "CHAR", start: 58, end: 64},
+	{name: "CHAR", start: 64, end: 70},
+	{name: "CHAR", start: 70, end: 76},
+	{name: "CHAR", start: 76, end: 82},
+	{name: "CHAR", start: 82, end: 88},
+}
+var featureDF17SurfacePosition = []featureBreakdown{
+	{name: "MOV", start:37, end: 44},
+	{name: "HB", start: 44, end: 45},
+	{name: "HD", start: 45, end: 52},
+	{name: "??", start: 52, end: 53},
+	{name: "CPR", start: 53, end: 54},
+	{name: "LAT", start: 54, end: 71},
+	{name: "LON", start: 71, end: 88},
+}
+var featureDF17AirPosition = []featureBreakdown{
+	{name: "SUB", start:37, end: 40},
+	{name: "AC", start: 40, end: 52},
+	{name: "TI", start: 52, end: 53},
+	{name: "CPR", start: 53, end: 54},
+	{name: "LAT", start: 54, end: 71},
+	{name: "LON", start: 71, end: 88},
+}
+var featureDF17AirVelocity = []featureBreakdown{
+	{name: "SUB", start:37, end: 40},
+	{name: "??", start: 40, end: 69},
+	{name: "VRS", start: 68, end: 69},
+	{name: "VR", start: 69, end: 78},
+	{name: "??", start: 78, end: 88},
+}
+
+var asdbFeatures = map[byte][]featureBreakdown{
+	1: featureDF17FlightName,
+	2: featureDF17FlightName,
+	3: featureDF17FlightName,
+	4: featureDF17FlightName,
+	5: featureDF17SurfacePosition,
+	6: featureDF17SurfacePosition,
+	7: featureDF17SurfacePosition,
+	8: featureDF17SurfacePosition,
+	9: featureDF17AirPosition,
+	10: featureDF17AirPosition,
+	11: featureDF17AirPosition,
+	12: featureDF17AirPosition,
+	13: featureDF17AirPosition,
+	14: featureDF17AirPosition,
+	15: featureDF17AirPosition,
+	16: featureDF17AirPosition,
+	17: featureDF17AirPosition,
+	18: featureDF17AirPosition,
+	19: featureDF17AirVelocity,
+	23: []featureBreakdown{
+		{name: "??", start: 40, end: 88},
+	},
+	28: []featureBreakdown{
+		{name: "??", start: 40, end: 88},
+	},
+
 }
 
 var frameFeatures = map[byte][]featureBreakdown{
@@ -102,18 +182,23 @@ var frameFeatures = map[byte][]featureBreakdown{
 	},
 	6: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "CRC", start:32, end: 56},
 	},
 	7: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "CRC", start:32, end: 56},
 	},
 	8: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "CRC", start:32, end: 56},
 	},
 	9: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "CRC", start:32, end: 56},
 	},
 	10: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "CRC", start:32, end: 56},
 	},
 	11: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
@@ -123,17 +208,21 @@ var frameFeatures = map[byte][]featureBreakdown{
 	},
 	12: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "CRC", start:32, end: 56},
 	},
 	13: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "CRC", start:32, end: 56},
 	},
 	14: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "CRC", start:32, end: 56},
 	},
 	15: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
+		{name: "CRC", start:32, end: 56},
 	},
-	16: []featureBreakdown{ //RI,MV Fields
+	16: []featureBreakdown{//RI,MV Fields
 		{name: "DF", start:0, end: 5},
 		{name: "VS", start:5, end: 6},
 		{name: "CC", start:6, end: 7},
@@ -146,7 +235,10 @@ var frameFeatures = map[byte][]featureBreakdown{
 	},
 	17: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
-		{name: "??", start:5, end: 88},
+		{name: "CA", start:5, end: 8},
+		{name: "AA", start:8, end: 32},
+		{name: "TC", start:32, end: 37},
+		{name: "DATA", start:40, end: 88, subFields: asdbFeatures},
 		{name: "CRC", start:88, end: 112},
 	},
 	18: []featureBreakdown{
@@ -305,6 +397,11 @@ func (f *Frame) showIdentity(output io.Writer) {
 	fmt.Fprintln(output, "")
 }
 func (f *Frame) showVelocity(output io.Writer) {
+	if f.superSonic {
+		fmt.Fprintln(output, "  Super Sonic?  : Yes!")
+	} else {
+		fmt.Fprintln(output, "  Super Sonic?  : No")
+	}
 	fmt.Fprintf(output, "  Velocity      : %0.2f", f.velocity)
 	fmt.Fprintln(output, "")
 }
@@ -318,9 +415,9 @@ func (f *Frame) showCprLatLon(output io.Writer) {
 	if f.IsEven() {
 		oddEven = "Even"
 	}
-	fmt.Fprintf(output, "  CPR Frame          : %s\n", oddEven)
-	fmt.Fprintf(output, "  CPR Latitude       : %d\n", f.rawLatitude)
-	fmt.Fprintf(output, "  CPR Longitude      : %d\n", f.rawLongitude)
+	fmt.Fprintf(output, "  CPR Frame     : %s\n", oddEven)
+	fmt.Fprintf(output, "  CPR Latitude  : %d\n", f.rawLatitude)
+	fmt.Fprintf(output, "  CPR Longitude : %d\n", f.rawLongitude)
 	fmt.Fprintln(output, "")
 }
 
@@ -331,7 +428,9 @@ func (f *Frame) showAdsb(output io.Writer) {
 	case 1, 2, 3, 4:
 		f.showFlightNumber(output)
 	case 5, 6, 7, 8:
+		f.showHeading(output)
 		f.showVelocity(output)
+		f.showCprLatLon(output)
 	case 9, 10, 11, 12, 13, 14, 15, 16, 17, 18:
 		f.showAltitude(output)
 		f.showCprLatLon(output)
@@ -395,15 +494,15 @@ func (f *Frame) showBitString(output io.Writer) {
 	}
 }
 
-func (f *Frame) formatBitString(features []featureBreakdown) string {
-	var header, seperator, bits, rawBits, bitFmt, bitDesc, footer, suffix string
+func (frame *Frame) formatBitString(features []featureBreakdown) string {
+	var header, separator, bits, rawBits, bitFmt, bitDesc, footer, suffix string
 	var padLen, realLen, shownBitCount int
 
-	for _, i := range f.message {
+	for _, i := range frame.message {
 		rawBits += fmt.Sprintf("%08s", strconv.FormatUint(uint64(i), 2))
 	}
 
-	for _, f := range features {
+	doMakeBitString := func(f featureBreakdown) {
 		padLen = len(f.name)
 		realLen = f.end - f.start
 		if realLen > padLen {
@@ -412,7 +511,7 @@ func (f *Frame) formatBitString(features []featureBreakdown) string {
 		shownBitCount += (f.end - f.start)
 		bitFmt = fmt.Sprintf(" %%- %ds |", padLen)
 		header += fmt.Sprintf(bitFmt, f.name)
-		seperator += strings.Repeat("-", padLen + 2) + "+"
+		separator += strings.Repeat("-", padLen + 2) + "+"
 		bits += fmt.Sprintf(bitFmt, rawBits[f.start: f.end])
 		bitDesc += fmt.Sprintf(bitFmt, strconv.Itoa(f.start))
 
@@ -426,57 +525,15 @@ func (f *Frame) formatBitString(features []featureBreakdown) string {
 		footer += fmt.Sprintf(" %s \t%d bit%s\t %s: %s\n", f.name, realLen, suffix, feature.field, feature.meaning)
 	}
 
-	return fmt.Sprintf("\n%s\n%s\n%s\n%s\n%s\n\n%s\n%d/%d bits shown\n", header, seperator, bits, seperator, bitDesc, footer, shownBitCount, f.getMessageLengthBits())
-	//return "\n" + header + "\n" + seperator + "\n" + bits + "\n" + seperator + "\n" + bitDesc + "\n\n" + footer
-}
-
-func (f *Frame) BitStringDF17() string {
-
-	if f.downLinkFormat != 17 {
-		return ""
-	}
-	var header, bits, rawBits string
-
-	switch f.messageType {
-	case 9, 10, 11, 12, 13, 14, 15, 16, 17, 18:
-		header += " DF   | CA  | ICAO 24bit addr          | DATA                                                                                | CRC                      |\n"
-		header += "                                       | TC    | SS | NICsb | ALT     Q      | T | F | LAT-CPR           | LON-CPR           |                          |\n"
-		header += "------+-----+--------------------------+-------+----+-------+----------------+---+---+-------------------+-------------------+--------------------------+\n"
-
-		for _, i := range f.message {
-			rawBits += fmt.Sprintf("%08s", strconv.FormatUint(uint64(i), 2))
+	for _, f := range features {
+		if 0 == len(f.subFields[frame.messageType]) {
+			doMakeBitString(f)
+		} else {
+			for _, sf := range f.subFields[frame.messageType] {
+				doMakeBitString(sf)
+			}
 		}
-
-		bits += rawBits[0:5] + " | " // Downlink Format
-		bits += rawBits[5:8] + " | " // Capability
-		bits += rawBits[8:32] + " | " // ICAO
-		// now we are into the packet data
-
-		bits += rawBits[32:37] + " | " // TC - Type code
-		bits += rawBits[37:39] + " | " // SS - Surveillance status
-		bits += rawBits[39:40] + "     | " // NIC supplement-B
-		bits += rawBits[40:47] + " "   // Altitude
-		bits += rawBits[47:48] + " "   // Altitude Q Bit
-		bits += rawBits[48:52] + " | " // Altitude
-		bits += rawBits[52:53] + " | " // Time
-		bits += rawBits[53:54] + " | " // F - CPR odd/even frame flag
-		bits += rawBits[54:71] + " | " // Latitude in CPR format
-		bits += rawBits[71:88] + " | " // Longitude in CPR format
-		bits += rawBits[88:] + " | "   // CRC
-		bits += "\n"
-	default:
-		header += " DF   | CA  | ICAO 24bit addr          | DATA                                                     | CRC                      |\n"
-		header += "------+-----+--------------------------+-------------------------------------------------------------------------------------+\n"
-		for _, i := range f.message {
-			rawBits += fmt.Sprintf("%08s", strconv.FormatUint(uint64(i), 2))
-		}
-
-		bits += rawBits[0:5] + " | " // Downlink Format
-		bits += rawBits[5:8] + " | " // Capability
-		bits += rawBits[8:32] + " | " // ICAO
-		bits += rawBits[32:88] + " | "   // DATA
-		bits += rawBits[88:] + " | "   // CRC
 	}
 
-	return header + bits
+	return fmt.Sprintf("\n%s\n%s\n%s\n%s\n%s\n\n%s\n%d/%d bits shown\n", header, separator, bits, separator, bitDesc, footer, shownBitCount, frame.getMessageLengthBits())
 }

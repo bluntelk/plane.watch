@@ -413,7 +413,7 @@ func (f *Frame) decodeModeSChecksum() {
 
 func (f *Frame) decodeFlightNumber() {
 	f.flight = make([]byte, 8)
-	f.aircraftType = int(f.messageType) - 1
+	f.aircraftType = int(((0x0E - f.messageType) << 4) | f.messageSubType);
 	f.flight[0] = aisCharset[f.message[5] >> 2]
 	f.flight[1] = aisCharset[((f.message[5] & 3) << 4) | (f.message[6] >> 4)]
 	f.flight[2] = aisCharset[((f.message[6] & 15) << 2) | (f.message[7] >> 6)]

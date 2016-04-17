@@ -58,6 +58,19 @@ func (df *Frame) MessageTypeString() string {
 	return name
 }
 
+func (f *Frame) decodeDF17LatLon() {
+	var msg6 = int(f.message[6])
+	var msg7 = int(f.message[7])
+	var msg8 = int(f.message[8])
+	var msg9 = int(f.message[9])
+	var msg10 = int(f.message[10])
+
+	// CPR LAT/LON
+	f.rawLatitude = ((msg6 & 3) << 15) | (msg7 << 7) | (msg8 >> 1)
+	f.rawLongitude = ((msg8 & 1) << 16) | (msg9 << 8) | msg10
+	f.cprFlagOddEven = int(msg6 & 4) >> 2
+}
+
 func (f *Frame) decodeDF17() {
 
 	// Down Link Format 17 Message Types
@@ -69,12 +82,11 @@ func (f *Frame) decodeDF17() {
 		f.decodeFlightNumber()
 	} else if f.messageType >= 5 && f.messageType <= 8 {
 		// surface position
-		movement := uint64(((f.message[4] << 4) | (f.message[5] >> 4)) & 0x007F)
-		if (movement > 0) && (movement < 125) {
-			f.velocity = decodeMovementField(movement)
-			f.onGround = true
-			f.validVerticalStatus = true
-		}
+		f.onGround = true
+		f.validVerticalStatus = true
+
+		f.decodeDF17LatLon()
+		f.decodeMovementField()
 
 		if f.message[5] & 0x08 != 0 {
 			f.heading = float64(((((f.message[5] << 4) | (f.message[6] >> 4)) & 0x007F) * 45) >> 4)
@@ -82,22 +94,11 @@ func (f *Frame) decodeDF17() {
 
 	} else if (f.messageType >= 9 && f.messageType <= 18) {
 		/* Airborne position Message */
-		f.cprFlagOddEven = int(f.message[6] & 4) >> 2
 		f.timeFlag = int(f.message[6] & (1 << 3))
-		f.decodeAC12AltitudeField() // decode altitude and unit
 		f.onGround = false
 		f.validVerticalStatus = true
-
-		var msg6 = int(f.message[6])
-		var msg7 = int(f.message[7])
-		var msg8 = int(f.message[8])
-		var msg9 = int(f.message[9])
-		var msg10 = int(f.message[10])
-
-		// CPR LAT/LON
-		f.rawLatitude = ((msg6 & 3) << 15) | (msg7 << 7) | (msg8 >> 1)
-		f.rawLongitude = ((msg8 & 1) << 16) | (msg9 << 8) | msg10
-
+		f.decodeAC12AltitudeField() // decode altitude and unit
+		f.decodeDF17LatLon()
 	} else if f.messageType == 19 && f.messageSubType >= 1 && f.messageSubType <= 4 {
 		/* Airborne Velocity Message */
 		f.onGround = false
@@ -121,6 +122,13 @@ func (f *Frame) decodeDF17() {
 			f.northSouthVelocity = int(((f.message[7] & 0x7f) << 3) | ((f.message[8] & 0xe0) >> 5))
 			f.verticalRateSource = int((f.message[8] & 0x10) >> 4)
 			/* Compute velocity and angle from the two speed components. */
+
+			if f.messageSubType == 2 {
+				// supersonic - unit is 4 knots
+				f.eastWestVelocity = f.eastWestVelocity << 2
+				f.northSouthVelocity = f.northSouthVelocity << 2
+				f.superSonic = true
+			}
 
 			f.velocity = math.Sqrt(float64((f.northSouthVelocity * f.northSouthVelocity) + (f.eastWestVelocity * f.eastWestVelocity)))
 			if f.velocity != 0 {
@@ -149,6 +157,7 @@ func (f *Frame) decodeDF17() {
 				airspeed--;
 				if f.messageSubType == 4 {
 					// If (supersonic) unit is 4 kts
+					f.superSonic = true
 					airspeed = airspeed << 2;
 				}
 				f.velocity = float64(airspeed);
@@ -181,4 +190,33 @@ func (df *Frame) IsEven() bool {
 
 func (df *Frame) FlightNumber() string {
 	return string(df.flight)
+}
+
+//
+//=========================================================================
+//
+// Decode the 7 bit ground movement field PWL exponential style scale
+//
+func (f *Frame) decodeMovementField() {
+	var gSpeed uint64
+	movement := uint64(((f.message[4] << 4) | (f.message[5] >> 4)) & 0x007F)
+	if (movement > 0) && (movement < 125) {
+
+		if movement > 123 {
+			gSpeed = 199 // > 175kt
+		} else if movement > 108 {
+			gSpeed = ((movement - 108) * 5) + 100
+		} else if movement > 93 {
+			gSpeed = ((movement - 93) * 2) + 70
+		} else if movement > 38 {
+			gSpeed = (movement - 38) + 15
+		} else if movement > 12 {
+			gSpeed = ((movement - 11) >> 1) + 2
+		} else if movement > 8 {
+			gSpeed = ((movement - 6) >> 2) + 1
+		} else {
+			gSpeed = 0
+		}
+		f.velocity =float64(gSpeed)
+	}
 }

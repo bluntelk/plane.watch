@@ -136,33 +136,3 @@ func modeAToModeC(ModeA int32) int32 {
 	//log.Printf(format, "Converted", strconv.FormatInt(int64(result), 2))
 	return result
 }
-
-//
-//=========================================================================
-//
-// Decode the 7 bit ground movement field PWL exponential style scale
-//
-func decodeMovementField(movement uint64) float64 {
-	var gspeed uint64
-
-	// Note : movement codes 0,125,126,127 are all invalid, but they are
-	//        trapped for before this function is called.
-
-	if movement > 123 {
-		gspeed = 199 // > 175kt
-	} else if movement > 108 {
-		gspeed = ((movement - 108) * 5) + 100
-	} else if movement > 93 {
-		gspeed = ((movement - 93) * 2) + 70
-	} else if movement > 38 {
-		gspeed = (movement - 38) + 15
-	} else if movement > 12 {
-		gspeed = ((movement - 11) >> 1) + 2
-	} else if movement > 8 {
-		gspeed = ((movement - 6) >> 2) + 1
-	} else {
-		gspeed = 0
-	}
-
-	return float64(gspeed)
-}

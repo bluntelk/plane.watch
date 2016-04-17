@@ -26,6 +26,7 @@ type Position struct {
 	unit                int
 	onGround            bool    /* VS Bit */
 	validVerticalStatus bool
+	superSonic          bool
 }
 
 type df11 struct {
