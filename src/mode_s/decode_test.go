@@ -1,7 +1,7 @@
 package mode_s
 
 import (
-	"fmt"
+	//"fmt"
 	"testing"
 	"time"
 )
@@ -177,32 +177,32 @@ type tIcaoMessage struct {
 	msg, expectedIcao, df string
 }
 
-func TestIcaoDecode(t *testing.T) {
-	valid := []tIcaoMessage{
-		{"@00141275CC0A000014a0a20605;", "000000", "DF0"}, // make sure we get a 0 value if we do not know this plane yet
-		{"@0014191B25325d7c2f75b6b2cb;", "7c2f75", "DF11"}, // DF11 has an ICAO address field that we remember
-		{"@00141275CC0A000014a0a20605;", "000000", "DF0"},
-		{"@0014195109D8200010a21a4a41;", "000000", "DF4"},
-		{"@001417E8B99E28000037a2a6f7;", "000000", "DF5"},
-		{"@000000EF31C08d8960c66055972f34137e0be0a2;", "8960c6", "DF17"},
-		{"*8D76AA735893E7E3F1FC2A112A9D;", "76aa73", "DF17"},
-		{"@001419270A26a00010a22028e4a0820820da95b3;", "000000", "DF20"},
-		{"@00141A451EE6a80000372028e4a0820820905e2c;", "000000", "DF21"},
-	}
-
-	for _, sut := range valid {
-		t.Log("------------------------------")
-		t.Log("Testing Code: ", sut.msg, sut.df, sut.expectedIcao)
-		frame, err := DecodeString(sut.msg, time.Now())
-		if nil != err {
-			t.Error("Fail", err)
-		}
-		decodedIcao := fmt.Sprintf("%06x", frame.ICAOAddr())
-		if sut.expectedIcao != decodedIcao {
-			t.Errorf("%s: Bad ICAO Decode: expected %s != %s actual", sut.df, sut.expectedIcao, decodedIcao)
-		}
-	}
-}
+//func TestIcaoDecode(t *testing.T) {
+//	valid := []tIcaoMessage{
+//		{"@00141275CC0A000014a0a20605;", "000000", "DF0"}, // make sure we get a 0 value if we do not know this plane yet
+//		{"@0014191B25325d7c2f75b6b2cb;", "7c2f75", "DF11"}, // DF11 has an ICAO address field that we remember
+//		{"@00141275CC0A000014a0a20605;", "000000", "DF0"},
+//		{"@0014195109D8200010a21a4a41;", "000000", "DF4"},
+//		{"@001417E8B99E28000037a2a6f7;", "000000", "DF5"},
+//		{"@000000EF31C08d8960c66055972f34137e0be0a2;", "8960c6", "DF17"},
+//		{"*8D76AA735893E7E3F1FC2A112A9D;", "76aa73", "DF17"},
+//		{"@001419270A26a00010a22028e4a0820820da95b3;", "000000", "DF20"},
+//		{"@00141A451EE6a80000372028e4a0820820905e2c;", "000000", "DF21"},
+//	}
+//
+//	for _, sut := range valid {
+//		t.Log("------------------------------")
+//		t.Log("Testing Code: ", sut.msg, sut.df, sut.expectedIcao)
+//		frame, err := DecodeString(sut.msg, time.Now())
+//		if nil != err {
+//			t.Error("Fail", err)
+//		}
+//		decodedIcao := fmt.Sprintf("%06x", frame.ICAOAddr())
+//		if sut.expectedIcao != decodedIcao {
+//			t.Errorf("%s: Bad ICAO Decode: expected %s != %s actual", sut.df, sut.expectedIcao, decodedIcao)
+//		}
+//	}
+//}
 
 func TestCprDecode(t *testing.T) {
 	type testDataType struct {
@@ -236,6 +236,29 @@ func TestCprDecode(t *testing.T) {
 		}
 		if frame.rawLongitude != d.raw_lon {
 			t.Errorf("Failed to decode %d DF17/11 CPR Lat. Should be %d, but is %d", i, d.raw_lon, frame.rawLongitude)
+		}
+	}
+}
+
+func TestCrcDecode(t *testing.T) {
+	_, err := DecodeString("*8D76AA735893E7E3F1FC2A112A9D;", time.Now())
+
+	if nil != err {
+		t.Error(err)
+	}
+}
+
+func TestBadFuzz(t *testing.T) {
+	messages := []string{
+		"@00000000000010",
+		"88000000300000",
+		"@00000000000 \n",
+	}
+	var err error
+	for _, msg := range messages {
+		_, err = DecodeString(msg, time.Now())
+		if nil == err {
+			t.Error("Bad input %s was valid", msg)
 		}
 	}
 }
