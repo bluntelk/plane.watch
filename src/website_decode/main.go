@@ -56,6 +56,7 @@ func runHttpServer(c *cli.Context) {
 				fmt.Fprintln(w, "No Packet Provided")
 				return
 			}
+			println("Decoding Frame:", packet)
 			frame, err := mode_s.DecodeString(packet, time.Now())
 			if err != nil {
 				fmt.Fprintln(w, "Failed to decode.", err)

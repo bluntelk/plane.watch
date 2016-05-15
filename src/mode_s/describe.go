@@ -20,7 +20,7 @@ type featureBreakdown struct {
 var featureDescription = map[string]featureDescriptionType{
 	"AA":{field: "Address Announced", meaning: "aircraft identification in All-Call reply - ICAO"},
 	"AC":{field: "Altitude Code", meaning: "Aircraft altitude code. All bits are Zeros if altitude information is not available."},
-	"AP":{field: "Address/Parity", meaning: "error detection field"},
+	"AP":{field: "Address/Parity", meaning: "Error detection field. Parity overlaid on the address"},
 	"AQ":{field: "Acquisition", meaning: "part of air-to-air protocol"},
 	"CA":{field: "Capability", meaning: "aircraft report of system capability"},
 	"CC":{field: "Crosslink Capability", meaning:"Indicates XPDR has ability to support crosslink capability"},
@@ -202,12 +202,12 @@ var frameFeatures = map[byte][]featureBreakdown{
 	//	{name: "DF", start:0, end: 5},
 	//	{name: "AP", start:32, end: 56},
 	//},
-	//11: []featureBreakdown{ // DF, CA, AA, PI
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "CA", start:5, end: 8},
-	//	{name: "AA", start:8, end: 32},
-	//	{name: "PI", start:32, end: 56},
-	//},
+	11: []featureBreakdown{ // DF, CA, AA, PI
+		{name: "DF", start:0, end: 5},
+		{name: "CA", start:5, end: 8},
+		{name: "AA", start:8, end: 32},
+		{name: "PI", start:32, end: 56},
+	},
 	//12: []featureBreakdown{
 	//	{name: "DF", start:0, end: 5},
 	//	{name: "AP", start:32, end: 56},
@@ -307,6 +307,7 @@ func (frame *Frame) Describe(output io.Writer) {
 		frame.showVerticalStatus(output)
 		frame.showAltitude(output)
 		frame.showRInformation(output)
+		frame.showSLField(output)
 	case 1, 2, 3: // Aircraft Identification and Category
 		frame.showFlightStatus(output)
 		frame.showFlightId(output)
@@ -323,6 +324,7 @@ func (frame *Frame) Describe(output io.Writer) {
 		frame.showVerticalStatus(output)
 		frame.showAltitude(output)
 		frame.showRInformation(output)
+		frame.showSLField(output)
 	case 17: //DF_17
 		frame.showICAO(output)
 		frame.showCapability(output)
@@ -428,6 +430,9 @@ func (f *Frame) showCprLatLon(output io.Writer) {
 
 func (f *Frame)showRInformation(output io.Writer) {
 	fmt.Fprintf(output, "TCAS            : (%d) %s\n", f.ri, rInformationField[f.ri])
+}
+func (f *Frame)showSLField(output io.Writer) {
+	fmt.Fprintf(output, "TCAS            : (%d) %s\n", f.sl, slInformationField[f.sl])
 }
 
 func (f *Frame) showAdsb(output io.Writer) {

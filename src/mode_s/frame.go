@@ -55,7 +55,7 @@ type Frame struct {
 	df17
 	df4_5_20_21
 	Position
-	ri             byte // the RI information field in DF0 & DF16
+	ri, sl         byte // the RI & SL information field in DF0 & DF16
 	mode           string
 	timeStamp      time.Time
 	raw            string
@@ -88,23 +88,23 @@ var downlinkFormatTable = map[byte]string{
 
 // DownLink Format Sub Type Capability CA
 var capabilityTable = map[byte]string{
-	0: "Level 1 (Survillance Only)",
-	1: "Level 2 (DF0,4,5,11)",
-	2: "Level 3 (DF0,4,5,11,20,21)",
-	3: "Level 4 (DF0,4,5,11,20,21,24)",
-	4: "Level 2+3+4 (DF0,4,5,11,20,21,24,code7 - is on ground)",
-	5: "Level 2+3+4 (DF0,4,5,11,20,21,24,code7 - is airborne)",
-	6: "Level 2+3+4 (DF0,4,5,11,20,21,24,code7)",
-	7: "Level 7 ???",
+	0: "Level 1 no communication capability (Survillance Only)", // 0,4,5,11
+	1: "Level 2 Comm-A and Comm-B capability", // DF 0,4,5,11,20,21
+	2: "Level 3 Comm-A, Comm-B and uplink ELM capability", // (DF0,4,5,11,20,21)
+	3: "Level 4 Comm-A, Comm-B uplink and downlink ELM capability", // (DF0,4,5,11,20,21,24)
+	4: "Level 2,3 or 4. can set code 7. is on ground", // DF0,4,5,11,20,21,24,code7
+	5: "Level 2,3 or 4. can set code 7. is airborne", // DF0,4,5,11,20,21,24,
+	6: "Level 2,3 or 4. can set code 7.",
+	7: "Level 7 DR≠0 or FS=3, 4 or 5",
 }
 
 var flightStatusTable = map[int]string{
 	0: "Normal, Airborne",
 	1: "Normal, On the ground",
-	2: "ALERT,  Airborne",
-	3: "ALERT,  On the ground",
-	4: "ALERT & Special Position Identification. Airborne or Ground",
-	5: "Special Position Identification. Airborne or Ground",
+	2: "ALERT, Airborne",
+	3: "ALERT, On the ground",
+	4: "ALERT, Special Position Identification. Airborne or Ground",
+	5: "Normal, Special Position Identification. Airborne or Ground",
 	6: "Value 6 is not assigned",
 	7: "Value 7 is not assigned",
 }
@@ -137,6 +137,17 @@ var rInformationField = map[byte]string{
 	13: "Airspeed is >600kts and ≤1200kts.",
 	14: "Airspeed is >1200kts.",
 	15: "Not assigned.",
+}
+
+var slInformationField = []string{
+	"No TCAS sensitivity level reported",
+	"TCAS operates at sensitivity level 1.",
+	"TCAS operates at sensitivity level 2.",
+	"TCAS operates at sensitivity level 3.",
+	"TCAS operates at sensitivity level 4.",
+	"TCAS operates at sensitivity level 5.",
+	"TCAS operates at sensitivity level 6.",
+	"TCAS operates at sensitivity level 7.",
 }
 var aisCharset string = "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456789??????"
 
