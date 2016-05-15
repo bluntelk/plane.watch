@@ -106,6 +106,7 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	case 0: // Airborne position, baro altitude only
 		frame.decodeVerticalStatus()
 		frame.decode13BitAltitudeField()
+		frame.decodeRInformationField()
 	case 1, 2, 3: // Aircraft Identification and Category
 		frame.decodeFlightStatus()
 		frame.decodeFlightId()
@@ -121,6 +122,7 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	case 16: //DF_16
 		frame.decodeVerticalStatus()
 		frame.decode13BitAltitudeField()
+		frame.decodeRInformationField()
 	case 17: //DF_17
 		frame.decodeICAO()
 		frame.decodeCapability()
@@ -242,14 +244,10 @@ func (f *Frame) decodeVerticalStatus() {
 	f.validVerticalStatus = true
 }
 
-//func (f *Frame) decodeDF4_5_20_21() error {
-//
-//	// bits 8,9,10,11,12 (5 bits) are the DR flag
-//	f.dr = int(f.message[1]) >> 3 & 31
-//	f.um = int(((f.message[1] & 7) << 3) | f.message[2]>>5)
-//	return nil
-//}
-
+// bits 13,14,15 and 16 make up the RI field
+func (f *Frame) decodeRInformationField() {
+	f.ri = (f.message[1] & 7) << 1 | (f.message[2] & 0x80) >> 7
+}
 
 // Determines the ICAO address from bytes 2,3 and 4
 func (f *Frame) decodeICAO() {

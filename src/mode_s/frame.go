@@ -55,6 +55,7 @@ type Frame struct {
 	df17
 	df4_5_20_21
 	Position
+	ri             byte // the RI information field in DF0 & DF16
 	mode           string
 	timeStamp      time.Time
 	raw            string
@@ -119,6 +120,24 @@ var emergencyStateTable = map[int]string{
 	7:  "Reserved",
 };
 
+var rInformationField = map[byte]string{
+	0: "No on-board TCAS.",
+	1: "Not assigned.",
+	2: "On-board TCAS with resolution capability inhibited.",
+	3: "On-board TCAS with vertical-only resolution capability.",
+	4: "On-board TCAS with vertical and horizontal resolution capability.",
+	5: "Not assigned.",
+	6: "Not assigned.",
+	7: "Not assigned.",
+	8: "No maximum airspeed data available.",
+	9: "Airspeed is ≤75kts.",
+	10: "Airspeed is >75kts and ≤150kts.",
+	11: "Airspeed is >150kts and ≤300kts.",
+	12: "Airspeed is >300kts and ≤600kts.",
+	13: "Airspeed is >600kts and ≤1200kts.",
+	14: "Airspeed is >1200kts.",
+	15: "Not assigned.",
+}
 var aisCharset string = "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456789??????"
 
 func (f *Frame) DownLinkType() byte {

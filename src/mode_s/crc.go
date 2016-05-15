@@ -54,6 +54,5 @@ func (f *Frame) checkCrc() error {
 		return fmt.Errorf("Invalid Checksum for DF %d", f.downLinkFormat)
 	default:
 		return fmt.Errorf("Do not know how to CRC Downlink Format %d", f.downLinkFormat)
-		return false
 	}
 }

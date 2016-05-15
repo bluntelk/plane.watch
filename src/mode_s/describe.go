@@ -19,11 +19,11 @@ type featureBreakdown struct {
 
 var featureDescription = map[string]featureDescriptionType{
 	"AA":{field: "Address Announced", meaning: "aircraft identification in All-Call reply - ICAO"},
-	"AC":{field: "Altitude Code", meaning: "aircraft altitude code"},
+	"AC":{field: "Altitude Code", meaning: "Aircraft altitude code. All bits are Zeros if altitude information is not available."},
 	"AP":{field: "Address/Parity", meaning: "error detection field"},
 	"AQ":{field: "Acquisition", meaning: "part of air-to-air protocol"},
 	"CA":{field: "Capability", meaning: "aircraft report of system capability"},
-	"CC":{field: "Crosslink Capability", meaning:""}, // added
+	"CC":{field: "Crosslink Capability", meaning:"Indicates XPDR has ability to support crosslink capability"},
 	"DF":{field: "Downlink Format", meaning: "downlink descriptor"},
 	"DI":{field: "Designator Identification", meaning: "describes content of SD field"},
 	"DR":{field: "Downlink Request", meaning: "aircraft requests permission to send data"},
@@ -40,14 +40,14 @@ var featureDescription = map[string]featureDescriptionType{
 	"NC":{field: "Number, C-segment", meaning: "part of ELM protocol"},
 	"ND":{field: "Number, D-segment", meaning: "part of ELM protocol"},
 	"PC":{field: "Protocol", meaning: "operating commands for the transponder"},
-	"PI":{field: "Parity/Interr.Identity", meaning: "reports source of interrogation"},
+	"PI":{field: "Parity/Interr.Identity", meaning: "reports source of interrogation. Contains the parity overlaid on the interrogator identity code"},
 	"PR":{field: "Probability of Reply", meaning: "used in stochastic acquisition mode"},
 	"RC":{field: "Reply Control", meaning: "part of ELM protocol"},
 	"RI":{field: "Reply Information", meaning: "aircraft status information for TCAS"},
 	"RL":{field: "Reply Length", meaning: "commands air-to-air reply length"},
 	"RR":{field: "Reply Request", meaning: "commands details of reply"},
 	"SD":{field: "Special Designator", meaning: "control codes to transponder"},
-	"SL":{field: "Sensitivity level, ACAS", meaning: "control codes to transponder"},
+	"SL":{field: "Sensitivity level, ACAS", meaning: "Reports the current operating sensitivity level of TCAS"},
 	"UF":{field: "Uplink Format", meaning: "format descriptor"},
 	"UM":{field: "Utility Message", meaning: "protocol message"},
 	"VS":{field: "Vertical Status", meaning: "aircraft status, airborne (0) or on the ground (1)"},
@@ -136,110 +136,113 @@ var asdbFeatures = map[byte][]featureBreakdown{
 
 var frameFeatures = map[byte][]featureBreakdown{
 
-	0: []featureBreakdown{
+	0: []featureBreakdown{ // DF, VS, CC, SL, RI, AC, AP
 		{name: "DF", start:0, end: 5},
 		{name: "VS", start:5, end: 6},
 		{name: "CC", start:6, end: 7},
 		{name: "??", start:7, end: 8},
 		{name: "SL", start:8, end: 11},
-		{name: "??", start:11, end: 20},
+		{name: "??", start:11, end: 13},
+		{name: "RI", start:13, end: 17},
+		{name: "??", start:17, end: 20},
 		{name: "AC", start:20, end: 32},
-		{name: "CRC", start:32, end: 56},
+		{name: "AP", start:32, end: 56},
 	},
-	1: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "FS", start:5, end: 8},
-		{name: "??", start:8, end: 32},
-		{name: "CRC", start:32, end: 56},
-	},
-	2: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "FS", start:5, end: 8},
-		{name: "??", start:8, end: 32},
-		{name: "CRC", start:32, end: 56},
-	},
-	3: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "FS", start:5, end: 8},
-		{name: "??", start:8, end: 32},
-		{name: "CRC", start:32, end: 56},
-	},
-	4: []featureBreakdown{
+	//1: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "FS", start:5, end: 8},
+	//	{name: "??", start:8, end: 32},
+	//	{name: "AP", start:32, end: 56},
+	//},
+	//2: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "FS", start:5, end: 8},
+	//	{name: "??", start:8, end: 32},
+	//	{name: "AP", start:32, end: 56},
+	//},
+	//3: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "FS", start:5, end: 8},
+	//	{name: "??", start:8, end: 32},
+	//	{name: "AP", start:32, end: 56},
+	//},
+	4: []featureBreakdown{ // DF, FS, DR, UM, AC, AP
 		{name: "DF", start:0, end: 5},
 		{name: "FS", start:5, end: 8},
 		{name: "DR", start:8, end: 13},
 		{name: "UM", start:13, end: 19},
 		{name: "AC", start:19, end: 32},
-		{name: "CRC", start:32, end: 56},
+		{name: "AP", start:32, end: 56},
 	},
-	5: []featureBreakdown{
+	5: []featureBreakdown{ // DF, FS, DR, UM, ID, AP
 		{name: "DF", start:0, end: 5},
 		{name: "FS", start:5, end: 8},
 		{name: "DR", start:8, end: 13},
 		{name: "UM", start:13, end: 19},
 		{name: "ID", start:19, end: 32},
-		{name: "CRC", start:32, end: 56},
+		{name: "AP", start:32, end: 56},
 	},
-	6: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "CRC", start:32, end: 56},
-	},
-	7: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "CRC", start:32, end: 56},
-	},
-	8: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "CRC", start:32, end: 56},
-	},
-	9: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "CRC", start:32, end: 56},
-	},
-	10: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "CRC", start:32, end: 56},
-	},
-	11: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "CA", start:5, end: 8},
-		{name: "AA", start:8, end: 32},
-		{name: "CRC", start:32, end: 56},
-	},
-	12: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "CRC", start:32, end: 56},
-	},
-	13: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "CRC", start:32, end: 56},
-	},
-	14: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "CRC", start:32, end: 56},
-	},
-	15: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "CRC", start:32, end: 56},
-	},
-	16: []featureBreakdown{//RI,MV Fields
+	//6: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "AP", start:32, end: 56},
+	//},
+	//7: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "AP", start:32, end: 56},
+	//},
+	//8: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "AP", start:32, end: 56},
+	//},
+	//9: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "AP", start:32, end: 56},
+	//},
+	//10: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "AP", start:32, end: 56},
+	//},
+	//11: []featureBreakdown{ // DF, CA, AA, PI
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "CA", start:5, end: 8},
+	//	{name: "AA", start:8, end: 32},
+	//	{name: "PI", start:32, end: 56},
+	//},
+	//12: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "AP", start:32, end: 56},
+	//},
+	//13: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "AP", start:32, end: 56},
+	//},
+	//14: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "AP", start:32, end: 56},
+	//},
+	//15: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "AP", start:32, end: 56},
+	//},
+	16: []featureBreakdown{//DF(5), VS(1), SL(3), RI(4), AC(13), MV (56), AP(24) ?? 106
 		{name: "DF", start:0, end: 5},
 		{name: "VS", start:5, end: 6},
-		{name: "CC", start:6, end: 7},
-		{name: "??", start:7, end: 8},
+		{name: "??", start:6, end: 8},
 		{name: "SL", start:8, end: 11},
-		{name: "??", start:11, end: 19},
+		{name: "??", start:11, end: 13},
+		{name: "RI", start:13, end: 17},
+		{name: "??", start:17, end: 19},
 		{name: "AC", start:19, end: 32},
-		{name: "??", start:32, end: 88},
-		{name: "CRC", start:88, end: 112},
+		{name: "MV", start:32, end: 88},
+		{name: "AP", start:88, end: 112},
 	},
-	17: []featureBreakdown{
+	17: []featureBreakdown{ // DF, CA, AA, ME, PI
 		{name: "DF", start:0, end: 5},
 		{name: "CA", start:5, end: 8},
 		{name: "AA", start:8, end: 32},
 		{name: "TC", start:32, end: 37},
-		{name: "DATA", start:40, end: 88, subFields: asdbFeatures},
-		{name: "CRC", start:88, end: 112},
+		{name: "ME", start:40, end: 88, subFields: asdbFeatures},
+		{name: "PI", start:88, end: 112},
 	},
 	18: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
@@ -259,38 +262,38 @@ var frameFeatures = map[byte][]featureBreakdown{
 		{name: "??", start:5, end: 88},
 		{name: "CRC", start:88, end: 112},
 	},
-	22: []featureBreakdown{
+	//22: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//},
+	//23: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//},
+	24: []featureBreakdown{// DF, KE, ND, MD, AP
 		{name: "DF", start:0, end: 5},
 	},
-	23: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-	},
-	24: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-	},
-	25: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-	},
-	26: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-	},
-	27: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-	},
-	28: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "??", start:5, end: 32},
-		{name: "CRC", start:32, end: 56},
-	},
-	29: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-	},
-	30: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-	},
-	31: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-	},
+	//25: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//},
+	//26: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//},
+	//27: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//},
+	//28: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//	{name: "??", start:5, end: 32},
+	//	{name: "CRC", start:32, end: 56},
+	//},
+	//29: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//},
+	//30: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//},
+	//31: []featureBreakdown{
+	//	{name: "DF", start:0, end: 5},
+	//},
 }
 
 func (frame *Frame) Describe(output io.Writer) {
@@ -303,6 +306,7 @@ func (frame *Frame) Describe(output io.Writer) {
 	case 0: // Airborne position, baro altitude only
 		frame.showVerticalStatus(output)
 		frame.showAltitude(output)
+		frame.showRInformation(output)
 	case 1, 2, 3: // Aircraft Identification and Category
 		frame.showFlightStatus(output)
 		frame.showFlightId(output)
@@ -318,6 +322,7 @@ func (frame *Frame) Describe(output io.Writer) {
 	case 16: //DF_16
 		frame.showVerticalStatus(output)
 		frame.showAltitude(output)
+		frame.showRInformation(output)
 	case 17: //DF_17
 		frame.showICAO(output)
 		frame.showCapability(output)
@@ -421,6 +426,10 @@ func (f *Frame) showCprLatLon(output io.Writer) {
 	fmt.Fprintln(output, "")
 }
 
+func (f *Frame)showRInformation(output io.Writer) {
+	fmt.Fprintf(output, "TCAS            : (%d) %s\n", f.ri, rInformationField[f.ri])
+}
+
 func (f *Frame) showAdsb(output io.Writer) {
 	fmt.Fprintf(output, "ADSB Msg Type   : %d (Sub Type %d): %s\n", f.messageType, f.messageSubType, f.MessageTypeString())
 
@@ -496,7 +505,7 @@ func (f *Frame) showBitString(output io.Writer) {
 
 func (frame *Frame) formatBitString(features []featureBreakdown) string {
 	var header, separator, bits, rawBits, bitFmt, bitDesc, footer, suffix string
-	var padLen, realLen, shownBitCount int
+	var padLen, realLen, shownBitCount, i int
 
 	for _, i := range frame.message {
 		rawBits += fmt.Sprintf("%08s", strconv.FormatUint(uint64(i), 2))
@@ -512,7 +521,16 @@ func (frame *Frame) formatBitString(features []featureBreakdown) string {
 		bitFmt = fmt.Sprintf(" %%- %ds |", padLen)
 		header += fmt.Sprintf(bitFmt, f.name)
 		separator += strings.Repeat("-", padLen + 2) + "+"
-		bits += fmt.Sprintf(bitFmt, rawBits[f.start: f.end])
+		//bits += fmt.Sprintf(bitFmt, rawBits[f.start: f.end])
+		bits += " "
+		for i = f.start; i < f.end; i++ {
+			if i % 8 == 0 {
+				bits += "<span class='byte-start'>" + string(rawBits[i]) + "</span>"
+			} else {
+				bits += string(rawBits[i])
+			}
+		}
+		bits += strings.Repeat(" ", padLen - (f.end - f.start) + 1) + "|"
 		bitDesc += fmt.Sprintf(bitFmt, strconv.Itoa(f.start))
 
 		if 1 == realLen {
