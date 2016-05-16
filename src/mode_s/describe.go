@@ -356,10 +356,12 @@ func (frame *Frame) Describe(output io.Writer) {
 		frame.showFlightStatus(output)
 		frame.showAltitude(output)
 		frame.showFlightNumber(output)
+		frame.showBdsData(output)
 	case 21: //DF_21
 		frame.showFlightStatus(output)
 		frame.showIdentity(output) // gillham encoded squawk
 		frame.showFlightNumber(output)
+		frame.showBdsData(output)
 	}
 
 	frame.showBitString(output)
@@ -515,6 +517,12 @@ func (f *Frame) DownLinkFormat() string {
 	}
 	return "Unknown Downlink Format"
 }
+
+func (f *Frame) showBdsData(output io.Writer) {
+	fmt.Fprintln(output, "BDS Info")
+	fmt.Fprintf(output, "  BDS Msg       : %s\n", f.DescribeBds())
+}
+
 
 func (f *Frame) showBitString(output io.Writer) {
 	if features, ok := frameFeatures[f.downLinkFormat]; ok {

@@ -9,13 +9,9 @@ import (
 	"fmt"
 )
 
-func main() {
-	if 2 != len(os.Args) {
-		println("first arg must be file of stored AVS packets")
-		return
-	}
+func gatherSamples(filePath string) {
 
-	f, err := os.Open(os.Args[1])
+	f, err := os.Open(filePath)
 	if nil != err {
 		println(err)
 		return
@@ -32,7 +28,7 @@ func main() {
 
 		frame, err := mode_s.DecodeString(line, time.Now())
 		if nil != err {
-			println(err)
+			println("Error! ", line, err.Error())
 			continue
 		}
 
@@ -47,7 +43,7 @@ func main() {
 			existingSamples[key] = true
 		}
 
-		if len(samples[frame.DownLinkType()]) < 10 {
+		if len(samples[frame.DownLinkType()]) < 100 {
 			if _, exist := existingSamples[line]; !exist {
 				samples[frame.DownLinkType()] = append(samples[frame.DownLinkType()], line)
 				existingSamples[line] = true
@@ -68,4 +64,44 @@ func main() {
 	for k, s := range samples {
 		println(k, ":", "['" + strings.Join(s, "', '") + "'],")
 	}
+}
+
+func showTypes(filePath string) {
+	f, err := os.Open(filePath)
+	if nil != err {
+		println(err)
+		return
+	}
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		frame, err := mode_s.DecodeString(line, time.Now())
+		if nil != err {
+			//println("Error! ", line, err.Error())
+			continue
+		}
+
+		fmt.Printf("DF%02d\t%s\n",frame.DownLinkType(), line)
+	}
+
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		println("first arg must be file of stored AVS packets")
+		return
+	}
+	var cmd string
+	if 3 <= len(os.Args) {
+		cmd = os.Args[2]
+	}
+
+	switch cmd {
+	case "type":
+		showTypes(os.Args[1])
+	default:
+		gatherSamples(os.Args[1])
+	}
+
 }

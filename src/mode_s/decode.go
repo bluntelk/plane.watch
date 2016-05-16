@@ -395,22 +395,9 @@ func (f *Frame) decodeFlightNumber() {
 	f.flight[7] = aisCharset[f.message[10] & 63]
 }
 
-func (f *Frame) decodeCommB() {
-	if f.message[4] == 0x20 {
-		// BDS 2,0 Aircraft Identification
-		f.decodeFlightNumber()
-	}
-}
-
 func (f *Frame) decodeFlightId() {
 	if f.message[4] == 32 && len(f.message) >= 10 {
 		// Aircraft Identification
 		f.decodeFlightNumber()
 	}
 }
-
-
-//func (list *icaoAddressWhiteList)updateLastSeen(addr uint32) {
-// look for our addr
-//	for i, icao := range list.ica
-//}
