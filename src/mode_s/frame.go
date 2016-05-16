@@ -149,6 +149,52 @@ var slInformationField = []string{
 	"TCAS operates at sensitivity level 6.",
 	"TCAS operates at sensitivity level 7.",
 }
+
+var bdsFields = map[string]string{
+	// Eurocontrol Format
+	"1.0": "Capability Report",
+	"1.7": "Engine No. 1 Report",
+	"2.0": "Flight Identity",
+	"2.1": "Aircraft Referenced State Vector Report",
+	"2.4": "Weight and Balance Report",
+	"2.7": "Engine No. 2 Report",
+	"2.A": "Radio System Frequency Report VHF",
+	"3.1": "Waypoint Information",
+	"3.7": "Engine No. 3 Report",
+	"4.0": "Path and Attitude Report",
+	"4.1": "Waypoint Identifier",
+	"4.7": "Engine No. 4 Report",
+	"5.0": "Speed and Track Report",
+	"5.1": "Position Report",
+	"6.0": "Ground Referenced State Vector",
+	"6.1": "G.M.T. Report",
+	"7.0": "Aircraft Intention 1 Report",
+	"7.1": "Meteorological Report",
+	"8.0": "Aircraft Intention 2 Report",
+	"9.0": "Aircraft Intention 3 Report",
+	"A.0": "Deviation Report",
+	"B.0": "Airspeeds Report",
+	"C.0": "Altitude Report",
+	"D.0": "Intention Report 1",
+	"D.1": "Turn Indication Report 1",
+	"D.2": "Turn Indication Report 2",
+	// Mode S Specific Services Format
+	"0.5": "Extended Squitter Airborne Position",
+	"0.6": "Extended Squitter Surface Position",
+	"0.7": "Extended Squitter Status",
+	"1.0": "Data Link Capability Report",
+	"2.0": "Aircraft Identity",
+	"4.0": "Aircraft Intention",
+	"4.3": "Aircraft Intention",
+	"4.4": "Meteorological Routine Report",
+	"4.5": "Meteorological Hazard Report",
+	"5.0": "Track and Turn Report",
+	"5.1": "Position Report Coarse",
+	"5.2": "Position Report Fine",
+	"5.3": "Air-referenced State Vector",
+	"6.0": "Heading and Speed Report",
+}
+
 var aisCharset string = "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456789??????"
 
 func (f *Frame) DownLinkType() byte {

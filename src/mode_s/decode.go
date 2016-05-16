@@ -88,8 +88,7 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 		return frame, err
 	}
 
-	// get the down link format (DF) - first 5 bits
-	frame.downLinkFormat = frame.message[0] >> 3
+	frame.decodeDownlink()
 
 	// now see if the message we got matches up with the DF format we decoded
 	if int(frame.getMessageLengthBytes()) != len(frame.message) {
@@ -146,6 +145,17 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	}
 
 	return frame, err
+}
+
+func (f *Frame) decodeDownlink() {
+	// DF24 is a little different. if the first two bits of the message are set, it is a DF24 message
+	if f.message[0] & 0xc0 == 0xc0 {
+		f.downLinkFormat = 24
+	} else {
+		// get the down link format (DF) - first 5 bits
+		f.downLinkFormat = f.message[0] >> 3
+	}
+
 }
 
 func (f *Frame) SetTimeStamp(timeStamp string) {
@@ -251,7 +261,7 @@ func (f *Frame) decodeRInformationField() {
 	f.ri = (f.message[1] & 7) << 1 | (f.message[2] & 0x80) >> 7
 }
 func (f *Frame) decodeSLField() {
-	f.sl  = (f.message[1] & 0xe0) >> 5
+	f.sl = (f.message[1] & 0xe0) >> 5
 }
 
 // Determines the ICAO address from bytes 2,3 and 4

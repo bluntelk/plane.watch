@@ -44,10 +44,10 @@ func (f *Frame) decodeModeSChecksum() bool {
 
 func (f *Frame) checkCrc() error {
 	switch f.downLinkFormat {
-	case 0,4,5,11,16,20,21,24:
-		// decoding/checking CRC here is tricky
+	case 0,4,5,16,20,21,24:
+		// decoding/checking CRC here is tricky. Field Type AP
 		return nil;
-	case 17,18:
+	case 11,17,18:// Field Type PI
 		if f.decodeModeSChecksum() {
 			return nil
 		}
