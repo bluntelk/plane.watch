@@ -138,7 +138,7 @@ func GetPlane(ICAO uint32) Plane {
 	}
 	var p Plane
 	p.IcaoIdentifier = ICAO
-	p.Icao = fmt.Sprintf("%6X", ICAO)
+	p.Icao = fmt.Sprintf("%06X", ICAO)
 	p.locationHistory = make([]PlaneLocation, 0)
 	p.ZeroCpr()
 	planeList[ICAO] = p
