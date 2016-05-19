@@ -26,16 +26,8 @@ type Position struct {
 	unit                int
 	onGround            bool    /* VS Bit */
 	validVerticalStatus bool
+	validAltitude       bool
 	superSonic          bool
-}
-
-type df11 struct {
-	capability byte //  DF11 Capability Sub Type
-}
-type df4_5_20_21 struct {
-	flightStatus int
-	dr           int /* Request extraction of down link request. */
-	um           int /* Request extraction of down link request. */
 }
 
 type df17 struct {
@@ -50,13 +42,22 @@ type df17 struct {
 	flight         []byte /* 8 chars flight number. */
 }
 
+type raw_fields struct {
+	// fields named what they are. see describe.go for what they mean
+
+	df, vs, ca, cc, sl, ri, dr, um, fs byte
+	ac, ap, id, aa, pi                 uint32
+	mv, me, mb                         uint64
+	md                                 [10]byte
+
+	ac_q, ac_m                         bool
+}
+
 type Frame struct {
+	raw_fields
 	bds
-	df11
 	df17
-	df4_5_20_21
 	Position
-	ri, sl         byte // the RI & SL information field in DF0 & DF16
 	mode           string
 	timeStamp      time.Time
 	raw            string
@@ -99,7 +100,7 @@ var capabilityTable = map[byte]string{
 	7: "Level 7 DR≠0 or FS=3, 4 or 5",
 }
 
-var flightStatusTable = map[int]string{
+var flightStatusTable = map[byte]string{
 	0: "Normal, Airborne",
 	1: "Normal, On the ground",
 	2: "ALERT, Airborne",
@@ -179,11 +180,11 @@ func (f *Frame) AltitudeUnits() string {
 }
 
 func (f *Frame) FlightStatusString() string {
-	return flightStatusTable[f.flightStatus]
+	return flightStatusTable[f.fs]
 }
 
-func (f *Frame) FlightStatusInt() int {
-	return f.flightStatus
+func (f *Frame) FlightStatus() byte {
+	return f.fs
 }
 
 func (f *Frame) Velocity() float64 {

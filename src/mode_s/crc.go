@@ -6,6 +6,8 @@ var (
 	modes_checksum_table  [256]uint32
 )
 
+const MODES_GENERATOR_POLY uint32 = 0xfff409
+
 func init() {
 	var i uint32
 	var j int

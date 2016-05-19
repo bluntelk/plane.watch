@@ -40,7 +40,7 @@ type PlaneLocation struct {
 type Flight struct {
 	Identifier string
 	Status     string
-	StatusId   int
+	StatusId   byte
 }
 
 type Plane struct {

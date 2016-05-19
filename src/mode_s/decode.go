@@ -15,8 +15,6 @@ const (
 	MODES_SHORT_MSG_BITS = (MODES_SHORT_MSG_BYTES * 8)
 )
 
-const MODES_GENERATOR_POLY uint32 = 0xfff409
-
 type icaoList struct {
 	icao     int
 	lastSeen time.Time
@@ -88,7 +86,7 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 		return frame, err
 	}
 
-	frame.decodeDownlink()
+	frame.decodeDownLinkFormat()
 
 	// now see if the message we got matches up with the DF format we decoded
 	if int(frame.getMessageLengthBytes()) != len(frame.message) {
@@ -104,50 +102,52 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	switch frame.downLinkFormat {
 	case 0: // Airborne position, baro altitude only
 		frame.decodeVerticalStatus()
-		frame.decode13BitAltitudeField()
-		frame.decodeRInformationField()
-		frame.decodeSLField()
-	case 1, 2, 3: // Aircraft Identification and Category
-		frame.decodeFlightStatus()
-		frame.decodeFlightId()
+		frame.decodeCrossLinkCapability()
+		frame.decodeSensitivityLevel()
+		frame.decodeReplyInformation()
+		frame.decode13bitAltitudeCode()
 	case 4:
 		frame.decodeFlightStatus()
-		frame.decode13BitAltitudeField()
+		frame.decodeDownLinkRequest()
+		frame.decodeUtilityMessage()
+		frame.decode13bitAltitudeCode()
 	case 5: //DF_5
 		frame.decodeFlightStatus()
+		frame.decodeDownLinkRequest()
+		frame.decodeUtilityMessage()
 		frame.decodeSquawkIdentity(2, 3) // gillham encoded squawk
 	case 11: //DF_11
 		frame.decodeICAO()
 		frame.decodeCapability()
 	case 16: //DF_16
 		frame.decodeVerticalStatus()
-		frame.decode13BitAltitudeField()
-		frame.decodeRInformationField()
-		frame.decodeSLField()
+		frame.decode13bitAltitudeCode()
+		frame.decodeReplyInformation()
+		frame.decodeSensitivityLevel()
 	case 17: //DF_17
 		frame.decodeICAO()
 		frame.decodeCapability()
 		frame.decodeDF17()
 	case 18: //DF_18
 		frame.decodeCapability() // control field
-		if 0 == frame.capability {
+		if 0 == frame.ca {
 			frame.decodeICAO()
 			frame.decodeDF17()
 		}
 	case 20: //DF_20
 		frame.decodeFlightStatus()
-		frame.decode13BitAltitudeField()
-		frame.decodeCommB()
+		frame.decode13bitAltitudeCode()
+		//frame.decodeCommB()
 	case 21: //DF_21
 		frame.decodeFlightStatus()
 		frame.decodeSquawkIdentity(2, 3) // gillham encoded squawk
-		frame.decodeCommB()
+		//frame.decodeCommB()
 	}
 
 	return frame, err
 }
 
-func (f *Frame) decodeDownlink() {
+func (f *Frame) decodeDownLinkFormat() {
 	// DF24 is a little different. if the first two bits of the message are set, it is a DF24 message
 	if f.message[0] & 0xc0 == 0xc0 {
 		f.downLinkFormat = 24
@@ -211,9 +211,9 @@ func (f *Frame) parseRawToMessage() error {
 }
 
 func (f *Frame) decodeCapability() {
-	f.capability = f.message[0] & 7
+	f.ca = f.message[0] & 7
 
-	switch f.capability {
+	switch f.ca {
 	case 4:
 		f.validVerticalStatus = true
 		f.onGround = true
@@ -223,26 +223,29 @@ func (f *Frame) decodeCapability() {
 	default:
 	}
 }
+func (f *Frame) decodeCrossLinkCapability() {
+	f.cc = f.message[0] & 0x2 >> 1
+}
 
 func (f *Frame) decodeFlightStatus() {
 	// first 5 bits are the downlink format
 	// bits 5,6,7 are the flight status
-	f.flightStatus = int(f.message[0] & 7)
-	if f.flightStatus == 0 || f.flightStatus == 2 {
+	f.fs = f.message[0] & 0x7
+	if f.fs == 0 || f.fs == 2 {
 		f.validVerticalStatus = true
 		f.onGround = false
 	}
-	if f.flightStatus == 1 || f.flightStatus == 3 {
+	if f.fs == 1 || f.fs == 3 {
 		f.validVerticalStatus = true
 		f.onGround = true
 	}
-	if f.flightStatus == 4 || f.flightStatus == 5 {
+	if f.fs == 4 || f.fs == 5 {
 		// special pos
 		f.validVerticalStatus = true
 		f.onGround = false // assume in the air
-		f.special = flightStatusTable[f.flightStatus]
+		f.special = flightStatusTable[f.fs]
 	}
-	if f.flightStatus == 2 || f.flightStatus == 3 || f.flightStatus == 4 {
+	if f.fs == 2 || f.fs == 3 || f.fs == 4 {
 		// ALERT!
 		f.alert = true
 	}
@@ -250,18 +253,25 @@ func (f *Frame) decodeFlightStatus() {
 
 // VS == Vertical Status
 func (f *Frame) decodeVerticalStatus() {
-	if f.message[0] & 4 != 0 {
-		f.onGround = true
-	}
+	f.vs = f.message[0] & 4 >> 2
+	f.onGround = f.vs != 0
 	f.validVerticalStatus = true
 }
 
 // bits 13,14,15 and 16 make up the RI field
-func (f *Frame) decodeRInformationField() {
+func (f *Frame) decodeReplyInformation() {
 	f.ri = (f.message[1] & 7) << 1 | (f.message[2] & 0x80) >> 7
 }
-func (f *Frame) decodeSLField() {
+func (f *Frame) decodeSensitivityLevel() {
 	f.sl = (f.message[1] & 0xe0) >> 5
+}
+
+func (f *Frame) decodeDownLinkRequest() {
+	f.dr = (f.message[1] & 0xf8) >> 3
+}
+
+func (f *Frame) decodeUtilityMessage(){
+	f.um = (f.message[1] & 0x7) << 3 | (f.message[2] & 0xe0) >> 5
 }
 
 // Determines the ICAO address from bytes 2,3 and 4
@@ -316,24 +326,32 @@ func (f *Frame) decodeAC12AltitudeField() {
 
 // bits 20-32 are the altitude
 // the 1 bits are AC13 field
-// 00000000 00000000 00011111 1X1Y1111 00000000
-func (f *Frame) decode13BitAltitudeField() error {
-	var m_bit int = int(f.message[3] & (1 << 6)) // bit 26. 0 == feet, 1 = metres
-	var q_bit int = int(f.message[3] & (1 << 4)) // bit 28
+// 00000000 00000000 00011111 1M1Q1111 00000000
+func (f *Frame) decode13bitAltitudeCode() error {
+
+	f.ac = uint32(f.message[2] & 0xf) << 8 | uint32(f.message[3])
+
+	// altitude
+	f.ac_m = f.ac & 0x40 == 0x40 // bit 26 of message. 0 == feet, 1 = metres
+	// resolution
+	f.ac_q = f.ac & 0x10 == 0x10 // bit 28 of message. 1 = 25 ft encoding, 0 = Gillham Mode C encoding
 
 	// make sure all the bits are good
 
-	if m_bit == 0 {
+	if !f.ac_m {
 		f.unit = MODES_UNIT_FEET
-		if q_bit == 1 {
+
+		/* N is the 11 bit integer resulting from the removal of bit Q and M */
+		var msg2 int32 = int32(f.message[2])
+		var msg3 int32 = int32(f.message[3])
+		var n int32 = int32((msg2 & 31) << 6) | ((msg3 & 0x80) >> 2) | ((msg3 & 0x20) >> 1) | (msg3 & 15)
+
+		if f.ac_q {
 			// 25 ft increments
-			/* N is the 11 bit integer resulting from the removal of bit Q and M */
-			var msg2 int32 = int32(f.message[2])
-			var msg3 int32 = int32(f.message[3])
-			var n int32 = int32((msg2 & 31) << 6) | ((msg3 & 0x80) >> 2) | ((msg3 & 0x20) >> 1) | (msg3 & 15)
 			/* The final altitude is due to the resulting number multiplied
 			 * by 25, minus 1000. */
 			f.altitude = (n * 25) - 1000
+			f.validAltitude = true
 		} else {
 			// altitude reported in feet, 100ft increments
 			/* Annex 10 — Aeronautical Telecommunications:
@@ -343,21 +361,12 @@ func (f *Frame) decode13BitAltitudeField() error {
 			   pattern for Mode C replies of 3.1.1.7.12.2.3. Starting with bit 20 the sequence shall be
 			   C1, A1, C2, A2, C4, A4, ZERO, B1, ZERO, B2, D2, B4, D4.
 			*/
-			var msg2 int32 = int32(f.message[2])
-			var msg3 int32 = int32(f.message[3])
-			var n int32 = int32((msg2 & 31) << 6) | ((msg3 & 0x80) >> 2) | ((msg3 & 0x20) >> 1) | (msg3 & 15)
 
 			f.altitude = gillhamToAltitude(n)
+			f.validAltitude = true
 		}
 	} else {
 		f.unit = MODES_UNIT_METRES
-		/* TODO: Implement altitude when meter unit is selected. */
-		var msg2 int32 = int32(f.message[2])
-		var msg3 int32 = int32(f.message[3])
-		var n int32 = int32((msg2 & 31) << 6) | int32((msg3 & 0x80) >> 2) | int32(msg3 & 15)
-
-		// bits 20,21,22,23,24,25, 27,28,29,30,31,32 are used for altitude
-		f.altitude = n
 	}
 	return nil
 }

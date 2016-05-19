@@ -71,7 +71,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		plane.Location.AltitudeUnits = frame.AltitudeUnits()
 		plane.Location.TimeStamp = time.Now()
 		plane.Flight.Status = frame.FlightStatusString()
-		plane.Flight.StatusId = frame.FlightStatusInt()
+		plane.Flight.StatusId = frame.FlightStatus()
 		if 5 == frame.DownLinkType() || 21 == frame.DownLinkType() {
 			plane.SquawkIdentity = frame.SquawkIdentity()
 		}

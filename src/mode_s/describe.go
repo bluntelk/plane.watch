@@ -137,7 +137,7 @@ var asdbFeatures = map[byte][]featureBreakdown{
 
 var frameFeatures = map[byte][]featureBreakdown{
 
-	0: []featureBreakdown{ // DF, VS, CC, SL, RI, AC, AP
+	0: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
 		{name: "VS", start:5, end: 6},
 		{name: "CC", start:6, end: 7},
@@ -149,25 +149,7 @@ var frameFeatures = map[byte][]featureBreakdown{
 		{name: "AC", start:20, end: 32},
 		{name: "AP", start:32, end: 56},
 	},
-	//1: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "FS", start:5, end: 8},
-	//	{name: "??", start:8, end: 32},
-	//	{name: "AP", start:32, end: 56},
-	//},
-	//2: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "FS", start:5, end: 8},
-	//	{name: "??", start:8, end: 32},
-	//	{name: "AP", start:32, end: 56},
-	//},
-	//3: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "FS", start:5, end: 8},
-	//	{name: "??", start:8, end: 32},
-	//	{name: "AP", start:32, end: 56},
-	//},
-	4: []featureBreakdown{ // DF, FS, DR, UM, AC, AP
+	4: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
 		{name: "FS", start:5, end: 8},
 		{name: "DR", start:8, end: 13},
@@ -175,7 +157,7 @@ var frameFeatures = map[byte][]featureBreakdown{
 		{name: "AC", start:19, end: 32},
 		{name: "AP", start:32, end: 56},
 	},
-	5: []featureBreakdown{ // DF, FS, DR, UM, ID, AP
+	5: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
 		{name: "FS", start:5, end: 8},
 		{name: "DR", start:8, end: 13},
@@ -183,49 +165,15 @@ var frameFeatures = map[byte][]featureBreakdown{
 		{name: "ID", start:19, end: 32},
 		{name: "AP", start:32, end: 56},
 	},
-	//6: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "AP", start:32, end: 56},
-	//},
-	//7: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "AP", start:32, end: 56},
-	//},
-	//8: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "AP", start:32, end: 56},
-	//},
-	//9: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "AP", start:32, end: 56},
-	//},
-	//10: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "AP", start:32, end: 56},
-	//},
-	11: []featureBreakdown{ // DF, CA, AA, PI
+
+	11: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
 		{name: "CA", start:5, end: 8},
 		{name: "AA", start:8, end: 32},
 		{name: "PI", start:32, end: 56},
 	},
-	//12: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "AP", start:32, end: 56},
-	//},
-	//13: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "AP", start:32, end: 56},
-	//},
-	//14: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "AP", start:32, end: 56},
-	//},
-	//15: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "AP", start:32, end: 56},
-	//},
-	16: []featureBreakdown{//DF(5), VS(1), SL(3), RI(4), AC(13), MV (56), AP(24) ?? 106
+
+	16: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
 		{name: "VS", start:5, end: 6},
 		{name: "  ", start:6, end: 8},
@@ -237,7 +185,7 @@ var frameFeatures = map[byte][]featureBreakdown{
 		{name: "MV", start:32, end: 88},
 		{name: "AP", start:88, end: 112},
 	},
-	17: []featureBreakdown{ // DF, CA, AA, ME, PI
+	17: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
 		{name: "CA", start:5, end: 8},
 		{name: "AA", start:8, end: 32},
@@ -262,7 +210,7 @@ var frameFeatures = map[byte][]featureBreakdown{
 		{name: "MB", start:32, end: 88},
 		{name: "AP", start:88, end: 112},
 	},
-	21: []featureBreakdown{ // DF(5), FS(3), DR(5), UM(6), AC(13), MB(56), AP(24)
+	21: []featureBreakdown{
 		{name: "DF", start:0, end: 5},
 		{name: "FS", start:5, end: 8},
 		{name: "DR", start:8, end: 13}, //
@@ -271,13 +219,7 @@ var frameFeatures = map[byte][]featureBreakdown{
 		{name: "MB", start:32, end: 88},
 		{name: "AP", start:88, end: 112},
 	},
-	//22: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//},
-	//23: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//},
-	24: []featureBreakdown{// DF, KE, ND, MD, AP
+	24: []featureBreakdown{
 		{name: "DF", start:0, end: 2},
 		{name: "  ", start:2, end: 3},
 		{name: "KE", start:3, end: 4},
@@ -285,29 +227,6 @@ var frameFeatures = map[byte][]featureBreakdown{
 		{name: "MD", start:8, end: 88},
 		{name: "AP", start:88, end: 112},
 	},
-	//25: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//},
-	//26: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//},
-	//27: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//},
-	//28: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//	{name: "??", start:5, end: 32},
-	//	{name: "CRC", start:32, end: 56},
-	//},
-	//29: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//},
-	//30: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//},
-	//31: []featureBreakdown{
-	//	{name: "DF", start:0, end: 5},
-	//},
 }
 
 func (frame *Frame) Describe(output io.Writer) {
@@ -317,40 +236,38 @@ func (frame *Frame) Describe(output io.Writer) {
 	fmt.Fprintf(output, "Frame           : %s\n", frame.raw)
 	// decode the specific DF type
 	switch frame.downLinkFormat {
-	case 0: // Airborne position, baro altitude only
+	case 0:
 		frame.showVerticalStatus(output)
+		frame.showCrossLinkCapability(output)
+		frame.showSensitivityLevel(output)
+		frame.showReplyInformation(output)
 		frame.showAltitude(output)
-		frame.showRInformation(output)
-		frame.showSLField(output)
-	case 1, 2, 3: // Aircraft Identification and Category
-		frame.showFlightStatus(output)
-		frame.showFlightId(output)
 	case 4:
 		frame.showFlightStatus(output)
 		frame.showAltitude(output)
-	case 5: //DF_5
+	case 5:
 		frame.showFlightStatus(output)
 		frame.showIdentity(output)
-	case 11: //DF_11
+	case 11:
 		frame.showICAO(output)
 		frame.showCapability(output)
-	case 16: //DF_16
+	case 16:
 		frame.showVerticalStatus(output)
 		frame.showAltitude(output)
-		frame.showRInformation(output)
-		frame.showSLField(output)
-	case 17: //DF_17
+		frame.showReplyInformation(output)
+		frame.showSensitivityLevel(output)
+	case 17:
 		frame.showICAO(output)
 		frame.showCapability(output)
 		frame.showAdsb(output)
 	case 18: //DF_18
 		//frame.showCapability() // control field
-		if 0 == frame.capability {
+		if 0 == frame.ca {
 			frame.showICAO(output)
 			frame.showCapability(output)
 			frame.showAdsb(output)
 		} else {
-			fmt.Fprintln(output, "Unable to decode DF18 Capability:", frame.capability)
+			fmt.Fprintln(output, "Unable to decode DF18 Capability:", frame.ca)
 		}
 	case 20: //DF_20
 		frame.showFlightStatus(output)
@@ -384,13 +301,17 @@ func (f *Frame) showVerticalRate(output io.Writer) {
 	fmt.Fprintln(output, "")
 }
 
+func (f *Frame) showCrossLinkCapability(output io.Writer) {
+	fmt.Fprintf(output, "CrossLink Cap   : %d\n", f.cc)
+}
+
 func (f *Frame) showAltitude(output io.Writer) {
-	fmt.Fprintf(output, "Altitude        : %d %s", f.altitude, f.AltitudeUnits())
+	fmt.Fprintf(output, "Altitude        : %d %s (q: %t, m: %t)", f.altitude, f.AltitudeUnits(), f.ac_q, f.ac_m)
 	fmt.Fprintln(output, "")
 }
 
 func (f *Frame) showFlightStatus(output io.Writer) {
-	fmt.Fprintf(output, "Flight Status   : (%d) %s\n", f.flightStatus, flightStatusTable[f.flightStatus])
+	fmt.Fprintf(output, "Flight Status   : (%d) %s\n", f.fs, flightStatusTable[f.fs])
 	f.showVerticalStatus(output)
 	if "" != f.special {
 		fmt.Fprintf(output, "Special Status  : %s", f.special)
@@ -411,7 +332,7 @@ func (f *Frame) showICAO(output io.Writer) {
 
 func (f *Frame) showCapability(output io.Writer) {
 	f.showVerticalStatus(output)
-	fmt.Fprintf(output, "Plane Mode S Cap: %s", capabilityTable[f.capability])
+	fmt.Fprintf(output, "Plane Mode S Cap: %s", capabilityTable[f.ca])
 	fmt.Fprintln(output, "")
 }
 
@@ -444,10 +365,10 @@ func (f *Frame) showCprLatLon(output io.Writer) {
 	fmt.Fprintln(output, "")
 }
 
-func (f *Frame)showRInformation(output io.Writer) {
+func (f *Frame)showReplyInformation(output io.Writer) {
 	fmt.Fprintf(output, "TCAS            : (%d) %s\n", f.ri, rInformationField[f.ri])
 }
-func (f *Frame)showSLField(output io.Writer) {
+func (f *Frame)showSensitivityLevel(output io.Writer) {
 	fmt.Fprintf(output, "TCAS            : (%d) %s\n", f.sl, slInformationField[f.sl])
 }
 
