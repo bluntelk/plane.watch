@@ -127,12 +127,12 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	case 17: //DF_17
 		frame.decodeICAO()
 		frame.decodeCapability()
-		frame.decodeDF17()
+		frame.decodeAdsb()
 	case 18: //DF_18
 		frame.decodeCapability() // control field
 		if 0 == frame.ca {
 			frame.decodeICAO()
-			frame.decodeDF17()
+			frame.decodeAdsb()
 		}
 	case 20: //DF_20
 		frame.decodeFlightStatus()
@@ -312,16 +312,6 @@ func (f *Frame) decodeSquawkIdentity(byte1, byte2 int) {
 	c = ((msg2 & 0x01) << 2) | ((msg2 & 0x04) >> 1) | ((msg2 & 0x10) >> 4)
 	d = ((msg3 & 0x01) << 2) | ((msg3 & 0x04) >> 1) | ((msg3 & 0x10) >> 4)
 	f.identity = a * 1000 + b * 100 + c * 10 + d
-}
-
-// returns the AC12 Altitude Field
-func (f *Frame) getAC12Field() int32 {
-	return ((int32(f.message[5]) << 4) | (int32(f.message[6]) >> 4)) & 0x0FFF
-}
-
-func (f *Frame) decodeAC12AltitudeField() {
-	field := f.getAC12Field()
-	f.altitude = decodeAC12Field(field)
 }
 
 // bits 20-32 are the altitude

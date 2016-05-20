@@ -232,8 +232,8 @@ var frameFeatures = map[byte][]featureBreakdown{
 func (frame *Frame) Describe(output io.Writer) {
 	fmt.Fprintf(output, "MODE S Packet:\n")
 	fmt.Fprintf(output, "Length:         : %d bits\n", frame.getMessageLengthBits())
-	fmt.Fprintf(output, "Downlink Format : %d (%s)\n", frame.downLinkFormat, frame.DownLinkFormat())
 	fmt.Fprintf(output, "Frame           : %s\n", frame.raw)
+	fmt.Fprintf(output, "DF: Downlink Format : %d (%s)\n", frame.downLinkFormat, frame.DownLinkFormat())
 	// decode the specific DF type
 	switch frame.downLinkFormat {
 	case 0:
@@ -244,18 +244,22 @@ func (frame *Frame) Describe(output io.Writer) {
 		frame.showAltitude(output)
 	case 4:
 		frame.showFlightStatus(output)
+		frame.showDownLinkRequest(output)
+		frame.showUtilityMessage(output)
 		frame.showAltitude(output)
 	case 5:
 		frame.showFlightStatus(output)
+		frame.showDownLinkRequest(output)
+		frame.showUtilityMessage(output)
 		frame.showIdentity(output)
 	case 11:
-		frame.showICAO(output)
 		frame.showCapability(output)
+		frame.showICAO(output)
 	case 16:
 		frame.showVerticalStatus(output)
-		frame.showAltitude(output)
-		frame.showReplyInformation(output)
 		frame.showSensitivityLevel(output)
+		frame.showReplyInformation(output)
+		frame.showAltitude(output)
 	case 17:
 		frame.showICAO(output)
 		frame.showCapability(output)
@@ -286,36 +290,35 @@ func (frame *Frame) Describe(output io.Writer) {
 }
 
 func (f *Frame) showVerticalStatus(output io.Writer) {
-	if !f.validVerticalStatus {
+	if !f.ValidVerticalStatus() {
 		return
 	}
 	if f.onGround {
-		fmt.Fprintf(output, "Vertical Status : On The Ground");
+		fmt.Fprintln(output, "VS: Vertical Status : On The Ground");
 	} else {
-		fmt.Fprintf(output, "Vertical Status : Airborne");
+		fmt.Fprintln(output, "VS: Vertical Status : Airborne");
 	}
-	fmt.Fprintln(output, "")
 }
+
 func (f *Frame) showVerticalRate(output io.Writer) {
 	fmt.Fprintf(output, "  Vertical Rate : %d", f.verticalRate)
 	fmt.Fprintln(output, "")
 }
 
 func (f *Frame) showCrossLinkCapability(output io.Writer) {
-	fmt.Fprintf(output, "CrossLink Cap   : %d\n", f.cc)
+	fmt.Fprintf(output, "CC: CrossLink Cap   : %d\n", f.cc)
 }
 
 func (f *Frame) showAltitude(output io.Writer) {
-	fmt.Fprintf(output, "Altitude        : %d %s (q: %t, m: %t)", f.altitude, f.AltitudeUnits(), f.ac_q, f.ac_m)
+	fmt.Fprintf(output, "AC: Altitude        : %d %s (q bit: %t, m bit: %t)", f.altitude, f.AltitudeUnits(), f.ac_q, f.ac_m)
 	fmt.Fprintln(output, "")
 }
 
 func (f *Frame) showFlightStatus(output io.Writer) {
-	fmt.Fprintf(output, "Flight Status   : (%d) %s\n", f.fs, flightStatusTable[f.fs])
+	fmt.Fprintf(output, "FS: Flight Status   : (%d) %s\n", f.fs, flightStatusTable[f.fs])
 	f.showVerticalStatus(output)
 	if "" != f.special {
-		fmt.Fprintf(output, "Special Status  : %s", f.special)
-		fmt.Fprintln(output, "")
+		fmt.Fprintf(output, "FS: Special Status  : %s\n", f.special)
 	}
 	f.showAlert(output)
 }
@@ -326,20 +329,27 @@ func (f *Frame) showFlightId(output io.Writer) {
 }
 
 func (f *Frame) showICAO(output io.Writer) {
-	fmt.Fprintf(output, "ICAO            : %6X", f.icao)
+	fmt.Fprintf(output, "AA: ICAO            : %6X", f.icao)
 	fmt.Fprintln(output, "")
 }
 
 func (f *Frame) showCapability(output io.Writer) {
 	f.showVerticalStatus(output)
-	fmt.Fprintf(output, "Plane Mode S Cap: %s", capabilityTable[f.ca])
-	fmt.Fprintln(output, "")
+	fmt.Fprintf(output, "CA: Plane Mode S Cap: %s\n", capabilityTable[f.ca])
 }
 
 func (f *Frame) showIdentity(output io.Writer) {
-	fmt.Fprintf(output, "Squawk Identity : %04d", f.identity)
-	fmt.Fprintln(output, "")
+	fmt.Fprintf(output, "ID: Squawk Identity : %04d\n", f.identity)
 }
+
+func (f *Frame) showDownLinkRequest(output io.Writer) {
+	fmt.Fprintf(output, "DR: Downlink Request: (%d) %s\n", f.dr, downlinkRequestField[f.dr])
+}
+
+func (f *Frame) showUtilityMessage(output io.Writer) {
+	fmt.Fprintf(output, "UM: Utility Request : (%d) %s\n", f.um, utilityMessageField[f.um])
+}
+
 func (f *Frame) showVelocity(output io.Writer) {
 	if f.superSonic {
 		fmt.Fprintln(output, "  Super Sonic?  : Yes!")
@@ -349,10 +359,12 @@ func (f *Frame) showVelocity(output io.Writer) {
 	fmt.Fprintf(output, "  Velocity      : %0.2f", f.velocity)
 	fmt.Fprintln(output, "")
 }
+
 func (f *Frame) showHeading(output io.Writer) {
 	fmt.Fprintf(output, "  Heading       : %0.2f", f.heading)
 	fmt.Fprintln(output, "")
 }
+
 func (f *Frame) showCprLatLon(output io.Writer) {
 	fmt.Fprintln(output, "Before Decoding : Half of vehicle location")
 	var oddEven string = "Odd"
@@ -366,18 +378,25 @@ func (f *Frame) showCprLatLon(output io.Writer) {
 }
 
 func (f *Frame)showReplyInformation(output io.Writer) {
-	fmt.Fprintf(output, "TCAS            : (%d) %s\n", f.ri, rInformationField[f.ri])
+	fmt.Fprintf(output, "RI: TCAS            : (%d) %s\n", f.ri, replyInformationField[f.ri])
 }
 func (f *Frame)showSensitivityLevel(output io.Writer) {
-	fmt.Fprintf(output, "TCAS            : (%d) %s\n", f.sl, slInformationField[f.sl])
+	fmt.Fprintf(output, "SL: TCAS            : (%d) %s\n", f.sl, sensitivityLevelInformationField[f.sl])
+}
+
+func (f *Frame) showCategory(output io.Writer) {
+	if f.ValidCategory() {
+		fmt.Fprintf(output, "Aircraft Cat    : (%d:%d) %s\n", f.catType, f.catSubType, f.Category())
+	}
 }
 
 func (f *Frame) showAdsb(output io.Writer) {
-	fmt.Fprintf(output, "ADSB Msg Type   : %d (Sub Type %d): %s\n", f.messageType, f.messageSubType, f.MessageTypeString())
+	fmt.Fprintf(output, "ME: ADSB Msg Type   : %d (Sub Type %d): %s\n", f.messageType, f.messageSubType, f.MessageTypeString())
 
 	switch f.messageType {
 	case 1, 2, 3, 4:
 		f.showFlightNumber(output)
+		f.showCategory(output)
 	case 5, 6, 7, 8:
 		f.showHeading(output)
 		f.showVelocity(output)
@@ -443,7 +462,6 @@ func (f *Frame) showBdsData(output io.Writer) {
 	fmt.Fprintln(output, "BDS Info")
 	fmt.Fprintf(output, "  BDS Msg       : %s\n", f.DescribeBds())
 }
-
 
 func (f *Frame) showBitString(output io.Writer) {
 	if features, ok := frameFeatures[f.downLinkFormat]; ok {

@@ -58,7 +58,7 @@ func (df *Frame) MessageTypeString() string {
 	return name
 }
 
-func (f *Frame) decodeDF17LatLon() {
+func (f *Frame) decodeAdsbLatLon() {
 	var msg6 = int(f.message[6])
 	var msg7 = int(f.message[7])
 	var msg8 = int(f.message[8])
@@ -71,7 +71,7 @@ func (f *Frame) decodeDF17LatLon() {
 	f.cprFlagOddEven = int(msg6 & 4) >> 2
 }
 
-func (f *Frame) decodeDF17() {
+func (f *Frame) decodeAdsb() {
 
 	// Down Link Format 17 Message Types
 	f.messageType = f.message[4] >> 3
@@ -80,12 +80,17 @@ func (f *Frame) decodeDF17() {
 	if f.messageType >= 1 && f.messageType <= 4 {
 		/* Aircraft Identification and Category */
 		f.decodeFlightNumber()
+
+		f.catType = 4-f.messageType
+		f.catSubType = f.messageSubType
+		f.catValid = true
+
 	} else if f.messageType >= 5 && f.messageType <= 8 {
 		// surface position
 		f.onGround = true
 		f.validVerticalStatus = true
 
-		f.decodeDF17LatLon()
+		f.decodeAdsbLatLon()
 		f.decodeMovementField()
 
 		if f.message[5] & 0x08 != 0 {
@@ -98,7 +103,7 @@ func (f *Frame) decodeDF17() {
 		f.onGround = false
 		f.validVerticalStatus = true
 		f.decodeAC12AltitudeField() // decode altitude and unit
-		f.decodeDF17LatLon()
+		f.decodeAdsbLatLon()
 	} else if f.messageType == 19 && f.messageSubType >= 1 && f.messageSubType <= 4 {
 		/* Airborne Velocity Message */
 		f.onGround = false
@@ -219,4 +224,14 @@ func (f *Frame) decodeMovementField() {
 		}
 		f.velocity =float64(gSpeed)
 	}
+}
+
+// returns the AC12 Altitude Field
+func (f *Frame) getAC12Field() int32 {
+	return ((int32(f.message[5]) << 4) | (int32(f.message[6]) >> 4)) & 0x0FFF
+}
+
+func (f *Frame) decodeAC12AltitudeField() {
+	field := f.getAC12Field()
+	f.altitude = decodeAC12Field(field)
 }
