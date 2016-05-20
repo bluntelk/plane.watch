@@ -93,6 +93,11 @@ func main() {
 			Action: test,
 		},
 		{
+			Name: "loveme",
+			Usage: "Show me some love baby",
+			Action: love,
+		},
+		{
 			Name: "run",
 			Usage: "Gather ADSB data and sends it to plane.watch",
 			Action: run,
@@ -151,6 +156,10 @@ func test(c *cli.Context) {
 	failOnError(err, "Unable to connect to rabbit")
 
 	log.Printf("Success. You are ready to go");
+}
+
+func love(c *cli.Context) {
+	fmt.Println("Plane watch loves you! (especially Billy)")
 }
 
 func run(c *cli.Context) {
