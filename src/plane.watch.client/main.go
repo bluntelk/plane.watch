@@ -28,12 +28,6 @@ func main() {
 	app.Name = "Plane Watch Client"
 	app.Usage = "Reads from dump1090 and sends it to http://plane.watch/"
 
-	app.Action = func(c *cli.Context) error {
-		fmt.Println("Plane watch loves you! (especially Billy *saucily winks*)")
-		return nil
-	}
-
-
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name: "pw_host",
@@ -99,6 +93,11 @@ func main() {
 			Action: test,
 		},
 		{
+			Name: "loveme",
+			Usage: "Show me some love baby",
+			Action: love,
+		},
+		{
 			Name: "run",
 			Usage: "Gather ADSB data and sends it to plane.watch",
 			Action: run,
@@ -157,6 +156,10 @@ func test(c *cli.Context) {
 	failOnError(err, "Unable to connect to rabbit")
 
 	log.Printf("Success. You are ready to go");
+}
+
+func love(c *cli.Context) {
+	fmt.Println("Plane watch loves you! (especially Billy)")
 }
 
 func run(c *cli.Context) {
