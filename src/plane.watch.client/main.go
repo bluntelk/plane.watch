@@ -28,6 +28,12 @@ func main() {
 	app.Name = "Plane Watch Client"
 	app.Usage = "Reads from dump1090 and sends it to http://plane.watch/"
 
+	app.Action = func(c *cli.Context) error {
+		fmt.Println("Plane watch loves you! (especially Billy *saucily winks*)")
+		return nil
+	}
+
+
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name: "pw_host",
