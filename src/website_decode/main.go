@@ -9,6 +9,7 @@ import (
 	"time"
 	"path"
 	"runtime/debug"
+	"log"
 )
 
 // this is a website where you put in one or more Mode S frames and they are decoded
@@ -72,6 +73,8 @@ func runHttpServer(c *cli.Context) {
 
 	})
 
-	http.ListenAndServe(":8080", nil)
+	port := ":" + c.String("port")
+	log.Printf("Listening on %s...\n", port)
+	log.Fatal(http.ListenAndServe(port, nil))
 
 }

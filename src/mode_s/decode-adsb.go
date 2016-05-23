@@ -73,10 +73,10 @@ func (f *Frame) decodeAdsb() {
 		}
 
 		if f.messageSubType == 1 || f.messageSubType == 2 {
-			f.eastWestDirection = int((f.message[5] & 4) >> 2)
+			f.eastWestDirection = int(f.message[5] & 4) >> 2
 			f.eastWestVelocity = int(((f.message[5] & 3) << 8) | f.message[6])
 			f.northSouthDirection = int((f.message[7] & 0x80) >> 7)
-			f.northSouthVelocity = int(((f.message[7] & 0x7f) << 3) | ((f.message[8] & 0xe0) >> 5))
+			f.northSouthVelocity = (int(f.message[7] & 0x7f) << 3) | (int(f.message[8] & 0xe0) >> 5)
 			f.verticalRateSource = int((f.message[8] & 0x10) >> 4)
 			/* Compute velocity and angle from the two speed components. */
 
@@ -91,16 +91,18 @@ func (f *Frame) decodeAdsb() {
 			f.validVelocity = true
 
 			if f.velocity != 0 {
-				var ewv float64 = float64(f.eastWestVelocity)
-				var nsv float64 = float64(f.northSouthVelocity)
 				var heading float64
+				f.eastWestVelocity -= 1
+				f.northSouthVelocity -= 1
 				if f.eastWestDirection != 0 {
-					ewv *= -1
+					// GO WEST! (0=east, 1=west)
+					f.eastWestVelocity *= -1
 				}
 				if f.northSouthDirection != 0 {
-					nsv *= -1
+					// Going Down South! (0=north, 1=south)
+					f.northSouthVelocity *= -1
 				}
-				heading = math.Atan2(ewv, nsv)
+				heading = math.Atan2(float64(f.eastWestVelocity), float64(f.northSouthVelocity))
 				/* Convert to degrees. */
 				f.heading = heading * 360 / (math.Pi * 2)
 				/* We don't want negative values but a 0-360 scale. */

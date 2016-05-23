@@ -317,6 +317,10 @@ func (f *Frame) ICAOAddr() uint32 {
 	return f.icao
 }
 
+func (f *Frame) ICAOString() string {
+	return fmt.Sprintf("%06X", f.icao)
+}
+
 func (f *Frame) Latitude() int {
 	return f.rawLatitude
 }

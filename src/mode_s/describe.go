@@ -70,9 +70,9 @@ var featureDescription = map[string]featureDescriptionType{
 	"HD":{field:"Heading Field", meaning:"The direction the plane is facing"},
 	"VR":{field:"Vertical Rate", meaning:"How fast the plane is going up or down"},
 	"VRS":{field:"Vertical Rate Sign", meaning:"0=up 1=down"},
-	"EWD":{field:"East/West Direction", meaning:"Non-zero == negative velocity. 0=east?"},
+	"EWD":{field:"East/West Direction", meaning:"Non-zero == negative velocity. 0=east, 1=west"},
 	"EWV":{field:"East/West Velocity", meaning:"How fast the plane is going in the indicated direction"},
-	"NSD":{field:"North/South Direction", meaning:"Non-zero == negative velocity. 0=north?"},
+	"NSD":{field:"North/South Direction", meaning:"Non-zero == negative velocity. 0=north,1=south"},
 	"NSV":{field:"North/South Velocity", meaning:"How fast the plane is going in the indicated direction"},
 	"SRC":{field:"Source Antenna", meaning:"Which antenna this signal was transitted from"},
 	"HAED":{field:"Height Above Ellipsoid (HAE) Direction", meaning:"Direction indicator: 1=down, 0=up"},
@@ -385,7 +385,7 @@ func (f *Frame) showICAO(output io.Writer) {
 }
 
 func (f *Frame) showCapability(output io.Writer) {
-	fmt.Fprintf(output, "CA: Plane Mode S Cap: %s\n", capabilityTable[f.ca])
+	fmt.Fprintf(output, "CA: Plane Mode S Cap: (%d) %s\n", f.ca, capabilityTable[f.ca])
 	f.showVerticalStatus(output)
 }
 
@@ -417,6 +417,7 @@ func (f *Frame) showVelocity(output io.Writer) {
 	}
 	if f.validVelocity {
 		fmt.Fprintf(output, "  Velocity          : %0.2f\n", f.velocity)
+		fmt.Fprintf(output, "  EW/NS VEL         : (East/west: %d) (North/South: %d)\n", f.eastWestVelocity, f.northSouthVelocity)
 	} else {
 		fmt.Fprintln(output, "  Velocity          : Invalid")
 	}

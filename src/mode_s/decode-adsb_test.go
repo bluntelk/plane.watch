@@ -13,8 +13,8 @@ func TestDecodeDF17BaroAlt1(t *testing.T) {
 		return
 	}
 
-	if 5250 != frame.Altitude() {
-		t.Errorf("DF17 Baro Alt: Failed to decode Altitude field correctly 5250 != %d", frame.Altitude())
+	if a, _ := frame.Altitude(); a != 5250 {
+		t.Errorf("DF17 Baro Alt: Failed to decode Altitude field correctly 5250 != %d", a)
 	}
 
 	sicao := fmt.Sprintf("%x", frame.ICAOAddr())
@@ -31,8 +31,8 @@ func TestDecodeDF17BaroAlt2(t *testing.T) {
 		return
 	}
 
-	if 16025 != frame.Altitude() {
-		t.Errorf("DF17 Baro Alt: Failed to decode Altitude field correctly 16025 != %d", frame.Altitude())
+	if a, _ := frame.Altitude(); a != 16025 {
+		t.Errorf("DF17 Baro Alt: Failed to decode Altitude field correctly 16025 != %d", a)
 	}
 
 	sicao := fmt.Sprintf("%x", frame.ICAOAddr())
@@ -49,12 +49,54 @@ func TestDecodeDF17BaroAlt3(t *testing.T) {
 		return
 	}
 
-	if 11650 != frame.Altitude() {
-		t.Errorf("DF17 Baro Alt: Failed to decode Altitude field correctly 16025 != %d", frame.Altitude())
+	if a, _ := frame.Altitude(); a != 11650 {
+		t.Errorf("DF17 Baro Alt: Failed to decode Altitude field correctly 16025 != %d", a)
 	}
 
 	sicao := fmt.Sprintf("%x", frame.ICAOAddr())
 	if "7c6c9a" != sicao {
 		t.Errorf("Did not correctly decode the ICAO address: 7c6c9a != %s", sicao)
 	}
+}
+
+// airborne velocity
+func TestDecodeDF17MT19ST1(t *testing.T) {
+	frame, err := DecodeString("8D7C451C99C4182CA0A4164A8C70", time.Now())
+	if nil != err {
+		t.Error(err.Error())
+	}
+
+	if 17 != frame.DownLinkType() {
+		t.Error("Strange, I swore that this was an ADS-B frame (type 17)")
+	}
+
+	if 5 != frame.ca {
+		t.Errorf("Capability should be 5, got %d", frame.ca)
+	}
+
+	if "7C451C" != frame.ICAOString() {
+		t.Errorf("Failed to decode ICAO. expected 7C451C, got %s", frame.ICAOString())
+	}
+
+	if 19 != frame.messageType || 1 != frame.messageSubType {
+		t.Errorf("Expected ADS-B Frame 19, subtype 1. Got: %d:%d",frame.messageType, frame.messageSubType)
+	}
+
+	if 1 != frame.eastWestDirection {
+		t.Errorf("Expected plane to be going west (1), but instead got: %d", frame.eastWestDirection)
+	}
+	if -23 != frame.eastWestVelocity {
+		t.Errorf("Expected plane to be going west @ 23 (-23), got %d", frame.eastWestVelocity)
+	}
+
+	if 0 != frame.northSouthDirection {
+		t.Errorf("Expected plane to be going north (0), but instead got: %d", frame.northSouthDirection)
+	}
+	if 356 != frame.northSouthVelocity {
+		t.Errorf("Expected plane to be going north @ 356 (356), got %d", frame.northSouthVelocity)
+	}
+	if frame.superSonic {
+		t.Errorf("Wow, this plane is going a lot faster than it should be! why is it thinking it is supersonic?")
+	}
+
 }
