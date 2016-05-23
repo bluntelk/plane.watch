@@ -27,7 +27,6 @@ func init() {
 	}
 }
 
-// TODO: Make checksum decoding work correctly!
 func (f *Frame) decodeModeSChecksum() bool {
 	var n uint32 = f.getMessageLengthBytes();
 	var i, index uint32;

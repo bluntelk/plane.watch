@@ -7,6 +7,7 @@ package mode_s
 import (
 	"time"
 	"strings"
+	"fmt"
 )
 
 const (
@@ -27,29 +28,40 @@ const (
 )
 
 type Position struct {
+	validAltitude       bool
 	altitude            int32
+	unit                int
+
 	rawLatitude         int     /* Non decoded latitude */
 	rawLongitude        int     /* Non decoded longitude */
+
 	eastWestDirection   int     /* 0 = East, 1 = West. */
 	eastWestVelocity    int     /* E/W velocity. */
 	northSouthDirection int     /* 0 = North, 1 = South. */
 	northSouthVelocity  int     /* N/S velocity. */
+	validVelocity       bool
+	velocity            float64 /* Computed from EW and NS velocity. */
+	superSonic          bool
+
 	verticalRateSource  int     /* Vertical rate source. */
 	verticalRate        int     /* Vertical rate. */
-	velocity            float64 /* Computed from EW and NS velocity. */
-	unit                int
+	validVerticalRate   bool
+
 	onGround            bool    /* VS Bit */
 	validVerticalStatus bool
-	validAltitude       bool
-	superSonic          bool
+
+	heading             float64
+	validHeading        bool
+
+	haeDirection        byte    //up or down increments of 25
+	haeDelta            int
+	validHae            bool
 }
 
 type df17 struct {
 	messageType    byte   // DF17 Extended Squitter Message Type
 	messageSubType byte   // DF17 Extended Squitter Message Sub Type
 
-						  //headingIsValid int
-	heading        float64
 	aircraftType   int
 	cprFlagOddEven int    /* 1 = Odd, 0 = Even CPR message. */
 	timeFlag       int    /* UTC synchronized? */
@@ -311,15 +323,24 @@ func (f *Frame) Latitude() int {
 func (f *Frame) Longitude() int {
 	return f.rawLongitude
 }
-func (f *Frame) Altitude() int32 {
-	return f.altitude
+
+func (f *Frame) Altitude() (int32, error) {
+	if f.validAltitude {
+		return f.altitude, nil
+	}
+	return 0, fmt.Errorf("Altitude is not valid")
 }
+
 func (f *Frame) AltitudeUnits() string {
 	if f.unit == MODES_UNIT_METRES {
 		return "metres"
 	} else {
 		return "feet"
 	}
+}
+
+func (f *Frame) AltitudeValid() bool {
+	return f.validAltitude
 }
 
 func (f *Frame) FlightStatusString() string {
@@ -330,14 +351,37 @@ func (f *Frame) FlightStatus() byte {
 	return f.fs
 }
 
-func (f *Frame) Velocity() float64 {
-	return f.velocity
+func (f *Frame) Velocity() (float64, error) {
+	if f.validVelocity {
+		return f.velocity, nil
+	}
+	return 0, fmt.Errorf("Velocity is not valid")
 }
-func (f *Frame) Heading() float64 {
-	return f.heading
+
+func (f *Frame) VelocityValid() bool {
+	return f.validVelocity
 }
-func (f *Frame) VerticalRate() int {
-	return f.verticalRate
+
+func (f *Frame) Heading() (float64, error) {
+	if f.validHeading {
+		return f.heading, nil
+	}
+	return 0, fmt.Errorf("Heading is not valid")
+}
+
+func (f *Frame) HeadingValid() bool {
+	return f.validHeading
+}
+
+func (f *Frame) VerticalRate() (int, error) {
+	if f.validVerticalRate {
+		return f.verticalRate, nil
+	}
+	return 0, fmt.Errorf("Vertical Rate is not valid")
+}
+
+func (f *Frame) VerticalRateValid() bool {
+	return f.validVerticalRate
 }
 
 func (f *Frame) Flight() string {
@@ -352,10 +396,13 @@ func (f *Frame) SquawkIdentity() uint32 {
 	return f.identity
 }
 
-func (f *Frame) OnGround() bool {
-	return f.onGround
+func (f *Frame) OnGround() (bool,error) {
+	if f.validVerticalStatus {
+		return f.onGround, nil
+	}
+	return false, fmt.Errorf("Vertical Status is not valid")
 }
-func (f *Frame) ValidVerticalStatus() bool {
+func (f *Frame) VerticalStatusValid() bool {
 	return f.validVerticalStatus
 }
 func (f *Frame) Alert() bool {

@@ -70,6 +70,13 @@ var featureDescription = map[string]featureDescriptionType{
 	"HD":{field:"Heading Field", meaning:"The direction the plane is facing"},
 	"VR":{field:"Vertical Rate", meaning:"How fast the plane is going up or down"},
 	"VRS":{field:"Vertical Rate Sign", meaning:"0=up 1=down"},
+	"EWD":{field:"East/West Direction", meaning:"Non-zero == negative velocity. 0=east?"},
+	"EWV":{field:"East/West Velocity", meaning:"How fast the plane is going in the indicated direction"},
+	"NSD":{field:"North/South Direction", meaning:"Non-zero == negative velocity. 0=north?"},
+	"NSV":{field:"North/South Velocity", meaning:"How fast the plane is going in the indicated direction"},
+	"SRC":{field:"Source Antenna", meaning:"Which antenna this signal was transitted from"},
+	"HAED":{field:"Height Above Ellipsoid (HAE) Direction", meaning:"Direction indicator: 1=down, 0=up"},
+	"HAEV":{field:"Height Above Ellipsoid (HAE) Delta", meaning:"Barometer offset"},
 }
 
 var featureDF17FlightName = []featureBreakdown{
@@ -102,10 +109,17 @@ var featureDF17AirPosition = []featureBreakdown{
 }
 var featureDF17AirVelocity = []featureBreakdown{
 	{name: "SUB", start:37, end: 40},
-	{name: "??", start: 40, end: 69},
+	{name: "??", start: 40, end: 45},
+	{name: "EWD", start: 45, end: 46},
+	{name: "EWV", start: 46, end: 56},
+	{name: "NSD", start: 56, end: 57},
+	{name: "NSV", start: 57, end: 67},
+	{name: "SRC", start: 67, end: 68},
 	{name: "VRS", start: 68, end: 69},
 	{name: "VR", start: 69, end: 78},
-	{name: "??", start: 78, end: 88},
+	{name: "??", start: 78, end: 80},
+	{name: "HAED", start: 80, end: 81},
+	{name: "HAEV", start: 81, end: 88},
 }
 
 var asdbFeatures = map[byte][]featureBreakdown{
@@ -143,10 +157,10 @@ var asdbFeatures = map[byte][]featureBreakdown{
 	31: []featureBreakdown{
 		{name: "SUB", start:37, end: 40},
 		{name: "CCC", start: 40, end: 56, subFields:map[byte][]featureBreakdown{
-			0:{
+			0:[]featureBreakdown{
 				{name: "CCC", start: 40, end: 56},
 			},
-			1: {
+			1:[]featureBreakdown{
 				{name: "??", start: 40, end: 44},
 				{name: "CCC", start: 44, end: 52},
 				{name: "??", start: 52, end: 56},
@@ -292,14 +306,14 @@ func (frame *Frame) Describe(output io.Writer) {
 		frame.showReplyInformation(output)
 		frame.showAltitude(output)
 	case 17:
-		frame.showICAO(output)
 		frame.showCapability(output)
+		frame.showICAO(output)
 		frame.showAdsb(output)
 	case 18: //DF_18
 		//frame.showCapability() // control field
 		if 0 == frame.ca {
-			frame.showICAO(output)
 			frame.showCapability(output)
+			frame.showICAO(output)
 			frame.showAdsb(output)
 		} else {
 			fmt.Fprintln(output, "Unable to decode DF18 Capability:", frame.ca)
@@ -321,7 +335,7 @@ func (frame *Frame) Describe(output io.Writer) {
 }
 
 func (f *Frame) showVerticalStatus(output io.Writer) {
-	if !f.ValidVerticalStatus() {
+	if !f.VerticalStatusValid() {
 		return
 	}
 	if f.onGround {
@@ -332,8 +346,11 @@ func (f *Frame) showVerticalStatus(output io.Writer) {
 }
 
 func (f *Frame) showVerticalRate(output io.Writer) {
-	fmt.Fprintf(output, "  Vertical Rate : %d", f.verticalRate)
-	fmt.Fprintln(output, "")
+	if f.validVerticalRate {
+		fmt.Fprintf(output, "  Vertical Rate     : %d\n", f.verticalRate)
+	} else {
+		fmt.Fprintln(output, "  Vertical Rate     : Invalid\n")
+	}
 }
 
 func (f *Frame) showCrossLinkCapability(output io.Writer) {
@@ -341,17 +358,20 @@ func (f *Frame) showCrossLinkCapability(output io.Writer) {
 }
 
 func (f *Frame) showAltitude(output io.Writer) {
-	fmt.Fprintf(output, "AC: Altitude        : %d %s (q bit: %t, m bit: %t)", f.altitude, f.AltitudeUnits(), f.ac_q, f.ac_m)
-	fmt.Fprintln(output, "")
+	if f.validAltitude {
+		fmt.Fprintf(output, "AC: Altitude        : %d %s (q bit: %t, m bit: %t)\n", f.altitude, f.AltitudeUnits(), f.ac_q, f.ac_m)
+	} else {
+		fmt.Fprintln(output, "AC: Altitude        : Invalid")
+	}
 }
 
 func (f *Frame) showFlightStatus(output io.Writer) {
 	fmt.Fprintf(output, "FS: Flight Status   : (%d) %s\n", f.fs, flightStatusTable[f.fs])
-	f.showVerticalStatus(output)
 	if "" != f.special {
 		fmt.Fprintf(output, "FS: Special Status  : %s\n", f.special)
 	}
 	f.showAlert(output)
+	f.showVerticalStatus(output)
 }
 
 func (f *Frame) showFlightId(output io.Writer) {
@@ -365,8 +385,8 @@ func (f *Frame) showICAO(output io.Writer) {
 }
 
 func (f *Frame) showCapability(output io.Writer) {
-	f.showVerticalStatus(output)
 	fmt.Fprintf(output, "CA: Plane Mode S Cap: %s\n", capabilityTable[f.ca])
+	f.showVerticalStatus(output)
 }
 
 func (f *Frame) showIdentity(output io.Writer) {
@@ -381,19 +401,33 @@ func (f *Frame) showUtilityMessage(output io.Writer) {
 	fmt.Fprintf(output, "UM: Utility Request : (%d) %s\n", f.um, utilityMessageField[f.um])
 }
 
+func (f *Frame) showHae(output io.Writer) {
+	if f.validHae {
+		fmt.Fprintf(output, "  HAE Delta         : %d (Height Above Ellipsoid)\n", f.haeDelta)
+	}else {
+		fmt.Fprintln(output, "  HAE Delta         : Unavailable")
+
+	}
+}
 func (f *Frame) showVelocity(output io.Writer) {
 	if f.superSonic {
-		fmt.Fprintln(output, "  Super Sonic?  : Yes!")
+		fmt.Fprintln(output, "  Super Sonic?      : Yes!")
 	} else {
-		fmt.Fprintln(output, "  Super Sonic?  : No")
+		fmt.Fprintln(output, "  Super Sonic?      : No")
 	}
-	fmt.Fprintf(output, "  Velocity      : %0.2f", f.velocity)
-	fmt.Fprintln(output, "")
+	if f.validVelocity {
+		fmt.Fprintf(output, "  Velocity          : %0.2f\n", f.velocity)
+	} else {
+		fmt.Fprintln(output, "  Velocity          : Invalid")
+	}
 }
 
 func (f *Frame) showHeading(output io.Writer) {
-	fmt.Fprintf(output, "  Heading       : %0.2f", f.heading)
-	fmt.Fprintln(output, "")
+	if f.validHeading {
+		fmt.Fprintf(output, "  Heading           : %0.2f\n", f.heading)
+	} else {
+		fmt.Fprintln(output, "  Heading           : Not Valid\n")
+	}
 }
 
 func (f *Frame) showCprLatLon(output io.Writer) {
@@ -418,6 +452,7 @@ func (f *Frame)showSensitivityLevel(output io.Writer) {
 func (f *Frame) showCategory(output io.Writer) {
 	if f.ValidCategory() {
 		fmt.Fprintf(output, "Aircraft Cat    : (%d:%d) %s\n", f.catType, f.catSubType, f.Category())
+		fmt.Fprintf(output, "Aircraft Cat    : (%d) (second calc)\n", f.aircraftType)
 	}
 }
 
@@ -442,8 +477,9 @@ func (f *Frame) showAdsb(output io.Writer) {
 			f.showVerticalRate(output)
 			f.showVelocity(output)
 		default:
-			fmt.Println("Unknown Sub Type")
+			// unknown sub type
 		}
+		f.showHae(output)
 	case 23:
 		if 7 == f.messageSubType {
 			f.showIdentity(output);

@@ -4,9 +4,7 @@ package mode_s
 
 import (
 	"math"
-	"fmt"
 )
-
 
 func (f *Frame) decodeAdsbLatLon() {
 	var msg6 = int(f.message[6])
@@ -45,6 +43,7 @@ func (f *Frame) decodeAdsb() {
 
 		if f.message[5] & 0x08 != 0 {
 			f.heading = float64(((((f.message[5] << 4) | (f.message[6] >> 4)) & 0x007F) * 45) >> 4)
+			f.validHeading = true
 		}
 
 	} else if (f.messageType >= 9 && f.messageType <= 18) {
@@ -52,9 +51,12 @@ func (f *Frame) decodeAdsb() {
 		f.timeFlag = int(f.message[6] & (1 << 3))
 		f.onGround = false
 		f.validVerticalStatus = true
-		f.decodeAC12AltitudeField() // decode altitude and unit
+		f.validAltitude = true
+
+		field := ((int32(f.message[5]) << 4) | (int32(f.message[6]) >> 4)) & 0x0FFF
+		f.altitude = decodeAC12Field(field)
 		f.decodeAdsbLatLon()
-	} else if f.messageType == 19 && f.messageSubType >= 1 && f.messageSubType <= 4 {
+	} else if f.messageType == 19 {
 		/* Airborne Velocity Message */
 		f.onGround = false
 		f.validVerticalStatus = true
@@ -67,6 +69,7 @@ func (f *Frame) decodeAdsb() {
 				f.verticalRate = 0 - f.verticalRate
 			}
 			f.verticalRate = f.verticalRate * 64
+			f.validVerticalRate = true
 		}
 
 		if f.messageSubType == 1 || f.messageSubType == 2 {
@@ -85,6 +88,8 @@ func (f *Frame) decodeAdsb() {
 			}
 
 			f.velocity = math.Sqrt(float64((f.northSouthVelocity * f.northSouthVelocity) + (f.eastWestVelocity * f.eastWestVelocity)))
+			f.validVelocity = true
+
 			if f.velocity != 0 {
 				var ewv float64 = float64(f.eastWestVelocity)
 				var nsv float64 = float64(f.northSouthVelocity)
@@ -102,6 +107,7 @@ func (f *Frame) decodeAdsb() {
 				if f.heading < 0 {
 					f.heading += 360
 				}
+				f.validHeading = true
 			} else {
 				f.heading = 0
 			}
@@ -115,12 +121,25 @@ func (f *Frame) decodeAdsb() {
 					airspeed = airspeed << 2;
 				}
 				f.velocity = float64(airspeed);
+				f.validVelocity = true
 			}
 
 			if f.message[5] & 4 != 0 {
 				f.heading = (360.0 / 128.0) * float64(((f.message[5] & 3) << 5) | (f.message[6] >> 3))
+				f.validHeading = true
 			}
 		}
+
+		if (f.message[10] > 0) {
+			f.validHae = true
+			f.haeDirection = (f.message[10] & 0x80) >> 7;
+			var multiplier int = -25;
+			if f.haeDirection == 0 {
+				multiplier = 25
+			}
+			f.haeDelta = multiplier * int((f.message[10] & 0x7f) - 1);
+		}
+
 	} else if f.messageType == 23 && f.messageSubType == 7 {
 		// TEST MESSAGE with  squawk - decode it!
 		f.decodeSquawkIdentity(5, 6)
@@ -179,15 +198,6 @@ func (f *Frame) decodeMovementField() {
 			gSpeed = 0
 		}
 		f.velocity = float64(gSpeed)
+		f.validVelocity = true
 	}
-}
-
-// returns the AC12 Altitude Field
-func (f *Frame) getAC12Field() int32 {
-	return ((int32(f.message[5]) << 4) | (int32(f.message[6]) >> 4)) & 0x0FFF
-}
-
-func (f *Frame) decodeAC12AltitudeField() {
-	field := f.getAC12Field()
-	f.altitude = decodeAC12Field(field)
 }

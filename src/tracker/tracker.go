@@ -34,8 +34,13 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 	switch frame.DownLinkType() {
 	case 0:
 		// grab the altitude
-		plane.Location.Altitude = frame.Altitude()
-		plane.Location.onGround = frame.OnGround()
+		if frame.AltitudeValid() {
+			plane.Location.Altitude, _ = frame.Altitude()
+			plane.Location.AltitudeUnits = frame.AltitudeUnits()
+		}
+		if frame.VerticalStatusValid() {
+			plane.Location.onGround, _ = frame.OnGround()
+		}
 		plane.Location.TimeStamp = time.Now()
 		if debug {
 			log.Printf(planeFormat + " is at %d %s \033[0m", plane.Location.Altitude, plane.Location.AltitudeUnits)
@@ -45,7 +50,9 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 
 	case 1, 2, 3:
 		hasChanged = true
-		plane.Location.onGround = frame.OnGround()
+		if frame.VerticalStatusValid() {
+			plane.Location.onGround, _ = frame.OnGround()
+		}
 		plane.Location.TimeStamp = time.Now()
 		if frame.Alert() {
 			plane.Special = "Alert"
@@ -56,19 +63,23 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		}
 		break
 	case 11:
-		if frame.ValidVerticalStatus() {
-			hasChanged = plane.Location.onGround != frame.OnGround()
-			plane.Location.onGround = frame.OnGround()
+		if frame.VerticalStatusValid() {
+			g, _ := frame.OnGround()
+			hasChanged = plane.Location.onGround != g
+			plane.Location.onGround = g
 		}
 	case 4, 5, 20, 21:
 		hasChanged = true
-		plane.Location.onGround = frame.OnGround()
+		if frame.VerticalStatusValid() {
+			plane.Location.onGround, _ = frame.OnGround()
+		}
 		if frame.Alert() {
 			plane.Special = "Alert"
 		}
-		plane.Location.Altitude = frame.Altitude()
-		plane.Location.onGround = false
-		plane.Location.AltitudeUnits = frame.AltitudeUnits()
+		if frame.AltitudeValid() {
+			plane.Location.Altitude, _ = frame.Altitude()
+			plane.Location.AltitudeUnits = frame.AltitudeUnits()
+		}
 		plane.Location.TimeStamp = time.Now()
 		plane.Flight.Status = frame.FlightStatusString()
 		plane.Flight.StatusId = frame.FlightStatus()
@@ -83,8 +94,13 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		break
 	case 16:
 		hasChanged = true
-		plane.Location.Altitude = frame.Altitude()
-		plane.Location.onGround = frame.OnGround()
+		if frame.AltitudeValid() {
+			plane.Location.Altitude, _ = frame.Altitude()
+			plane.Location.AltitudeUnits = frame.AltitudeUnits()
+		}
+		if frame.VerticalStatusValid() {
+			plane.Location.onGround, _ = frame.OnGround()
+		}
 		plane.Location.TimeStamp = time.Now()
 
 	case 17, 18: // ADS-B
@@ -107,9 +123,16 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 			}
 		case mode_s.DF17_FRAME_SURFACE_POS: // "Surface Position"
 			{
-				plane.Location.Heading = frame.Heading()
-				plane.Location.Velocity = frame.Velocity()
-				plane.Location.onGround = true
+				if frame.HeadingValid() {
+					plane.Location.Heading, _ = frame.Heading()
+				}
+				if frame.VelocityValid() {
+					plane.Location.Velocity, _ = frame.Velocity()
+
+				}
+				if frame.VerticalStatusValid() {
+					plane.Location.onGround, _ = frame.OnGround()
+				}
 				plane.Location.hasHeading = true
 				plane.Location.TimeStamp = time.Now()
 
@@ -121,7 +144,9 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 			}
 		case mode_s.DF17_FRAME_AIR_POS_BARO:// "Airborne Position (with Barometric Altitude)"
 			{
-				plane.Location.onGround = false
+				if frame.VerticalStatusValid() {
+					plane.Location.onGround, _ = frame.OnGround()
+				}
 				plane.Location.TimeStamp = time.Now()
 				hasChanged = true
 
@@ -131,16 +156,26 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 					plane.SetCprOddLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
 				}
 
-				plane.DecodeCpr(frame.Altitude(), frame.AltitudeUnits())
+				altitude, _ := frame.Altitude()
+				plane.DecodeCpr(altitude, frame.AltitudeUnits())
 
 				break
 			}
 		case mode_s.DF17_FRAME_AIR_VELOCITY: // "Airborne Velocity"
 			{
-				plane.Location.Heading = frame.Heading()
-				plane.Location.Velocity = frame.Velocity()
-				plane.Location.VerticalRate = frame.VerticalRate()
-				plane.Location.onGround = false
+				if frame.HeadingValid() {
+					plane.Location.Heading, _ = frame.Heading()
+				}
+				if frame.VelocityValid() {
+					plane.Location.Velocity, _ = frame.Velocity()
+
+				}
+				if frame.VerticalRateValid() {
+					plane.Location.VerticalRate, _ = frame.VerticalRate()
+				}
+				if frame.VerticalStatusValid() {
+					plane.Location.onGround, _ = frame.OnGround()
+				}
 				plane.Location.hasHeading = true
 				plane.Location.TimeStamp = time.Now()
 				if debug {
