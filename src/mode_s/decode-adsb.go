@@ -7,56 +7,6 @@ import (
 	"fmt"
 )
 
-const (
-	DF17_FRAME_ID_CAT = "Aircraft Identification and Category"
-	DF17_FRAME_SURFACE_POS = "Surface Position"
-	DF17_FRAME_AIR_POS_BARO = "Airborne Position (with Barometric Altitude)"
-	DF17_FRAME_AIR_VELOCITY = "Airborne Velocity"
-	DF17_FRAME_AIR_POS_GNSS = "Airborne Position (with GNSS Height)"
-	DF17_FRAME_TEST_MSG = "Test Message"
-	DF17_FRAME_TEST_MSG_SQUAWK = "Test Message with Squawk"
-	DF17_FRAME_SURFACE_SYS_STATUS = "Surface System Status"
-	DF17_FRAME_EXT_SQUIT_EMERG = "Extended Squitter Aircraft Status (Emergency)"
-	DF17_FRAME_EXT_SQUIT_STATUS = "Extended Squitter Aircraft Status (1090ES TCAS RA)"
-	DF17_FRAME_STATE_STATUS = "Target State and Status Message"
-	DF17_FRAME_AIRCRAFT_OPER = "Aircraft Operational Status Message"
-)
-
-func (df *Frame) MessageTypeString() string {
-	var name string = "Unknown"
-	if df.messageType >= 1 && df.messageType <= 4 {
-		name = DF17_FRAME_ID_CAT
-	} else if df.messageType >= 5 && df.messageType <= 8 {
-		name = DF17_FRAME_SURFACE_POS
-	} else if df.messageType >= 9 && df.messageType <= 18 {
-		name = DF17_FRAME_AIR_POS_BARO
-	} else if df.messageType == 19 && df.messageSubType >= 1 && df.messageSubType <= 4 {
-		name = DF17_FRAME_AIR_VELOCITY
-	} else if df.messageType >= 20 && df.messageType <= 22 {
-		name = DF17_FRAME_AIR_POS_GNSS
-	} else if df.messageType == 23 {
-		if df.messageSubType == 7 {
-			name = DF17_FRAME_TEST_MSG_SQUAWK
-		} else {
-			name = DF17_FRAME_TEST_MSG
-		}
-	} else if df.messageType == 24 && df.messageSubType == 1 {
-		name = DF17_FRAME_SURFACE_SYS_STATUS
-	} else if df.messageType == 28 && df.messageSubType == 1 {
-		name = DF17_FRAME_EXT_SQUIT_EMERG
-	} else if df.messageType == 28 && df.messageSubType == 2 {
-		name = DF17_FRAME_EXT_SQUIT_STATUS
-	} else if df.messageType == 29 {
-		if (df.messageSubType == 0 || df.messageSubType == 1) {
-			name = DF17_FRAME_STATE_STATUS
-		} else {
-			name = fmt.Sprintf("%s (Unknown Sub Message %d)", DF17_FRAME_STATE_STATUS, df.messageSubType);
-		}
-	} else if df.messageType == 31 && (df.messageSubType == 0 || df.messageSubType == 1) {
-		name = DF17_FRAME_AIRCRAFT_OPER
-	}
-	return name
-}
 
 func (f *Frame) decodeAdsbLatLon() {
 	var msg6 = int(f.message[6])
@@ -81,7 +31,7 @@ func (f *Frame) decodeAdsb() {
 		/* Aircraft Identification and Category */
 		f.decodeFlightNumber()
 
-		f.catType = 4-f.messageType
+		f.catType = 4 - f.messageType
 		f.catSubType = f.messageSubType
 		f.catValid = true
 
@@ -108,18 +58,17 @@ func (f *Frame) decodeAdsb() {
 		/* Airborne Velocity Message */
 		f.onGround = false
 		f.validVerticalStatus = true
-		if f.messageSubType >= 1 && f.messageSubType <= 4 {
-			var verticalRateSign int = int((f.message[8] & 0x8) >> 3)
-			f.verticalRate = int(((f.message[8] & 7) << 6) | ((f.message[9] & 0xfc) >> 2))
-			if f.verticalRate != 0 {
-				f.verticalRate--
-				if verticalRateSign != 0 {
-					f.verticalRate = 0 - f.verticalRate
-				}
-				f.verticalRate = f.verticalRate * 64
-			}
 
+		var verticalRateSign int = int((f.message[8] & 0x8) >> 3)
+		f.verticalRate = (int(f.message[8] & 7) << 6) | (int(f.message[9] & 0xfc) >> 2)
+		if f.verticalRate != 0 {
+			f.verticalRate--
+			if verticalRateSign != 0 {
+				f.verticalRate = 0 - f.verticalRate
+			}
+			f.verticalRate = f.verticalRate * 64
 		}
+
 		if f.messageSubType == 1 || f.messageSubType == 2 {
 			f.eastWestDirection = int((f.message[5] & 4) >> 2)
 			f.eastWestVelocity = int(((f.message[5] & 3) << 8) | f.message[6])
@@ -175,27 +124,34 @@ func (f *Frame) decodeAdsb() {
 	} else if f.messageType == 23 && f.messageSubType == 7 {
 		// TEST MESSAGE with  squawk - decode it!
 		f.decodeSquawkIdentity(5, 6)
-	} else if f.messageType == 28 && f.messageSubType == 1 {
-		// EMERGENCY, EMERGENCY, THERE'S AN EMERGENCY GOING ON
-		f.decodeSquawkIdentity(5, 6)
-		var emergencyId int = int((f.message[5] & 0xE0) >> 5)
-		f.alert = emergencyId != 0
-		f.special = emergencyStateTable[emergencyId]
+	} else if f.messageType == 28 {
+		if f.messageSubType == 1 {
+			// EMERGENCY (or priority), EMERGENCY, THERE'S AN EMERGENCY GOING ON
+			f.decodeSquawkIdentity(5, 6)
+			var emergencyId int = int((f.message[5] & 0xE0) >> 5)
+			f.alert = emergencyId != 0
+			f.special = emergencyStateTable[emergencyId]
+
+			// can get the Mode A Address too
+			//mode_a_code = (short) (msg[2]|((msg[1]&0x1F)<<8));
+
+		} else if f.messageSubType == 2 {
+			// TCAS Resolution Advisory
+		}
+
+	} else if f.messageType == 29 {
+	} else if f.messageType == 31 {
+		// Operational Status Message
+		if f.messageSubType == 0 {
+			f.validVerticalStatus = true
+			f.onGround = false
+		} else if f.messageSubType == 1 {
+			f.validVerticalStatus = true
+			f.onGround = true
+		}
 	}
 }
 
-func (df *Frame) MessageType() byte {
-	return df.messageType
-}
-
-// Whether or not this frame is even or odd, for CPR Location
-func (df *Frame) IsEven() bool {
-	return df.cprFlagOddEven == 0
-}
-
-func (df *Frame) FlightNumber() string {
-	return string(df.flight)
-}
 
 //
 //=========================================================================
@@ -222,7 +178,7 @@ func (f *Frame) decodeMovementField() {
 		} else {
 			gSpeed = 0
 		}
-		f.velocity =float64(gSpeed)
+		f.velocity = float64(gSpeed)
 	}
 }
 

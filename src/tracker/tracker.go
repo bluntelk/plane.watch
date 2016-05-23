@@ -99,6 +99,9 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		case mode_s.DF17_FRAME_ID_CAT: // "Aircraft Identification and Category"
 			{
 				plane.Flight.Identifier = frame.FlightNumber()
+				if frame.ValidCategory() {
+					plane.AirframeCategory = frame.Category()
+				}
 				hasChanged = true
 				break
 			}

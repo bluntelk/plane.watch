@@ -82,7 +82,7 @@ func showTypes(filePath string) {
 			continue
 		}
 
-		fmt.Printf("DF%02d\t%s\n",frame.DownLinkType(), line)
+		fmt.Printf("DF%02d\tMT%02d\tST%02d\t%s\n",frame.DownLinkType(), frame.MessageType(), frame.MessageSubType(), line)
 	}
 
 }
@@ -100,8 +100,10 @@ func main() {
 	switch cmd {
 	case "type":
 		showTypes(os.Args[1])
-	default:
+	case "gather":
 		gatherSamples(os.Args[1])
+	default:
+		println("3rd argument must be either type or gather")
 	}
 
 }

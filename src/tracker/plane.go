@@ -56,6 +56,7 @@ type Plane struct {
 	NumUpdates       int
 	frameTimes       []time.Time
 	RecentFrameCount int
+	AirframeCategory string
 }
 
 type PlaneList map[uint32]Plane

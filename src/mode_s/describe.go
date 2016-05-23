@@ -53,6 +53,8 @@ var featureDescription = map[string]featureDescriptionType{
 	"VS":{field: "Vertical Status", meaning: "aircraft status, airborne (0) or on the ground (1)"},
 	"  ":{field: "Padding", meaning:"Unused"},
 	"??":{field: "???", meaning:"Unknown"},
+	"CCC":{field: "Capability Class Code", meaning:"Capability Class Code"},
+	"OMC":{field: "Operational Mode Code", meaning:"Operational Mode Code"},
 	"CRC":{field: "CRC", meaning:"CRC Checksum"},
 	"TC":{field:"DF 17 Message Type", meaning:"Message Category"},
 	"SUB":{field:"DF 17 Message Sub Type", meaning:"Message Sub Type"},
@@ -127,10 +129,39 @@ var asdbFeatures = map[byte][]featureBreakdown{
 	18: featureDF17AirPosition,
 	19: featureDF17AirVelocity,
 	23: []featureBreakdown{
+		{name: "SUB", start:37, end: 40},
 		{name: "??", start: 40, end: 88},
 	},
 	28: []featureBreakdown{
+		{name: "SUB", start:37, end: 40},
 		{name: "??", start: 40, end: 88},
+	},
+	29: []featureBreakdown{
+		{name: "SUB", start:37, end: 40},
+		{name: "??", start: 40, end: 88},
+	},
+	31: []featureBreakdown{
+		{name: "SUB", start:37, end: 40},
+		{name: "CCC", start: 40, end: 56, subFields:map[byte][]featureBreakdown{
+			0:{
+				{name: "CCC", start: 40, end: 56},
+			},
+			1: {
+				{name: "??", start: 40, end: 44},
+				{name: "CCC", start: 44, end: 52},
+				{name: "??", start: 52, end: 56},
+			},
+		},
+		}, // only for message type 0
+		{name: "OMC", start: 56, end: 72}, // only for message type 0
+		{name: "??", start: 72, end: 75}, //VERSION
+		{name: "??", start: 75, end: 76}, //nic_suppl - Navigation Integrity Category
+		{name: "??", start: 76, end: 80}, //nac_pos
+		{name: "??", start: 80, end: 82}, // geometric_vertical_accuracy
+		{name: "??", start: 82, end: 84}, // sil
+		{name: "??", start: 84, end: 85}, //nic_trk_hdg
+		{name: "??", start: 85, end: 86}, // hrd
+		{name: "??", start: 86, end: 88},
 	},
 
 }
@@ -406,11 +437,7 @@ func (f *Frame) showAdsb(output io.Writer) {
 		f.showCprLatLon(output)
 	case 19:
 		switch f.messageSubType {
-		case 1, 2:
-			f.showHeading(output)
-			f.showVerticalRate(output)
-			f.showVelocity(output)
-		case 3, 4:
+		case 1, 2, 3, 4:
 			f.showHeading(output)
 			f.showVerticalRate(output)
 			f.showVelocity(output)
@@ -426,6 +453,9 @@ func (f *Frame) showAdsb(output io.Writer) {
 			f.showIdentity(output);
 			f.showAlert(output);
 		}
+	case 29:
+	case 31:
+		f.showVerticalStatus(output)
 	default:
 		fmt.Fprintln(output, "Packet Type Not Yet Decoded")
 	}
@@ -514,7 +544,13 @@ func (frame *Frame) formatBitString(features []featureBreakdown) string {
 			doMakeBitString(f)
 		} else {
 			for _, sf := range f.subFields[frame.messageType] {
-				doMakeBitString(sf)
+				if 0 == len(sf.subFields[frame.messageSubType]) {
+					doMakeBitString(sf)
+				} else {
+					for _, ssf := range sf.subFields[frame.messageSubType] {
+						doMakeBitString(ssf)
+					}
+				}
 			}
 		}
 	}

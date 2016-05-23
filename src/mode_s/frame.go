@@ -9,8 +9,22 @@ import (
 	"strings"
 )
 
-const MODES_UNIT_FEET = 0
-const MODES_UNIT_METRES = 1
+const (
+	MODES_UNIT_FEET = 0
+	MODES_UNIT_METRES = 1
+	DF17_FRAME_ID_CAT = "Aircraft Identification and Category"
+	DF17_FRAME_SURFACE_POS = "Surface Position"
+	DF17_FRAME_AIR_POS_BARO = "Airborne Position (with Barometric Altitude)"
+	DF17_FRAME_AIR_VELOCITY = "Airborne Velocity"
+	DF17_FRAME_AIR_POS_GNSS = "Airborne Position (with GNSS Height)"
+	DF17_FRAME_TEST_MSG = "Test Message"
+	DF17_FRAME_TEST_MSG_SQUAWK = "Test Message with Squawk"
+	DF17_FRAME_SURFACE_SYS_STATUS = "Surface System Status"
+	DF17_FRAME_EXT_SQUIT_EMERG = "Extended Squitter Aircraft Status (Emergency)"
+	DF17_FRAME_EXT_SQUIT_STATUS = "Extended Squitter Aircraft Status (1090ES TCAS Resolution Advisory)"
+	DF17_FRAME_STATE_STATUS = "Target State and Status Message"
+	DF17_FRAME_AIRCRAFT_OPER = "Aircraft Operational Status Message"
+)
 
 type Position struct {
 	altitude            int32
@@ -54,8 +68,8 @@ type raw_fields struct {
 	ac_q, ac_m                         bool
 
 	// adsb decoding
-	catType, catSubType byte
-	catValid bool
+	catType, catSubType                byte
+	catValid                           bool
 }
 
 type Frame struct {
@@ -124,7 +138,7 @@ var (
 		3:  "Minimum fuel",
 		4:  "No communications (squawk 7600)",
 		5:  "Unlawful interference (squawk 7500)",
-		6:  "Reserved",
+		6:  "Downed Aircraft",
 		7:  "Reserved",
 	};
 
@@ -247,6 +261,42 @@ var (
 	}
 )
 
+func (df *Frame) MessageTypeString() string {
+	var name string = "Unknown"
+	if df.messageType >= 1 && df.messageType <= 4 {
+		name = DF17_FRAME_ID_CAT
+	} else if df.messageType >= 5 && df.messageType <= 8 {
+		name = DF17_FRAME_SURFACE_POS
+	} else if df.messageType >= 9 && df.messageType <= 18 {
+		name = DF17_FRAME_AIR_POS_BARO
+	} else if df.messageType == 19 && df.messageSubType >= 1 && df.messageSubType <= 4 {
+		name = DF17_FRAME_AIR_VELOCITY
+	} else if df.messageType >= 20 && df.messageType <= 22 {
+		name = DF17_FRAME_AIR_POS_GNSS
+	} else if df.messageType == 23 {
+		if df.messageSubType == 7 {
+			name = DF17_FRAME_TEST_MSG_SQUAWK
+		} else {
+			name = DF17_FRAME_TEST_MSG
+		}
+	} else if df.messageType == 24 && df.messageSubType == 1 {
+		name = DF17_FRAME_SURFACE_SYS_STATUS
+	} else if df.messageType == 28 && df.messageSubType == 1 {
+		name = DF17_FRAME_EXT_SQUIT_EMERG
+	} else if df.messageType == 28 && df.messageSubType == 2 {
+		name = DF17_FRAME_EXT_SQUIT_STATUS
+	} else if df.messageType == 29 {
+		if (df.messageSubType == 0 || df.messageSubType == 1) {
+			name = DF17_FRAME_STATE_STATUS
+		} else {
+			name = fmt.Sprintf("%s (Unknown Sub Message %d)", DF17_FRAME_STATE_STATUS, df.messageSubType);
+		}
+	} else if df.messageType == 31 && (df.messageSubType == 0 || df.messageSubType == 1) {
+		name = DF17_FRAME_AIRCRAFT_OPER
+	}
+	return name
+}
+
 func (f *Frame) DownLinkType() byte {
 	return f.downLinkFormat
 }
@@ -318,4 +368,21 @@ func (f *Frame) ValidCategory() bool {
 
 func (f *Frame) Category() string {
 	return aircraftCategory[f.catType][f.catSubType]
+}
+
+func (df *Frame) MessageType() byte {
+	return df.messageType
+}
+
+func (df *Frame) MessageSubType() byte {
+	return df.messageSubType
+}
+
+// Whether or not this frame is even or odd, for CPR Location
+func (df *Frame) IsEven() bool {
+	return df.cprFlagOddEven == 0
+}
+
+func (df *Frame) FlightNumber() string {
+	return string(df.flight)
 }
