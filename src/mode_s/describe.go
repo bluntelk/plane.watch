@@ -77,6 +77,7 @@ var featureDescription = map[string]featureDescriptionType{
 	"SRC":{field:"Source Antenna", meaning:"Which antenna this signal was transitted from"},
 	"HAED":{field:"Height Above Ellipsoid (HAE) Direction", meaning:"Direction indicator: 1=down, 0=up"},
 	"HAEV":{field:"Height Above Ellipsoid (HAE) Delta", meaning:"Barometer offset"},
+	"EID":{field:"Emergency ID", meaning:"Emergency Table Lookup ID"},
 }
 
 var featureDF17FlightName = []featureBreakdown{
@@ -144,11 +145,25 @@ var asdbFeatures = map[byte][]featureBreakdown{
 	19: featureDF17AirVelocity,
 	23: []featureBreakdown{
 		{name: "SUB", start:37, end: 40},
-		{name: "??", start: 40, end: 88},
+		{name: "ID", start: 40, end: 53},
+		{name: "  ", start: 53, end: 88},
 	},
 	28: []featureBreakdown{
 		{name: "SUB", start:37, end: 40},
-		{name: "??", start: 40, end: 88},
+		{name: "??", start: 40, end: 88, subFields:map[byte][]featureBreakdown{
+			0:[]featureBreakdown{
+				{name: "??", start: 40, end: 88},
+			},
+			1:[]featureBreakdown{// EMERGENCY (or priority), Status
+				{name: "EID", start: 40, end: 43},
+				{name: "ID", start: 43, end: 56},
+				{name: "  ", start: 56, end: 88},
+			},
+			2:[]featureBreakdown{// TCAS Resolution Advisory
+				{name: "??", start: 40, end: 88},
+			},
+		},
+		},
 	},
 	29: []featureBreakdown{
 		{name: "SUB", start:37, end: 40},
@@ -177,7 +192,6 @@ var asdbFeatures = map[byte][]featureBreakdown{
 		{name: "??", start: 85, end: 86}, // hrd
 		{name: "??", start: 86, end: 88},
 	},
-
 }
 
 var frameFeatures = map[byte][]featureBreakdown{
@@ -276,8 +290,8 @@ var frameFeatures = map[byte][]featureBreakdown{
 
 func (frame *Frame) Describe(output io.Writer) {
 	fmt.Fprintf(output, "MODE S Packet:\n")
-	fmt.Fprintf(output, "Length:         : %d bits\n", frame.getMessageLengthBits())
-	fmt.Fprintf(output, "Frame           : %s\n", frame.raw)
+	fmt.Fprintf(output, "Length              : %d bits\n", frame.getMessageLengthBits())
+	fmt.Fprintf(output, "Frame               : %s\n", frame.raw)
 	fmt.Fprintf(output, "DF: Downlink Format : %d (%s)\n", frame.downLinkFormat, frame.DownLinkFormat())
 	// decode the specific DF type
 	switch frame.downLinkFormat {
@@ -508,7 +522,7 @@ func (f *Frame) showAlert(output io.Writer) {
 }
 func (f *Frame) showSpecial(output io.Writer) {
 	if "" != f.special {
-		fmt.Fprintf(output, "  Special       : %s\n", f.special)
+		fmt.Fprintf(output, "  Special           : %s\n", f.special)
 	}
 }
 

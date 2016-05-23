@@ -21,7 +21,7 @@ const (
 	DF17_FRAME_TEST_MSG = "Test Message"
 	DF17_FRAME_TEST_MSG_SQUAWK = "Test Message with Squawk"
 	DF17_FRAME_SURFACE_SYS_STATUS = "Surface System Status"
-	DF17_FRAME_EXT_SQUIT_EMERG = "Extended Squitter Aircraft Status (Emergency)"
+	DF17_FRAME_EXT_SQUIT_EMERG = "Extended Squitter Aircraft Status (Emergency Or Priority)"
 	DF17_FRAME_EXT_SQUIT_STATUS = "Extended Squitter Aircraft Status (1090ES TCAS Resolution Advisory)"
 	DF17_FRAME_STATE_STATUS = "Target State and Status Message"
 	DF17_FRAME_AIRCRAFT_OPER = "Aircraft Operational Status Message"
