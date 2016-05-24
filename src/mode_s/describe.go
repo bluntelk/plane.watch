@@ -78,6 +78,14 @@ var featureDescription = map[string]featureDescriptionType{
 	"HAED":{field:"Height Above Ellipsoid (HAE) Direction", meaning:"Direction indicator: 1=down, 0=up"},
 	"HAEV":{field:"Height Above Ellipsoid (HAE) Delta", meaning:"Barometer offset"},
 	"EID":{field:"Emergency ID", meaning:"Emergency Table Lookup ID"},
+
+	"NICp":{field:"Navigation Integrity Category", meaning:""},
+	"NACv":{field:"Navigation Accuracy Category", meaning:""},
+	"NUC":{field:"Navigation Uncertainty Category", meaning:""},
+	"SIL":{field:"Surveillance/Source Integrity Level", meaning:""},
+	"APLW":{field:"Airplane Width and Length", meaning:""},
+	"VER":{field:"ADSB Version", meaning:"This airframes ADSB Compatability"},
+	"GVA":{field:"Geometric Vertical Accuracy", meaning:""},
 }
 
 var featureDF17FlightName = []featureBreakdown{
@@ -172,22 +180,22 @@ var asdbFeatures = map[byte][]featureBreakdown{
 	31: []featureBreakdown{
 		{name: "SUB", start:37, end: 40},
 		{name: "CCC", start: 40, end: 56, subFields:map[byte][]featureBreakdown{
-			0:[]featureBreakdown{
+			0:[]featureBreakdown{ // airborne
 				{name: "CCC", start: 40, end: 56},
 			},
-			1:[]featureBreakdown{
+			1:[]featureBreakdown{ //surface
 				{name: "??", start: 40, end: 44},
 				{name: "CCC", start: 44, end: 52},
-				{name: "??", start: 52, end: 56},
+				{name: "APLW", start: 52, end: 56},
 			},
 		},
-		}, // only for message type 0
-		{name: "OMC", start: 56, end: 72}, // only for message type 0
-		{name: "??", start: 72, end: 75}, //VERSION
-		{name: "??", start: 75, end: 76}, //nic_suppl - Navigation Integrity Category
-		{name: "??", start: 76, end: 80}, //nac_pos
-		{name: "??", start: 80, end: 82}, // geometric_vertical_accuracy
-		{name: "??", start: 82, end: 84}, // sil
+		},
+		{name: "OMC", start: 56, end: 72},
+		{name: "VER", start: 72, end: 75}, //VERSION
+		{name: "NICp", start: 75, end: 76}, //nic_suppl - Navigation Integrity Category
+		{name: "NACv", start: 76, end: 80}, //nac_pos
+		{name: "GVA", start: 80, end: 82}, // geometric_vertical_accuracy
+		{name: "SIL", start: 82, end: 84}, // sil
 		{name: "??", start: 84, end: 85}, //nic_trk_hdg
 		{name: "??", start: 85, end: 86}, // hrd
 		{name: "??", start: 86, end: 88},
@@ -507,6 +515,7 @@ func (f *Frame) showAdsb(output io.Writer) {
 	case 29:
 	case 31:
 		f.showVerticalStatus(output)
+		f.showAdsbVersion(output)
 	default:
 		fmt.Fprintln(output, "Packet Type Not Yet Decoded")
 	}
@@ -537,6 +546,10 @@ func (f *Frame) DownLinkFormat() string {
 		return description
 	}
 	return "Unknown Downlink Format"
+}
+
+func (f *Frame)showAdsbVersion(output io.Writer) {
+	fmt.Fprintf(output, "    ADS-B Version   : (%d) %s\n", f.adsbVersion, adsbCompatibilityVersion[f.adsbVersion])
 }
 
 func (f *Frame) showBdsData(output io.Writer) {

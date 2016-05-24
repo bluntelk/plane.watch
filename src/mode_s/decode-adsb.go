@@ -149,7 +149,7 @@ func (f *Frame) decodeAdsb() {
 		if f.messageSubType == 1 {
 			// EMERGENCY (or priority), EMERGENCY, THERE'S AN EMERGENCY GOING ON
 			f.decodeSquawkIdentity(5, 6)
-			var emergencyId int = int((f.message[5] & 0xE0) >> 5)
+			var emergencyId int = int((f.message[5] & 0xe0) >> 5)
 			f.alert = emergencyId != 0
 			f.special = emergencyStateTable[emergencyId]
 
@@ -166,10 +166,14 @@ func (f *Frame) decodeAdsb() {
 		if f.messageSubType == 0 {
 			f.validVerticalStatus = true
 			f.onGround = false
+
+
 		} else if f.messageSubType == 1 {
 			f.validVerticalStatus = true
 			f.onGround = true
 		}
+
+		f.adsbVersion = (f.message[9] & 0xe0) >> 5
 	}
 }
 

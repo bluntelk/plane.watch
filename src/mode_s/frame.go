@@ -66,6 +66,8 @@ type df17 struct {
 	cprFlagOddEven int    /* 1 = Odd, 0 = Even CPR message. */
 	timeFlag       int    /* UTC synchronized? */
 	flight         []byte /* 8 chars flight number. */
+
+	adsbVersion    byte
 }
 
 type raw_fields struct {
@@ -271,6 +273,17 @@ var (
 			7:"Reserved",
 		},
 	}
+
+	adsbCompatibilityVersion = []string{
+		0: "Conformant to DO-260/ED-102 and DO-242",
+		1: "Conformant to DO-260A and DO-242A",
+		2: "Conformant to DO-260B/ED-102A and DO-242B",
+		3: "reserved",
+		4: "reserved",
+		5: "reserved",
+		6: "reserved",
+		7: "reserved",
+	}
 )
 
 func (df *Frame) MessageTypeString() string {
@@ -400,7 +413,7 @@ func (f *Frame) SquawkIdentity() uint32 {
 	return f.identity
 }
 
-func (f *Frame) OnGround() (bool,error) {
+func (f *Frame) OnGround() (bool, error) {
 	if f.validVerticalStatus {
 		return f.onGround, nil
 	}
