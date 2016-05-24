@@ -82,7 +82,7 @@ func showTypes(filePath string) {
 			continue
 		}
 
-		fmt.Printf("DF%02d\tMT%02d\tST%02d\t%s\n",frame.DownLinkType(), frame.MessageType(), frame.MessageSubType(), line)
+		fmt.Printf("DF%02d\tMT%02d\tST%02d\t%s\t%s\n",frame.DownLinkType(), frame.MessageType(), frame.MessageSubType(), frame.ICAOString(), line)
 	}
 
 }

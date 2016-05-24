@@ -25,15 +25,15 @@ func (f *Frame) decodeAdsb() {
 	f.messageType = f.message[4] >> 3
 	f.messageSubType = f.message[4] & 7
 
-	if f.messageType >= 1 && f.messageType <= 4 {
+	switch f.messageType {
+	case 1, 2, 3, 4:
 		/* Aircraft Identification and Category */
 		f.decodeFlightNumber()
 
 		f.catType = 4 - f.messageType
 		f.catSubType = f.messageSubType
 		f.catValid = true
-
-	} else if f.messageType >= 5 && f.messageType <= 8 {
+	case 5, 6, 7, 8:
 		// surface position
 		f.onGround = true
 		f.validVerticalStatus = true
@@ -45,8 +45,7 @@ func (f *Frame) decodeAdsb() {
 			f.heading = float64(((((f.message[5] << 4) | (f.message[6] >> 4)) & 0x007F) * 45) >> 4)
 			f.validHeading = true
 		}
-
-	} else if (f.messageType >= 9 && f.messageType <= 18) {
+	case 9, 10, 11, 12, 13, 14, 15, 16, 17, 18:
 		/* Airborne position Message */
 		f.timeFlag = int(f.message[6] & (1 << 3))
 		f.onGround = false
@@ -56,7 +55,8 @@ func (f *Frame) decodeAdsb() {
 		field := ((int32(f.message[5]) << 4) | (int32(f.message[6]) >> 4)) & 0x0FFF
 		f.altitude = decodeAC12Field(field)
 		f.decodeAdsbLatLon()
-	} else if f.messageType == 19 {
+
+	case 19:
 		/* Airborne Velocity Message */
 		f.onGround = false
 		f.validVerticalStatus = true
@@ -72,7 +72,7 @@ func (f *Frame) decodeAdsb() {
 			f.validVerticalRate = true
 		}
 
-		if f.messageSubType == 1 || f.messageSubType == 2 {
+		if f.messageSubType == 1 || f.messageSubType == 2 { // Ground Speed Message
 			f.eastWestDirection = int(f.message[5] & 4) >> 2
 			f.eastWestVelocity = int(((f.message[5] & 3) << 8) | f.message[6])
 			f.northSouthDirection = int((f.message[7] & 0x80) >> 7)
@@ -113,10 +113,10 @@ func (f *Frame) decodeAdsb() {
 			} else {
 				f.heading = 0
 			}
-		} else if f.messageSubType == 3 || f.messageSubType == 4 {
+		} else if f.messageSubType == 3 || f.messageSubType == 4 { // Air Speed -- ground speed not available
 			var airspeed int = int(((f.message[7] & 0x7f) << 3) | (f.message[8] >> 5));
 			if airspeed != 0 {
-				airspeed--;
+				airspeed -= 1;
 				if f.messageSubType == 4 {
 					// If (supersonic) unit is 4 kts
 					f.superSonic = true
@@ -141,11 +141,19 @@ func (f *Frame) decodeAdsb() {
 			}
 			f.haeDelta = multiplier * int((f.message[10] & 0x7f) - 1);
 		}
+	case 20, 21, 22:
+	//NoOp
+	case 23:
+		if f.messageSubType == 7 {
+			// TEST MESSAGE with  squawk - decode it!
+			f.decodeSquawkIdentity(5, 6)
+		} else {
+			//??
+		}
 
-	} else if f.messageType == 23 && f.messageSubType == 7 {
-		// TEST MESSAGE with  squawk - decode it!
-		f.decodeSquawkIdentity(5, 6)
-	} else if f.messageType == 28 {
+	case 24, 25, 26, 27:
+	//NoOp
+	case 28:
 		if f.messageSubType == 1 {
 			// EMERGENCY (or priority), EMERGENCY, THERE'S AN EMERGENCY GOING ON
 			f.decodeSquawkIdentity(5, 6)
@@ -159,14 +167,14 @@ func (f *Frame) decodeAdsb() {
 		} else if f.messageSubType == 2 {
 			// TCAS Resolution Advisory
 		}
-
-	} else if f.messageType == 29 {
-	} else if f.messageType == 31 {
+	case 29:
+	case 30:
+	// NoOp
+	case 31:
 		// Operational Status Message
 		if f.messageSubType == 0 {
 			f.validVerticalStatus = true
 			f.onGround = false
-
 
 		} else if f.messageSubType == 1 {
 			f.validVerticalStatus = true
@@ -174,6 +182,8 @@ func (f *Frame) decodeAdsb() {
 		}
 
 		f.adsbVersion = (f.message[9] & 0xe0) >> 5
+
+
 	}
 }
 

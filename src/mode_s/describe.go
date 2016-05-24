@@ -22,6 +22,8 @@ var featureDescription = map[string]featureDescriptionType{
 	"AC":{field: "Altitude Code", meaning: "Aircraft altitude code. All bits are Zeros if altitude information is not available."},
 	"AP":{field: "Address/Parity", meaning: "Error detection field. Parity overlaid on the address"},
 	"AQ":{field: "Acquisition", meaning: "part of air-to-air protocol"},
+	"AB":{field: "Air Speed Bit", meaning:"0=indicated air speed, 1=true air speed"},
+	"AS":{field: "True/Indicated Air Speed", meaning:"0=indicated air speed, 1=true air speed"},
 	"CA":{field: "Capability", meaning: "aircraft report of system capability"},
 	"CC":{field: "Crosslink Capability", meaning:"Indicates XPDR has ability to support crosslink capability"},
 	"DF":{field: "Downlink Format", meaning: "downlink descriptor"},
@@ -74,10 +76,13 @@ var featureDescription = map[string]featureDescriptionType{
 	"EWV":{field:"East/West Velocity", meaning:"How fast the plane is going in the indicated direction"},
 	"NSD":{field:"North/South Direction", meaning:"Non-zero == negative velocity. 0=north,1=south"},
 	"NSV":{field:"North/South Velocity", meaning:"How fast the plane is going in the indicated direction"},
-	"SRC":{field:"Source Antenna", meaning:"Which antenna this signal was transitted from"},
+	"VSRC":{field:"Source Antenna", meaning:"Which antenna this signal was transitted from"},
 	"HAED":{field:"Height Above Ellipsoid (HAE) Direction", meaning:"Direction indicator: 1=down, 0=up"},
 	"HAEV":{field:"Height Above Ellipsoid (HAE) Delta", meaning:"Barometer offset"},
 	"EID":{field:"Emergency ID", meaning:"Emergency Table Lookup ID"},
+
+	"IC":{field:"Intent Change", meaning:""},
+	"IFR":{field:"Instrument Flight Rules Capability", meaning:""},
 
 	"NICp":{field:"Navigation Integrity Category", meaning:""},
 	"NACv":{field:"Navigation Accuracy Category", meaning:""},
@@ -116,19 +121,55 @@ var featureDF17AirPosition = []featureBreakdown{
 	{name: "LAT", start: 54, end: 71},
 	{name: "LON", start: 71, end: 88},
 }
-var featureDF17AirVelocity = []featureBreakdown{
+
+var featureDF17AirVelocityUnknown = []featureBreakdown{
+	{name: "??", start:37, end: 88},
+}
+var featureDF17AirVelocityGroundSpeed = []featureBreakdown{
 	{name: "SUB", start:37, end: 40},
-	{name: "??", start: 40, end: 45},
+	{name: "IC", start: 40, end: 41},
+	{name: "IFR", start: 41, end: 42},
+	{name: "NACv", start: 42, end: 45},
 	{name: "EWD", start: 45, end: 46},
 	{name: "EWV", start: 46, end: 56},
 	{name: "NSD", start: 56, end: 57},
 	{name: "NSV", start: 57, end: 67},
-	{name: "SRC", start: 67, end: 68},
+	{name: "VSRC", start: 67, end: 68},
 	{name: "VRS", start: 68, end: 69},
 	{name: "VR", start: 69, end: 78},
 	{name: "??", start: 78, end: 80},
 	{name: "HAED", start: 80, end: 81},
 	{name: "HAEV", start: 81, end: 88},
+}
+var featureDF17AirVelocityAirSpeed = []featureBreakdown{
+	{name: "SUB", start:37, end: 40},
+	{name: "IC", start: 40, end: 41},
+	{name: "IFR", start: 41, end: 42},
+	{name: "NACv", start: 42, end: 45},
+	{name: "HB", start:45, end: 46},
+	{name: "HD", start:46, end: 56},
+	{name: "AB", start:56, end: 57},
+	{name: "AS", start:57, end: 67},
+	{name: "VSRC", start:67, end: 68},
+	{name: "VRS", start:68, end: 69},
+	{name: "VR", start:69, end: 78},
+	{name: "??", start:78, end: 80},
+	{name: "HAED", start: 80, end: 81},
+	{name: "HAEV", start: 81, end: 88},
+}
+
+var featureDF17AirVelocity = []featureBreakdown{
+	{name: "??", start:37, end: 88, subFields:map[byte][]featureBreakdown{
+		0:featureDF17AirVelocityUnknown,
+		1:featureDF17AirVelocityGroundSpeed,
+		2:featureDF17AirVelocityGroundSpeed,
+		3:featureDF17AirVelocityAirSpeed,
+		4:featureDF17AirVelocityAirSpeed,
+		5:featureDF17AirVelocityUnknown,
+		6:featureDF17AirVelocityUnknown,
+		7:featureDF17AirVelocityUnknown,
+	},
+	},
 }
 
 var asdbFeatures = map[byte][]featureBreakdown{

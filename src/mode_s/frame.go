@@ -17,6 +17,7 @@ const (
 	DF17_FRAME_SURFACE_POS = "Surface Position"
 	DF17_FRAME_AIR_POS_BARO = "Airborne Position (with Barometric Altitude)"
 	DF17_FRAME_AIR_VELOCITY = "Airborne Velocity"
+	DF17_FRAME_AIR_VELOCITY_UNKNOWN = "Airborne Velocity (unknown sub type)"
 	DF17_FRAME_AIR_POS_GNSS = "Airborne Position (with GNSS Height)"
 	DF17_FRAME_TEST_MSG = "Test Message"
 	DF17_FRAME_TEST_MSG_SQUAWK = "Test Message with Squawk"
@@ -294,8 +295,12 @@ func (df *Frame) MessageTypeString() string {
 		name = DF17_FRAME_SURFACE_POS
 	} else if df.messageType >= 9 && df.messageType <= 18 {
 		name = DF17_FRAME_AIR_POS_BARO
-	} else if df.messageType == 19 && df.messageSubType >= 1 && df.messageSubType <= 4 {
-		name = DF17_FRAME_AIR_VELOCITY
+	} else if df.messageType == 19 {
+		if df.messageSubType >= 1 && df.messageSubType <= 4 {
+			name = DF17_FRAME_AIR_VELOCITY
+		} else {
+			name = DF17_FRAME_AIR_VELOCITY_UNKNOWN
+		}
 	} else if df.messageType >= 20 && df.messageType <= 22 {
 		name = DF17_FRAME_AIR_POS_GNSS
 	} else if df.messageType == 23 {
