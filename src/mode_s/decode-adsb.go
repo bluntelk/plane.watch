@@ -195,7 +195,7 @@ func (f *Frame) decodeAdsb() {
 			f.onGround = false
 
 			f.compatibilityClass = int(f.message[5]) << 8 | int(f.message[6])
-			if f.compatibilityClass & 0xC000 != 0 {
+			if f.compatibilityClass & 0xC000 == 0 {
 				f.cccHasOperationalTcas = bp((f.compatibilityClass & 0x2000) != 0)
 				f.cccHasAirRefVel = bp((f.compatibilityClass & 0x200) != 0)
 				f.cccHasTargetStateRpt = bp((f.compatibilityClass & 0x100) != 0)
@@ -211,8 +211,7 @@ func (f *Frame) decodeAdsb() {
 			f.compatibilityClass = int(f.message[5]) << 4 | int(f.message[6] & 0xF0) >> 4
 			f.airframe_width_len = f.message[6] & 0x0F
 
-			// will never be true? only have 8 bits... :(
-			if f.compatibilityClass & 0xC000 != 0 {
+			if f.compatibilityClass & 0xC000 == 0 {
 				f.cccHasLowTxPower = bp((f.compatibilityClass & 0x200) != 0)
 				f.cccHasUATReceiver = (f.compatibilityClass & 0x100) != 0
 				f.validNacV = true
@@ -220,7 +219,7 @@ func (f *Frame) decodeAdsb() {
 				f.nicSupplementC = byte((f.compatibilityClass & 0x10) >> 4)
 			}
 		}
-		if f.compatibilityClass & 0xC000 != 0 {
+		if f.compatibilityClass & 0xC000 == 0 {
 			f.validCompatibilityClass = true
 			f.cccHas1090EsIn = (f.compatibilityClass & 0x1000) != 0
 		}

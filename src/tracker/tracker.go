@@ -125,15 +125,22 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 			{
 				if frame.HeadingValid() {
 					plane.Location.Heading, _ = frame.Heading()
+					plane.Location.hasHeading = true
 				}
 				if frame.VelocityValid() {
 					plane.Location.Velocity, _ = frame.Velocity()
-
 				}
 				if frame.VerticalStatusValid() {
 					plane.Location.onGround, _ = frame.OnGround()
 				}
-				plane.Location.hasHeading = true
+
+				if frame.IsEven() {
+					plane.SetCprEvenLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
+				} else {
+					plane.SetCprOddLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
+				}
+				plane.DecodeCpr(0, frame.AltitudeUnits())
+
 				plane.Location.TimeStamp = time.Now()
 
 				if debug {

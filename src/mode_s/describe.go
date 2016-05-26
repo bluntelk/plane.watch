@@ -648,7 +648,7 @@ func (f *Frame) showAdsbMsgSubType(output io.Writer) {
 func (f *Frame) showCapabilityClassInfo(output io.Writer) {
 	if (f.validCompatibilityClass) {
 		if nil != f.cccHasLowTxPower {
-			fmt.Fprintf(output, "  Low TX Power      : %t\n", f.cccHasLowTxPower)
+			fmt.Fprintf(output, "  Low TX Power      : %t\n", *f.cccHasLowTxPower)
 		}
 	} else {
 		fmt.Fprintf(output, "Compatibility Class : Unknown\n")
