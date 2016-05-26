@@ -22,8 +22,9 @@ const (
 	DF17_FRAME_TEST_MSG = "Test Message"
 	DF17_FRAME_TEST_MSG_SQUAWK = "Test Message with Squawk"
 	DF17_FRAME_SURFACE_SYS_STATUS = "Surface System Status"
-	DF17_FRAME_EXT_SQUIT_EMERG = "Extended Squitter Aircraft Status (Emergency Or Priority)"
-	DF17_FRAME_EXT_SQUIT_STATUS = "Extended Squitter Aircraft Status (1090ES TCAS Resolution Advisory)"
+	DF17_FRAME_EMERG_PRIORITY = "Extended Squitter Aircraft Status (Emergency Or Priority)"
+	DF17_FRAME_EMERG_PRIORITY_UNKNOWN = "Unknown Emergency or Priority message"
+	DF17_FRAME_TCAS_RA = "Extended Squitter Aircraft Status (1090ES TCAS Resolution Advisory)"
 	DF17_FRAME_STATE_STATUS = "Target State and Status Message"
 	DF17_FRAME_AIRCRAFT_OPER = "Aircraft Operational Status Message"
 )
@@ -60,15 +61,42 @@ type Position struct {
 }
 
 type df17 struct {
-	messageType    byte   // DF17 Extended Squitter Message Type
-	messageSubType byte   // DF17 Extended Squitter Message Sub Type
+	messageType             byte   // DF17 Extended Squitter Message Type
+	messageSubType          byte   // DF17 Extended Squitter Message Sub Type
 
-	aircraftType   int
-	cprFlagOddEven int    /* 1 = Odd, 0 = Even CPR message. */
-	timeFlag       int    /* UTC synchronized? */
-	flight         []byte /* 8 chars flight number. */
+	cprFlagOddEven          int    /* 1 = Odd, 0 = Even CPR message. */
+	timeFlag                int    /* UTC synchronized? */
+	flight                  []byte /* 8 chars flight number. */
 
-	adsbVersion    byte
+	validCompatibilityClass bool
+	compatibilityClass      int
+	cccHasOperationalTcas   *bool
+	cccHas1090EsIn          bool
+	cccHasAirRefVel         *bool  // supports Air Referenced Velocity
+	cccHasLowTxPower        *bool
+	cccHasTargetStateRpt    *bool  // supports Target State Report
+	cccHasTargetChangeRpt   *bool  // supports Target Change Report
+	cccHasUATReceiver       bool
+	validNacV               bool
+
+	operationalModeCode     int
+	adsbVersion             byte
+	nacP                    byte   // Navigation accuracy category - position
+	geoVertAccuracy         byte   // geometric vertical accuracy
+	sil                     byte
+	airframe_width_len      byte
+	nicCrossCheck           byte   // whether or not the alt or heading is cross checked
+	northReference          byte   // 0=true north, 1 = magnetic north
+
+	surveillanceStatus      byte
+	nicSupplementA          byte
+	nicSupplementB          byte
+	nicSupplementC          byte
+	containmentRadius       int
+
+	intentChange            byte
+	ifrCapability           byte
+	nacV                    byte
 }
 
 type raw_fields struct {
@@ -109,7 +137,7 @@ type Frame struct {
 
 var (
 	downlinkFormatTable = map[byte]string{
-		0:  "short air-air surveillance (TCAS)",
+		0:  "Short air-air surveillance (TCAS)",
 		4:  "Roll Call Reply - Altitude (~100ft accuracy)",
 		5:  "Roll Call Reply - Squawk",
 		11: "All-Call reply containing aircraft address", // transponder capabilities
@@ -285,6 +313,13 @@ var (
 		6: "reserved",
 		7: "reserved",
 	}
+
+	surveillanceStatus = []string{
+		0: "No condition information",
+		1: "Permanent alert (emergency condition)",
+		2: "Temporary alert (change in Mode A identity code other than emergency condition)",
+		3: "SPI condition",
+	}
 )
 
 func (df *Frame) MessageTypeString() string {
@@ -311,10 +346,15 @@ func (df *Frame) MessageTypeString() string {
 		}
 	} else if df.messageType == 24 && df.messageSubType == 1 {
 		name = DF17_FRAME_SURFACE_SYS_STATUS
-	} else if df.messageType == 28 && df.messageSubType == 1 {
-		name = DF17_FRAME_EXT_SQUIT_EMERG
-	} else if df.messageType == 28 && df.messageSubType == 2 {
-		name = DF17_FRAME_EXT_SQUIT_STATUS
+	} else if df.messageType == 28 {
+		if df.messageSubType == 1 {
+			name = DF17_FRAME_EMERG_PRIORITY
+
+		} else if df.messageSubType == 2 {
+			name = DF17_FRAME_TCAS_RA
+		} else {
+			name = DF17_FRAME_EMERG_PRIORITY_UNKNOWN
+		}
 	} else if df.messageType == 29 {
 		if (df.messageSubType == 0 || df.messageSubType == 1) {
 			name = DF17_FRAME_STATE_STATUS
@@ -454,4 +494,164 @@ func (df *Frame) IsEven() bool {
 
 func (df *Frame) FlightNumber() string {
 	return string(df.flight)
+}
+
+/**
+ * horizontal containment radius limit in meters.
+ * Set NIC supplement A from Operational Status Message for better precision.
+ * Otherwise, we'll be pessimistic.
+ * Note: For ADS-B versions < 2, this is inaccurate for NIC class 6, since there was
+ * no NIC supplement B in earlier versions.
+ */
+func (f *Frame) ContainmentRadiusLimit(nic_suppl_a bool) (float64, error) {
+	var radius float64
+	var err error
+	if f.downLinkFormat != 17 {
+		return radius, fmt.Errorf("ContainmentRadiusLimit Only valid for ADS-B Airborne Position Messages")
+	}
+	switch (f.messageType) {
+	case 0, 18, 22:
+		err = fmt.Errorf("Unknown Containment Radius")
+	case 9, 20:
+		radius = 7.5;
+	case 10, 21:
+		radius = 25;
+	case 11:
+		if nic_suppl_a {
+			radius = 75
+		} else {
+			radius = 185.2
+		}
+	case 12:
+		radius = 370.4;
+	case 13:
+		if 0 == f.nicSupplementB {
+			radius = 926
+		} else if nic_suppl_a {
+			radius = 1111.2
+		} else {
+			radius = 555.6
+		}
+	case 14:
+		radius = 1852
+	case 15:
+		radius = 3704
+	case 16:
+		if nic_suppl_a {
+			radius = 7408
+		} else {
+			radius = 14816
+		}
+	case 17:
+		radius = 37040;
+	default:
+		radius = 0;
+	}
+
+	return radius, err
+}
+
+func (f *Frame) NavigationIntegrityCategory(nic_suppl_a bool) (byte, error) {
+	var nic byte
+	var err error
+	if f.downLinkFormat != 17 {
+		return nic, fmt.Errorf("ContainmentRadiusLimit Only valid for ADS-B Airborne Position Messages")
+	}
+	switch (f.messageType) {
+	case 0, 18, 22:
+		err = fmt.Errorf("Unknown Navigation Integrity Category");
+	case 9, 20:
+		nic = 11;
+	case 10: case 21:
+		nic = 10;
+	case 11:
+		if nic_suppl_a {
+			nic = 9;
+		}else {
+			nic = 8
+		}
+	case 12:
+		nic = 7;
+	case 13:
+		nic = 6;
+	case 14:
+		nic = 5;
+	case 15:
+		nic = 4;
+	case 16:
+		if nic_suppl_a {
+			nic = 3
+		} else {
+			nic = 2
+		}
+	case 17:
+		nic = 1;
+	default:
+		nic = 0;
+	}
+
+	return nic, err
+}
+
+/**
+ * Gets the air frames size in metres
+ */
+func (f *Frame)getAirplaneLengthWidth() (float32, float32, error) {
+	if ! (f.messageType == 31 && f.messageSubType == 1) {
+		return 0, 0, fmt.Errorf("Can only get aircraft size from ADSB message 31 sub type 1")
+	}
+	var length, width float32
+	var err error
+
+	switch (f.airframe_width_len) {
+	case 1:
+		length = 15
+		width = 23
+	case 2:
+		length = 25
+		width = 28.5
+	case 3:
+		length = 25
+		width = 34
+	case 4:
+		length = 35
+		width = 33
+	case 5:
+		length = 35
+		width = 38
+	case 6:
+		length = 45
+		width = 39.5
+	case 7:
+		length = 45
+		width = 45
+	case 8:
+		length = 55
+		width = 45
+	case 9:
+		length = 55
+		width = 52
+	case 10:
+		length = 65
+		width = 59.5
+	case 11:
+		length = 65
+		width = 67
+	case 12:
+		length = 75
+		width = 72.5
+	case 13:
+		length = 75
+		width = 80
+	case 14:
+		length = 85
+		width = 80
+	case 15:
+		length = 85
+		width = 90
+	default:
+		err = fmt.Errorf("Unable to determine airframes size")
+	}
+
+	return length, width, err
 }

@@ -211,7 +211,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				}
 				break
 			}
-		case mode_s.DF17_FRAME_EXT_SQUIT_EMERG: //, "Extended Squitter Aircraft Status (Emergency)":
+		case mode_s.DF17_FRAME_EMERG_PRIORITY: //, "Extended Squitter Aircraft Status (Emergency)":
 			{
 				if debug {
 					log.Printf(planeFormat + "\033[2m %s\033[0m", messageType)
@@ -221,7 +221,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				hasChanged = true
 				break
 			}
-		case mode_s.DF17_FRAME_EXT_SQUIT_STATUS: //, "Extended Squitter Aircraft Status (1090ES TCAS RA)":
+		case mode_s.DF17_FRAME_TCAS_RA: //, "Extended Squitter Aircraft Status (1090ES TCAS RA)":
 			{
 				if debug {
 					log.Printf(planeFormat + "\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)

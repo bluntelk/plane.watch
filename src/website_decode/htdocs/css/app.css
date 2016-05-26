@@ -1,3 +1,15 @@
 .byte-start {
     color: red;
 }
+
+body {
+
+}
+
+h2 {
+    margin-top: 0;
+}
+
+.top-panel {
+    min-height: 115px;
+}

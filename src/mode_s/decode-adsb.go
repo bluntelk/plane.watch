@@ -31,12 +31,14 @@ func (f *Frame) decodeAdsb() {
 		f.decodeFlightNumber()
 
 		f.catType = 4 - f.messageType
-		f.catSubType = f.messageSubType
+		f.catSubType = f.message[4] & 7
 		f.catValid = true
+		f.messageSubType = 0
 	case 5, 6, 7, 8:
 		// surface position
 		f.onGround = true
 		f.validVerticalStatus = true
+		f.messageSubType = 0
 
 		f.decodeAdsbLatLon()
 		f.decodeMovementField()
@@ -47,19 +49,27 @@ func (f *Frame) decodeAdsb() {
 		}
 	case 9, 10, 11, 12, 13, 14, 15, 16, 17, 18:
 		/* Airborne position Message */
+		f.messageSubType = 0
 		f.timeFlag = int(f.message[6] & (1 << 3))
 		f.onGround = false
 		f.validVerticalStatus = true
-		f.validAltitude = true
+		f.surveillanceStatus = (f.message[4] & 0x06) >> 1
+		f.nicSupplementB = f.message[4] & 0x01
 
 		field := ((int32(f.message[5]) << 4) | (int32(f.message[6]) >> 4)) & 0x0FFF
 		f.altitude = decodeAC12Field(field)
+		f.validAltitude = f.altitude != 0
 		f.decodeAdsbLatLon()
 
 	case 19:
 		/* Airborne Velocity Message */
 		f.onGround = false
 		f.validVerticalStatus = true
+
+		f.intentChange = (f.message[5] & 0x80) >> 7
+		f.ifrCapability = (f.message[5] & 0x40) >> 6
+		f.validNacV = true
+		f.nacV = (f.message[5] & 0x38) >> 3
 
 		var verticalRateSign int = int((f.message[8] & 0x8) >> 3)
 		f.verticalRate = (int(f.message[8] & 7) << 6) | (int(f.message[9] & 0xfc) >> 2)
@@ -72,7 +82,8 @@ func (f *Frame) decodeAdsb() {
 			f.validVerticalRate = true
 		}
 
-		if f.messageSubType == 1 || f.messageSubType == 2 { // Ground Speed Message
+		if f.messageSubType == 1 || f.messageSubType == 2 {
+			// Ground Speed Message
 			f.eastWestDirection = int(f.message[5] & 4) >> 2
 			f.eastWestVelocity = int(((f.message[5] & 3) << 8) | f.message[6])
 			f.northSouthDirection = int((f.message[7] & 0x80) >> 7)
@@ -113,7 +124,8 @@ func (f *Frame) decodeAdsb() {
 			} else {
 				f.heading = 0
 			}
-		} else if f.messageSubType == 3 || f.messageSubType == 4 { // Air Speed -- ground speed not available
+		} else if f.messageSubType == 3 || f.messageSubType == 4 {
+			// Air Speed -- ground speed not available
 			var airspeed int = int(((f.message[7] & 0x7f) << 3) | (f.message[8] >> 5));
 			if airspeed != 0 {
 				airspeed -= 1;
@@ -142,7 +154,7 @@ func (f *Frame) decodeAdsb() {
 			f.haeDelta = multiplier * int((f.message[10] & 0x7f) - 1);
 		}
 	case 20, 21, 22:
-	//NoOp
+	//NoOp -- Airborne Position with GNSS instead of Baro
 	case 23:
 		if f.messageSubType == 7 {
 			// TEST MESSAGE with  squawk - decode it!
@@ -172,18 +184,56 @@ func (f *Frame) decodeAdsb() {
 	// NoOp
 	case 31:
 		// Operational Status Message
+		// TODO: Finish this off - it is not in a good working state
+
+		// bool pointer helper
+		bp := func(b bool) *bool {return &b}
+
 		if f.messageSubType == 0 {
+			// on the ground!
 			f.validVerticalStatus = true
 			f.onGround = false
+
+			f.compatibilityClass = int(f.message[5]) << 8 | int(f.message[6])
+			if f.compatibilityClass & 0xC000 != 0 {
+				f.cccHasOperationalTcas = bp((f.compatibilityClass & 0x2000) != 0)
+				f.cccHasAirRefVel = bp((f.compatibilityClass & 0x200) != 0)
+				f.cccHasTargetStateRpt = bp((f.compatibilityClass & 0x100) != 0)
+
+				changeRpt := (f.compatibilityClass & 0xC0)
+				f.cccHasTargetChangeRpt = bp(changeRpt == 1 || changeRpt == 2)
+				f.cccHasUATReceiver = (f.compatibilityClass & 0x20) != 0
+			}
 
 		} else if f.messageSubType == 1 {
 			f.validVerticalStatus = true
 			f.onGround = true
+			f.compatibilityClass = int(f.message[5]) << 4 | int(f.message[6] & 0xF0) >> 4
+			f.airframe_width_len = f.message[6] & 0x0F
+
+			// will never be true? only have 8 bits... :(
+			if f.compatibilityClass & 0xC000 != 0 {
+				f.cccHasLowTxPower = bp((f.compatibilityClass & 0x200) != 0)
+				f.cccHasUATReceiver = (f.compatibilityClass & 0x100) != 0
+				f.validNacV = true
+				f.nacV = byte((f.compatibilityClass & 0xE0) >> 5)
+				f.nicSupplementC = byte((f.compatibilityClass & 0x10) >> 4)
+			}
+		}
+		if f.compatibilityClass & 0xC000 != 0 {
+			f.validCompatibilityClass = true
+			f.cccHas1090EsIn = (f.compatibilityClass & 0x1000) != 0
 		}
 
+		f.operationalModeCode = int(f.message[7]) << 8 | int(f.message[8])
 		f.adsbVersion = (f.message[9] & 0xe0) >> 5
+		f.nicSupplementA = f.message[9] & 0x10 >> 4
 
-
+		f.nacP = f.message[9] & 0x0F
+		f.geoVertAccuracy = f.message[10] & 0xC0 >> 6
+		f.sil = f.message[10] & 0x30 >> 4
+		f.nicCrossCheck = f.message[10] & 0x08 >> 3
+		f.northReference = f.message[10] & 0x04 >> 2
 	}
 }
 

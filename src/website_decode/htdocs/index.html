@@ -1,111 +1,339 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="Decode ADSB AVR Frames">
+    <meta name="author" content="Jason Playne">
+
     <title>Mode S Packet Decoder</title>
-    <link rel="stylesheet" href="css/foundation.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css"
+          integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
     <link rel="stylesheet" href="css/app.css">
+
+    <script src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"
+            integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS"
+            crossorigin="anonymous"></script>
+    <script src="js/app.js" type="application/ecmascript"></script>
 </head>
 <body>
 
-<div class="callout large primary">
-    <div class="row column text-center">
-        <h1>Mode S Packet Decoder</h1>
-        <h2 class="subheader">Decoding your Mode S (and ADS-B) packets</h2>
-    </div>
-</div>
 
-<div class="row">
-    <div class="column small-4">
-        <p class="float-right">Example Packets</p>
+<!-- Fixed navbar -->
+<nav class="navbar navbar-inverse navbar-static-top">
+    <div class="container">
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar"
+                    aria-expanded="false" aria-controls="navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="#">Mode S Decoder</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+            <ul class="nav navbar-nav">
+            </ul>
+
+            <ul class="nav navbar-nav navbar-right">
+            </ul>
+        </div><!--/.nav-collapse -->
     </div>
-    <div class="column small-8">
-        <div id="examples"></div>
-    </div>
-</div>
-<div class="row medium-12 columns">
-    <div class="column small-4">
-    </div>
-    <div class="column small-8">
-        <form action="#" method="POST" id="input-form">
-            <div class="input-group">
-                <input class="input-group-field" name="packet" title="packet" type="text" id="packet"/>
-                <div class="input-group-button">
-                    <input class="button" type="submit" value="Decode Packet!">
+</nav>
+
+<div class="container">
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="panel panel-default top-panel">
+                <div class="panel-body">
+                    <p>Either choose a packet from the menu above or input your own in the text box below.</p>
+                    <form action="#" method="POST" id="input-form" class="form-inline">
+                        <div class="form-group">
+                            <label class="sr-only" for="packet">Mode S Frame</label>
+                            <input class="form-control" size="34" name="packet" title="packet" type="text" id="packet"/>
+                        </div>
+                        <input class="btn btn-primary" type="submit" value="Decode Packet!">
+                    </form>
                 </div>
             </div>
-        </form>
+        </div>
+        <div class="col-lg-6">
+            <div class="panel panel-default top-panel">
+                <div class="panel-body">
+                    <h2>Mode S Packet Decoder</h2>
+                    <p>Use this page to decode all of your mode s packets</p>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
+    <div class="row">
+        <div class="col-sm-12">
+            <div class="btn-group btn-group-justified">
+                <div class="btn-group">
+                    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
+                        DF00 <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-packet="*00050319AB8C22;">*00050319AB8C22;</a></li>
+                        <li><a href="#" data-packet="*02818314F34FE7;">*02818314F34FE7;</a></li>
+                        <li><a href="#" data-packet="*02410097A181E3;">*02410097A181E3;</a></li>
+                        <li><a href="#" data-packet="*000001B6747458;">*000001B6747458;</a></li>
+                        <li><a href="#" data-packet="*028183150CBBEE;">*028183150CBBEE;</a></li>
+                        <li><a href="#" data-packet="*02619420C9D617;">*02619420C9D617;</a></li>
+                        <li><a href="#" data-packet="*0000011D8D208A;">*0000011D8D208A;</a></li>
+                        <li><a href="#" data-packet="*00C586A2FD84DD;">*00C586A2FD84DD;</a></li>
+                        <li><a href="#" data-packet="*0000019075E0F5;">*0000019075E0F5;</a></li>
+                        <li><a href="#" data-packet="*02818335D9DA51;">*02818335D9DA51;</a></li>
+                    </ul>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
+                        DF04 <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-packet="*200006A2DE8B1C;">*200006A2DE8B1C;</a></li>
+                        <li><a href="#" data-packet="*20001420250AF0;">*20001420250AF0;</a></li>
+                        <li><a href="#" data-packet="*2000031BC5B39E;">*2000031BC5B39E;</a></li>
+                        <li><a href="#" data-packet="*2000031EEEDFAE;">*2000031EEEDFAE;</a></li>
+                        <li><a href="#" data-packet="*20000E36A91BE9;">*20000E36A91BE9;</a></li>
+                        <li><a href="#" data-packet="*200006A2DEE500;">*200006A2DEE500;</a></li>
+                        <li><a href="#" data-packet="*210000992F8C48;">*210000992F8C48;</a></li>
+                        <li><a href="#" data-packet="*200007A2D0869C;">*200007A2D0869C;</a></li>
+                        <li><a href="#" data-packet="*20000E3956BBA1;">*20000E3956BBA1;</a></li>
+                        <li><a href="#" data-packet="*2020011CB7CEF5;">*2020011CB7CEF5;</a></li>
+                    </ul>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
+                        DF05 <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-packet="*29001B3AF47E76;">*29001B3AF47E76;</a></li>
+                        <li><a href="#" data-packet="*28001B1F2181F6;">*28001B1F2181F6;</a></li>
+                        <li><a href="#" data-packet="*28000D08CEE4C5;">*28000D08CEE4C5;</a></li>
+                        <li><a href="#" data-packet="*2820050BD0D698;">*2820050BD0D698;</a></li>
+                        <li><a href="#" data-packet="*2800050B95AAB1;">*2800050B95AAB1;</a></li>
+                        <li><a href="#" data-packet="*28000300448966;">*28000300448966;</a></li>
+                        <li><a href="#" data-packet="*28000E980FDA8E;">*28000E980FDA8E;</a></li>
+                        <li><a href="#" data-packet="*29001E0D3CB4BF;">*29001E0D3CB4BF;</a></li>
+                        <li><a href="#" data-packet="*280011814A6674;">*280011814A6674;</a></li>
+                        <li><a href="#" data-packet="*29000A1AEE1F58;">*29000A1AEE1F58;</a></li>
+                    </ul>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
+                        DF11 <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-packet="*5F7C7B5ABB4F87;">*5F7C7B5ABB4F87;</a></li>
+                        <li><a href="#" data-packet="*5DA8BBE71A5F07;">*5DA8BBE71A5F07;</a></li>
+                        <li><a href="#" data-packet="*5D7C0B6DB05076;">*5D7C0B6DB05076;</a></li>
+                        <li><a href="#" data-packet="*5D7C431FBE0A77;">*5D7C431FBE0A77;</a></li>
+                        <li><a href="#" data-packet="*5D7C7534BAE2B0;">*5D7C7534BAE2B0;</a></li>
+                        <li><a href="#" data-packet="*5D7C1B28ACC729;">*5D7C1B28ACC729;</a></li>
+                        <li><a href="#" data-packet="*5D7C431FBE0A73;">*5D7C431FBE0A73;</a></li>
+                        <li><a href="#" data-packet="*5D7C7A5D1D6885;">*5D7C7A5D1D6885;</a></li>
+                        <li><a href="#" data-packet="*5D7C71817B3F27;">*5D7C71817B3F27;</a></li>
+                        <li><a href="#" data-packet="*5DA8BBE71A5F03;">*5DA8BBE71A5F03;</a></li>
+                    </ul>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
+                        DF16 <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-packet="*8061942058A20AA10C3A1E6EE7CD;">*8061942058A20AA10C3A1E6EE7CD;</a>
+                        </li>
+                        <li><a href="#" data-packet="*80818334581B428E8A31CF7C7D60;">*80818334581B428E8A31CF7C7D60;</a>
+                        </li>
+                        <li><a href="#" data-packet="*8061902258822EFC8B9486FDA3BF;">*8061902258822EFC8B9486FDA3BF;</a>
+                        </li>
+                        <li><a href="#" data-packet="*808183195819A2903631F52A7D7A;">*808183195819A2903631F52A7D7A;</a>
+                        </li>
+                        <li><a href="#" data-packet="*8061942258A22EFCE193EC57EC86;">*8061942258A22EFCE193EC57EC86;</a>
+                        </li>
+                        <li><a href="#" data-packet="*8081831458194291C231CD654207;">*8081831458194291C231CD654207;</a>
+                        </li>
+                        <li><a href="#" data-packet="*808182BF5817F292F2315EDFCA2E;">*808182BF5817F292F2315EDFCA2E;</a>
+                        </li>
+                        <li><a href="#" data-packet="*80618522582A2EFD9D92ADA8531A;">*80618522582A2EFD9D92ADA8531A;</a>
+                        </li>
+                        <li><a href="#" data-packet="*808182B958179293B630CA1A8F00;">*808182B958179293B630CA1A8F00;</a>
+                        </li>
+                        <li><a href="#" data-packet="*8061852A582AAAA332365DD50360;">*8061852A582AAAA332365DD50360;</a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
+                        DF17 <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-packet="*8D76CE88204C9072CB48209A504D;">(04/0) Aircraft Identification and
+                            Category</a></li>
+                        <li><a href="#" data-packet="*8D7C7181215D01A08208204D8BF1;">(04/1) Aircraft Identification and
+                            Category</a></li>
+                        <li><a href="#" data-packet="*8D7C7745226151A08208205CE9C2;">(04/2) Aircraft Identification and
+                            Category</a></li>
+                        <li><a href="#" data-packet="*8D7C80AD2358F6B1E35C60FF1925;">(04/3) Aircraft Identification and
+                            Category</a></li>
+                        <li><a href="#" data-packet="*8D7C146525446074DF5820738E90;">(04/5) Aircraft Identification and
+                            Category</a></li>
+                        <li role="separator" class="divider"></li>
+                        <li><a href="#" data-packet="*8C7C1474381DA443C6450A369656;">(07) Surface Position</a></li>
+                        <li><a href="#" data-packet="*8C7C451C423C52D692D953855472;">(08) Surface Position</a></li>
+                        <li role="separator" class="divider"></li>
+                        <li><a href="#" data-packet="*8D89611348DB01C6EA41C4C7B8BF;">(09) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8D7C1BE8581B66E9BD8CEEDC1C9F;">(11) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8F7C629659A0A6F64D8BAA09D3F0;">(11) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8F7C48125C0D26E63F843E8D2A2F;">(11) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8D7C451C6005871025918865645E;">(12) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8D76E72A6837D373A0DB1871D882;">(13) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8F7C16716905F2988431007B4985;">(13) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8F7C16716D09E28D162D7C05371C;">(13) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8D7C431A70A60F1C25937CD73CD6;">(14) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8D7C779478658783F6EF1389B39E;">(15) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8C7C14707D8003800009ACDAFF39;">(15) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8F7C74B98005C29AD8306EA347CF;">(16) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8E7C391F811796FC1DA0CE5B8643;">(16) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8D7C74B98805C29ADA306EEBFE28;">(17) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8D76E730904B7782CA3BF2D98AE6;">(18) Airborne Position</a></li>
+                        <li><a href="#" data-packet="*8E7C629691A0A59C64468DFB014F;">(18) Airborne Position</a></li>
+                        <li role="separator" class="divider"></li>
+                        <li><a href="#" data-packet="*8E7C1671980000000000004A5672;">(19/0) Airborne Velocity</a></li>
+                        <li><a href="#" data-packet="*8D7C7181991060866808026F519B;">(19/1) Airborne Velocity</a></li>
+                        <li><a href="#" data-packet="*8D7C14769B441E11383400CAB903;">(19/3) Airborne Velocity</a></li>
+                        <li><a href="#" data-packet="*8C8960DE9D84543BAE4639A90C6B;">(19/5) Airborne Velocity</a></li>
+                        <li role="separator" class="divider"></li>
+                        <li><a href="#" data-packet="*8D7C431FBF59D00000000069B618;">(23/7) Test message with Squawk</a>
+                        </li>
+                        <li role="separator" class="divider"></li>
+                        <li><a href="#" data-packet="*8D7C4A09E00300020259A0CBC2F4;">(28/0) Aircraft
+                            Emergency/Priority</a></li>
+                        <li><a href="#" data-packet="*8D7C7181E1050B00000000C13340;">(28/1) Aircraft
+                            Emergency/Priority</a></li>
+                        <li role="separator" class="divider"></li>
+                        <li><a href="#" data-packet="*8D7C3F18E8000020713800DA52FD;">(29/0) Target State and Status</a>
+                        </li>
+                        <li><a href="#" data-packet="*8D7C1474E9481900093810E5B315;">(29/1) Target State and Status</a>
+                        </li>
+                        <li><a href="#" data-packet="*8DA8BBE7EA0BD870013F082BC5C5;">(29/2) Target State and Status</a>
+                        </li>
+                        <li role="separator" class="divider"></li>
+                        <li><a href="#" data-packet="*8D7C7181F80000060049A8F9E70F;">(31/0) Operational Status
+                            Message</a></li>
+                        <li><a href="#" data-packet="*8C7C4A0CF9004103834938E42BD4;">(31/1) Operational Status
+                            Message</a></li>
+                    </ul>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
+                        DF18 <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-packet="*907CF7C610408498C81820006790;">*907CF7C610408498C81820006790;</a>
+                        </li>
+                        <li><a href="#" data-packet="*907CF7C7C1000000001F04BF815D;">*907CF7C7C1000000001F04BF815D;</a>
+                        </li>
+                        <li><a href="#" data-packet="*907CF7C710408498C82820A021BB;">*907CF7C710408498C82820A021BB;</a>
+                        </li>
+                        <li><a href="#" data-packet="*907CF7C6C10400000020046EFBAC;">*907CF7C6C10400000020046EFBAC;</a>
+                        </li>
+                        <li><a href="#" data-packet="*907CF7C6C104000000210460F62C;">*907CF7C6C104000000210460F62C;</a>
+                        </li>
+                        <li><a href="#" data-packet="*907CF7C7C1000000001E04B18CDD;">*907CF7C7C1000000001E04B18CDD;</a>
+                        </li>
+                        <li><a href="#" data-packet="*907CF7C6C1040000001F04EA2B25;">*907CF7C6C1040000001F04EA2B25;</a>
+                        </li>
+                        <li><a href="#" data-packet="*907CF7C630408C98D8ADE0A061BB;">*907CF7C630408C98D8ADE0A061BB;</a>
+                        </li>
+                        <li><a href="#" data-packet="*907CF7C7C5000000001E0C3FFF7F;">*907CF7C7C5000000001E0C3FFF7F;</a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
+                        DF19 <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-packet="">No DF19 Packets to choose from yet</a></li>
+                    </ul>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
+                        DF20 <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-packet="*A0001420000000000007EE5154A7;">*A0001420000000000007EE5154A7;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A0280319FA08BD09A020008DE244;">*A0280319FA08BD09A020008DE244;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A00003340009A1157E2000FE035A;">*A00003340009A1157E2000FE035A;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A000011D0015370D40000088924F;">*A000011D0015370D40000088924F;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A0001020000000000007ED320583;">*A0001020000000000007ED320583;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A0280319F9E8AB08E00800418E05;">*A0280319F9E8AB08E00800418E05;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A000031F0009A3157E580084DDB1;">*A000031F0009A3157E580084DDB1;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A020011D0015210D00000033F676;">*A020011D0015210D00000033F676;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A10000968509090CA0A7F903110E;">*A10000968509090CA0A7F903110E;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A000031EF2999B14E22443D87C4F;">*A000031EF2999B14E22443D87C4F;</a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
+                        DF21 <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-packet="*A8000B3A001CA9138000001C4E2F;">*A8000B3A001CA9138000001C4E2F;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A828080800000030E40005E3A949;">*A828080800000030E40005E3A949;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A8280808FF5F8B0A8004329463A3;">*A8280808FF5F8B0A8004329463A3;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A8001F1B00000030CC000057C402;">*A8001F1B00000030CC000057C402;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A8001F1B0010BB1B40046FE67663;">*A8001F1B0010BB1B40046FE67663;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A8000A1A80509D118004452EE5BE;">*A8000A1A80509D118004452EE5BE;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A8000A00000000000000050008E3;">*A8000A00000000000000050008E3;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A8000A0000000000000432C6CFAF;">*A8000A0000000000000432C6CFAF;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A8000D088BBC5DF0D001041D8E1F;">*A8000D088BBC5DF0D001041D8E1F;</a>
+                        </li>
+                        <li><a href="#" data-packet="*A8000D08F19ED317FDF46C1B4FFC;">*A8000D08F19ED317FDF46C1B4FFC;</a>
+                        </li>
+                    </ul>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown">
+                        DF24 <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a href="#" data-packet="">No DF24 packets to choose from</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<div class="medium-12 large-12 columns">
+
     <pre id="result">
 
     </pre>
+
 </div>
-
-<script type="application/javascript" src="js/vendor/jquery.js"></script>
-
-<script>
-    $(document).ready(function () {
-        $('#packet').val("*A028009F96887B05FFA000413602;");
-        $('#input-form').submit(function (event) {
-            var packet = $('#packet').val();
-            $.get("/decode", {'packet': packet})
-                    .done(function (data) {
-                        $('#result').html(data)
-                    })
-                    .fail(function () {
-                        $('#result').html("Failed to get data")
-                    });
-            event.preventDefault();
-        });
-    });
-    var examplePackets = {
-        21: ['*A8000B3A001CA9138000001C4E2F;', '*A828080800000030E40005E3A949;', '*A8280808FF5F8B0A8004329463A3;', '*A8001F1B00000030CC000057C402;', '*A8001F1B0010BB1B40046FE67663;', '*A8000A1A80509D118004452EE5BE;', '*A8000A00000000000000050008E3;', '*A8000A0000000000000432C6CFAF;', '*A8000D088BBC5DF0D001041D8E1F;', '*A8000D08F19ED317FDF46C1B4FFC;'],
-        5: ['*29001B3AF47E76;', '*28001B1F2181F6;', '*28000D08CEE4C5;', '*2820050BD0D698;', '*2800050B95AAB1;', '*28000300448966;', '*28000E980FDA8E;', '*29001E0D3CB4BF;', '*280011814A6674;', '*29000A1AEE1F58;'],
-        17: ['*8D7C7181215D01A08208204D8BF1;', '*8C7C1474381DA443C6450A369656;', '*8C7C451C423C52D692D953855472;', '*8D89611348DB01C6EA41C4C7B8BF;', '*8D7C1BE8581B66E9BD8CEEDC1C9F;', '*8D7C451C6005871025918865645E;', '*8D76E72A6837D373A0DB1871D882;', '*8D7C431A70A60F1C25937CD73CD6;', '*8C7C14707D8003800009ACDAFF39;', '*8E7C391F811796FC1DA0CE5B8643;', '*8D7C74B98805C29ADA306EEBFE28;', '*8D76E730904B7782CA3BF2D98AE6;', '*8D7C7181991060866808026F519B;', '*8D7C431FBF59D00000000069B618;', '*8D7C7181E1050B00000000C13340;', '*8DA8BBE7EA0BD870013F082BC5C5;', '*8D7C7181F80000060049A8F9E70F;'],
-        0: ['*00050319AB8C22;', '*02818314F34FE7;', '*02410097A181E3;', '*000001B6747458;', '*028183150CBBEE;', '*02619420C9D617;', '*0000011D8D208A;', '*00C586A2FD84DD;', '*0000019075E0F5;', '*02818335D9DA51;'],
-        11: ['*5F7C7B5ABB4F87;', '*5DA8BBE71A5F07;', '*5D7C0B6DB05076;', '*5D7C431FBE0A77;', '*5D7C7534BAE2B0;', '*5D7C1B28ACC729;', '*5D7C431FBE0A73;', '*5D7C7A5D1D6885;', '*5D7C71817B3F27;', '*5DA8BBE71A5F03;'],
-        4: ['*200006A2DE8B1C;', '*20001420250AF0;', '*2000031BC5B39E;', '*2000031EEEDFAE;', '*20000E36A91BE9;', '*200006A2DEE500;', '*210000992F8C48;', '*200007A2D0869C;', '*20000E3956BBA1;', '*2020011CB7CEF5;'],
-        18: ['*907CF7C610408498C81820006790;', '*907CF7C7C1000000001F04BF815D;', '*907CF7C710408498C82820A021BB;', '*907CF7C6C10400000020046EFBAC;', '*907CF7C6C104000000210460F62C;', '*907CF7C7C1000000001E04B18CDD;', '*907CF7C6C1040000001F04EA2B25;', '*907CF7C630408C98D8ADE0A061BB;', '*907CF7C7C5000000001E0C3FFF7F;'],
-        20: ['*A0001420000000000007EE5154A7;', '*A0280319FA08BD09A020008DE244;', '*A00003340009A1157E2000FE035A;', '*A000011D0015370D40000088924F;', '*A0001020000000000007ED320583;', '*A0280319F9E8AB08E00800418E05;', '*A000031F0009A3157E580084DDB1;', '*A020011D0015210D00000033F676;', '*A10000968509090CA0A7F903110E;', '*A000031EF2999B14E22443D87C4F;'],
-        16: ['*8061942058A20AA10C3A1E6EE7CD;', '*80818334581B428E8A31CF7C7D60;', '*8061902258822EFC8B9486FDA3BF;', '*808183195819A2903631F52A7D7A;', '*8061942258A22EFCE193EC57EC86;', '*8081831458194291C231CD654207;', '*808182BF5817F292F2315EDFCA2E;', '*80618522582A2EFD9D92ADA8531A;', '*808182B958179293B630CA1A8F00;', '*8061852A582AAAA332365DD50360;']
-//        28: ['*E1999863859533;']
-    };
-    var lastRandomNumber = -1;
-    function setExamplePacket(df) {
-        var length = examplePackets[df].length;
-        var id = parseInt(Math.random() * length, 10);
-        if (length > 1) {
-            while (lastRandomNumber == id) {
-                id = parseInt(Math.random() * length, 10);
-            }
-            lastRandomNumber = id;
-        } else {
-            id = 0;
-        }
-        var packet = examplePackets[df][id];
-        var packetField = $('#packet');
-        packetField.val(packet);
-        packetField.submit();
-    }
-
-    var examples = $('#examples');
-    for (let key in examplePackets) {
-        if (examplePackets.hasOwnProperty(key)) {
-            var link = $('<a class="button">DF' + key + '</a>');
-            link.val("DF " + key);
-            link.click(function (event) {
-                setExamplePacket(key);
-                event.preventDefault()
-            });
-            examples.append(link);
-            examples.append('&nbsp;');
-
-        }
-    }
-
-</script>
 </body>
 </html>

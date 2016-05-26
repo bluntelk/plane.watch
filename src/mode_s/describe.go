@@ -50,6 +50,7 @@ var featureDescription = map[string]featureDescriptionType{
 	"RR":{field: "Reply Request", meaning: "commands details of reply"},
 	"SD":{field: "Special Designator", meaning: "control codes to transponder"},
 	"SL":{field: "Sensitivity level, ACAS", meaning: "Reports the current operating sensitivity level of TCAS"},
+	"SS":{field: "Surveillance Status", meaning: ""},
 	"UF":{field: "Uplink Format", meaning: "format descriptor"},
 	"UM":{field: "Utility Message", meaning: "protocol message"},
 	"VS":{field: "Vertical Status", meaning: "aircraft status, airborne (0) or on the ground (1)"},
@@ -62,7 +63,7 @@ var featureDescription = map[string]featureDescriptionType{
 	"SUB":{field:"DF 17 Message Sub Type", meaning:"Message Sub Type"},
 	"DATA":{field:"ADS-B Data", meaning:"ADS-B Data"},
 	"CHAR":{field:"Flight Number", meaning:"1 character of the AIS charset"},
-	"TI":{field:"Time Bit", meaning:"UTC Time"},
+	"TI":{field:"UTC Sync Time Bit", meaning:"Indicates if the Time of Applicability of the message is UTC Sync'd. 0=no"},
 	"CPR":{field:"CPR Odd/Even", meaning:"CPR Odd/Even Frame Type"},
 	"LAT":{field:"CPR Latitude", meaning:"1 of 4 sets of data required to decode planes lat/lon"},
 	"LON":{field:"CPR Longitude", meaning:"1 of 4 sets of data required to decode planes lat/lon"},
@@ -81,16 +82,21 @@ var featureDescription = map[string]featureDescriptionType{
 	"HAEV":{field:"Height Above Ellipsoid (HAE) Delta", meaning:"Barometer offset"},
 	"EID":{field:"Emergency ID", meaning:"Emergency Table Lookup ID"},
 
-	"IC":{field:"Intent Change", meaning:""},
-	"IFR":{field:"Instrument Flight Rules Capability", meaning:""},
+	"IC":{field:"Intent Change", meaning:"If aircraft wants to change altitude etc"},
+	"IFR":{field:"Instrument Flight Rules Capability", meaning:"ADSB v1 Only"},
 
 	"NICp":{field:"Navigation Integrity Category", meaning:""},
+	"NICb":{field:"Navigation Integrity Category Supplement B", meaning:""},
 	"NACv":{field:"Navigation Accuracy Category", meaning:""},
 	"NUC":{field:"Navigation Uncertainty Category", meaning:""},
-	"SIL":{field:"Surveillance/Source Integrity Level", meaning:""},
+	"SIL":{field:"Surveillance/Source Integrity Level", meaning:"indicates the probability of exceeding the NIC containment radius"},
 	"APLW":{field:"Airplane Width and Length", meaning:""},
 	"VER":{field:"ADSB Version", meaning:"This airframes ADSB Compatability"},
 	"GVA":{field:"Geometric Vertical Accuracy", meaning:""},
+
+	"NTH":{field:"NIC Altiude|Track/Heading", meaning:"Altudude (sub type 0) or track/heading (sub type 1) have been cross checked with other sources"},
+	"HRD":{field:"Heading North Info", meaning:"heading based on 0=true north, 1=magnetic north"},
+
 }
 
 var featureDF17FlightName = []featureBreakdown{
@@ -114,7 +120,8 @@ var featureDF17SurfacePosition = []featureBreakdown{
 	{name: "LON", start: 71, end: 88},
 }
 var featureDF17AirPosition = []featureBreakdown{
-	{name: "SUB", start:37, end: 40},
+	{name: "SS", start:37, end: 39},
+	{name: "NICb", start:39, end: 40},
 	{name: "AC", start: 40, end: 52},
 	{name: "TI", start: 52, end: 53},
 	{name: "CPR", start: 53, end: 54},
@@ -123,7 +130,8 @@ var featureDF17AirPosition = []featureBreakdown{
 }
 
 var featureDF17AirVelocityUnknown = []featureBreakdown{
-	{name: "??", start:37, end: 88},
+	{name: "SUB", start:37, end: 40},
+	{name: "??", start:40, end: 88},
 }
 var featureDF17AirVelocityGroundSpeed = []featureBreakdown{
 	{name: "SUB", start:37, end: 40},
@@ -211,6 +219,21 @@ var asdbFeatures = map[byte][]featureBreakdown{
 			2:[]featureBreakdown{// TCAS Resolution Advisory
 				{name: "??", start: 40, end: 88},
 			},
+			3:[]featureBreakdown{
+				{name: "??", start: 40, end: 88},
+			},
+			4:[]featureBreakdown{
+				{name: "??", start: 40, end: 88},
+			},
+			5:[]featureBreakdown{
+				{name: "??", start: 40, end: 88},
+			},
+			6:[]featureBreakdown{
+				{name: "??", start: 40, end: 88},
+			},
+			7:[]featureBreakdown{
+				{name: "??", start: 40, end: 88},
+			},
 		},
 		},
 	},
@@ -221,10 +244,10 @@ var asdbFeatures = map[byte][]featureBreakdown{
 	31: []featureBreakdown{
 		{name: "SUB", start:37, end: 40},
 		{name: "CCC", start: 40, end: 56, subFields:map[byte][]featureBreakdown{
-			0:[]featureBreakdown{ // airborne
+			0:[]featureBreakdown{// airborne
 				{name: "CCC", start: 40, end: 56},
 			},
-			1:[]featureBreakdown{ //surface
+			1:[]featureBreakdown{//surface
 				{name: "??", start: 40, end: 44},
 				{name: "CCC", start: 44, end: 52},
 				{name: "APLW", start: 52, end: 56},
@@ -233,12 +256,12 @@ var asdbFeatures = map[byte][]featureBreakdown{
 		},
 		{name: "OMC", start: 56, end: 72},
 		{name: "VER", start: 72, end: 75}, //VERSION
-		{name: "NICp", start: 75, end: 76}, //nic_suppl - Navigation Integrity Category
-		{name: "NACv", start: 76, end: 80}, //nac_pos
+		{name: "NICp", start: 75, end: 76}, //Navigation Integrity Category Supplement A
+		{name: "NACv", start: 76, end: 80}, //Navigation Accuracy Category Position
 		{name: "GVA", start: 80, end: 82}, // geometric_vertical_accuracy
 		{name: "SIL", start: 82, end: 84}, // sil
-		{name: "??", start: 84, end: 85}, //nic_trk_hdg
-		{name: "??", start: 85, end: 86}, // hrd
+		{name: "NTH", start: 84, end: 85}, //nic_trk_hdg
+		{name: "HRD", start: 85, end: 86}, // hrd
 		{name: "??", start: 86, end: 88},
 	},
 }
@@ -341,7 +364,7 @@ func (frame *Frame) Describe(output io.Writer) {
 	fmt.Fprintf(output, "MODE S Packet:\n")
 	fmt.Fprintf(output, "Length              : %d bits\n", frame.getMessageLengthBits())
 	fmt.Fprintf(output, "Frame               : %s\n", frame.raw)
-	fmt.Fprintf(output, "DF: Downlink Format : %d (%s)\n", frame.downLinkFormat, frame.DownLinkFormat())
+	fmt.Fprintf(output, "DF: Downlink Format : (%d) %s\n", frame.downLinkFormat, frame.DownLinkFormat())
 	// decode the specific DF type
 	switch frame.downLinkFormat {
 	case 0:
@@ -428,6 +451,29 @@ func (f *Frame) showAltitude(output io.Writer) {
 	}
 }
 
+func (f *Frame) showContainmentRadius(output io.Writer) {
+	r, err := f.ContainmentRadiusLimit(true)
+	if nil != err {
+		fmt.Fprintf(output, "  Containment Radius: %s\n", err)
+	} else {
+		fmt.Fprintf(output, "  Containment Radius: %0.2f metres\n", r)
+	}
+}
+
+func (f *Frame) showSurveilanceStatus(output io.Writer) {
+	fmt.Fprintf(output, "  Surveillance      : (Status:%d) %s\n", f.surveillanceStatus, surveillanceStatus[f.surveillanceStatus])
+}
+
+func (f *Frame) showNavigationIntegrity(output io.Writer) {
+	fmt.Fprintf(output, "  NIC Supplement B  : %d\n", f.nicSupplementB)
+	nic, err := f.NavigationIntegrityCategory(true)
+	if nil != err {
+		fmt.Fprintf(output, "  Nav Integrity     : %s\n", err)
+	} else {
+		fmt.Fprintf(output, "  Nav Integrity     : %d\n", nic)
+	}
+}
+
 func (f *Frame) showFlightStatus(output io.Writer) {
 	fmt.Fprintf(output, "FS: Flight Status   : (%d) %s\n", f.fs, flightStatusTable[f.fs])
 	if "" != f.special {
@@ -494,12 +540,26 @@ func (f *Frame) showHeading(output io.Writer) {
 	}
 }
 
+func (f *Frame) showIntentChange(output io.Writer) {
+	fmt.Fprintf(output, "  Intent Change     : %t\n", f.intentChange != 0)
+}
+func (f *Frame) showInstrumentFlightRulesCapability(output io.Writer) {
+	fmt.Fprintf(output, "  IFR Capable       : %t\n", f.ifrCapability != 0)
+}
+
+func (f *Frame) showNavAccuracyCat(output io.Writer) {
+	if f.validNacV {
+		fmt.Fprintf(output, "  Nav Accuracy Cat  : %d\n", f.nacV)
+	}
+}
+
 func (f *Frame) showCprLatLon(output io.Writer) {
 	fmt.Fprintln(output, "Before Decoding : Half of vehicle location")
 	var oddEven string = "Odd"
 	if f.IsEven() {
 		oddEven = "Even"
 	}
+	fmt.Fprintf(output, "  UTC Sync?     : %t\n", f.timeFlag != 0)
 	fmt.Fprintf(output, "  CPR Frame     : %s\n", oddEven)
 	fmt.Fprintf(output, "  CPR Latitude  : %d\n", f.rawLatitude)
 	fmt.Fprintf(output, "  CPR Longitude : %d\n", f.rawLongitude)
@@ -515,53 +575,107 @@ func (f *Frame)showSensitivityLevel(output io.Writer) {
 
 func (f *Frame) showCategory(output io.Writer) {
 	if f.ValidCategory() {
-		fmt.Fprintf(output, "Aircraft Cat    : (%d:%d) %s\n", f.catType, f.catSubType, f.Category())
-		fmt.Fprintf(output, "Aircraft Cat    : (%d) (second calc)\n", f.aircraftType)
+		fmt.Fprintf(output, "CAT: Aircraft Cat   : (%d:%d) %s\n", f.catType, f.catSubType, f.Category())
 	}
 }
 
 func (f *Frame) showAdsb(output io.Writer) {
-	fmt.Fprintf(output, "ME: ADSB Msg Type   : %d (Sub Type %d): %s\n", f.messageType, f.messageSubType, f.MessageTypeString())
+	fmt.Fprintf(output, "ME : ADSB Msg Type  : (%d) %s\n", f.messageType, f.MessageTypeString())
 
 	switch f.messageType {
 	case 1, 2, 3, 4:
-		f.showFlightNumber(output)
 		f.showCategory(output)
+		f.showFlightNumber(output)
 	case 5, 6, 7, 8:
-		f.showHeading(output)
 		f.showVelocity(output)
+		f.showHeading(output)
 		f.showCprLatLon(output)
 	case 9, 10, 11, 12, 13, 14, 15, 16, 17, 18:
+		f.showContainmentRadius(output)
+		f.showSurveilanceStatus(output)
+		f.showNavigationIntegrity(output)
 		f.showAltitude(output)
 		f.showCprLatLon(output)
 	case 19:
+		f.showAdsbMsgSubType(output)
 		switch f.messageSubType {
 		case 1, 2, 3, 4:
+			f.showIntentChange(output)
+			f.showInstrumentFlightRulesCapability(output)
+			f.showNavAccuracyCat(output)
 			f.showHeading(output)
-			f.showVerticalRate(output)
 			f.showVelocity(output)
+			f.showVerticalRate(output)
 		default:
-			// unknown sub type
+		// unknown sub type
 		}
 		f.showHae(output)
 	case 23:
+		f.showAdsbMsgSubType(output)
 		if 7 == f.messageSubType {
 			f.showIdentity(output);
 		}
 	case 28:
+		f.showAdsbMsgSubType(output)
 		if 1 == f.messageSubType {
 			f.showIdentity(output);
 			f.showAlert(output);
+		} else if 2 == f.messageSubType {
+			// TCAS RA
 		}
 	case 29:
 	case 31:
+		f.showAdsbMsgSubType(output)
+		f.showCapabilityClassInfo(output)
 		f.showVerticalStatus(output)
+		f.showOperationalModeInfo(output)
+		f.showAircraftLengthWidth(output)
 		f.showAdsbVersion(output)
+		f.showNavAccuracyCat(output)
+		f.showCrossCheck(output)
+		f.showCompassNorth(output)
 	default:
 		fmt.Fprintln(output, "Packet Type Not Yet Decoded")
 	}
 
 	fmt.Fprintln(output, "")
+}
+
+func (f *Frame) showAdsbMsgSubType(output io.Writer) {
+	fmt.Fprintf(output, "SUB:      Sub Type  : %d \n", f.messageSubType)
+}
+
+func (f *Frame) showCapabilityClassInfo(output io.Writer) {
+	if (f.validCompatibilityClass) {
+		if nil != f.cccHasLowTxPower {
+			fmt.Fprintf(output, "  Low TX Power      : %t\n", f.cccHasLowTxPower)
+		}
+	} else {
+		fmt.Fprintf(output, "Compatibility Class : Unknown\n")
+	}
+}
+func (f *Frame) showOperationalModeInfo(output io.Writer) {
+
+}
+func (f *Frame) showAircraftLengthWidth(output io.Writer) {
+	length, width, err := f.getAirplaneLengthWidth()
+	if nil == err {
+		fmt.Fprintf(output, "    Airframe Size   : width:%0.1f length:%0.1f metres\n", width, length)
+	}
+}
+func (f *Frame) showCrossCheck(output io.Writer) {
+	if f.messageSubType == 0 {
+		fmt.Fprintf(output, "NIC Baro CrossCheck : %t\n", f.nicCrossCheck==1)
+	} else if f.messageSubType == 1 {
+		fmt.Fprintf(output, "NIC Track CrossCheck: %t\n", f.nicCrossCheck==1)
+	}
+}
+func (f *Frame) showCompassNorth(output io.Writer) {
+	if f.northReference != 0 {
+		fmt.Fprintf(output, "  Compass Heading   : Magnetic North\n")
+	} else {
+		fmt.Fprintf(output, "  Compass Heading   : True North\n")
+	}
 }
 
 func (f *Frame) showAlert(output io.Writer) {
@@ -577,7 +691,7 @@ func (f *Frame) showSpecial(output io.Writer) {
 }
 
 func (f *Frame) showFlightNumber(output io.Writer) {
-	fmt.Fprintf(output, "Flight Number   : %s\n", f.FlightNumber())
+	fmt.Fprintf(output, "    Flight Number   : %s\n", f.FlightNumber())
 }
 
 // determines what type of mode S Message this frame is
