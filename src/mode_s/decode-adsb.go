@@ -14,9 +14,9 @@ func (f *Frame) decodeAdsbLatLon() {
 	var msg10 = int(f.message[10])
 
 	// CPR LAT/LON
-	f.rawLatitude = ((msg6 & 3) << 15) | (msg7 << 7) | (msg8 >> 1)
-	f.rawLongitude = ((msg8 & 1) << 16) | (msg9 << 8) | msg10
-	f.cprFlagOddEven = int(msg6 & 4) >> 2
+	f.rawLatitude = ((msg6 & 0x03) << 15) | (msg7 << 7) | (msg8 >> 1)
+	f.rawLongitude = ((msg8 & 0x01) << 16) | (msg9 << 8) | msg10
+	f.cprFlagOddEven = int(msg6 & 0x04) >> 2
 }
 
 func (f *Frame) decodeAdsb() {

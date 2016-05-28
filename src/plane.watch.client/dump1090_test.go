@@ -83,8 +83,12 @@ func TestAltitudeDecode(t *testing.T) {
 	if nil != err {
 		t.Error(err)
 	}
-	if 600 != frame.Altitude() {
-		t.Errorf("Expected an altitude of 600 feet, got %d", frame.Altitude())
+	a, err := frame.Altitude()
+	if nil != err {
+		t.Error(err)
+	}
+	if 600 != a {
+		t.Errorf("Expected an altitude of 600 feet, got %d", a)
 	}
 }
 

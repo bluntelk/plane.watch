@@ -10,6 +10,9 @@ import (
 	"path"
 	"runtime/debug"
 	"log"
+	"strings"
+	"tracker"
+	"encoding/json"
 )
 
 // this is a website where you put in one or more Mode S frames and they are decoded
@@ -50,20 +53,39 @@ func runHttpServer(c *cli.Context) {
 		}()
 		switch r.URL.Path {
 		case "/decode":
-			var packet string
+			tracker.NukePlanes();
+			var submittedPackets string
 			r.ParseForm()
-			packet = r.FormValue("packet")
-			if "" == packet {
+			submittedPackets = r.FormValue("packet")
+			if "" == submittedPackets {
 				fmt.Fprintln(w, "No Packet Provided")
 				return
 			}
-			println("Decoding Frame:", packet)
-			frame, err := mode_s.DecodeString(packet, time.Now())
-			if err != nil {
-				fmt.Fprintln(w, "Failed to decode.", err)
-				return
+			packets := strings.Split(submittedPackets, ";")
+			icaoList := make(map[uint32]uint32)
+			for _, packet := range packets {
+				packet = strings.TrimSpace(packet)
+				if "" == packet {
+					continue;
+				}
+				println("Decoding Frame:", packet)
+				frame, err := mode_s.DecodeString(packet, time.Now())
+				if err != nil {
+					fmt.Fprintln(w, "Failed to decode.", err)
+					return
+				}
+				tracker.HandleModeSFrame(frame, false);
+				icaoList[frame.ICAOAddr()] = frame.ICAOAddr()
+				frame.Describe(w)
 			}
-			frame.Describe(w)
+
+			for _, icao := range icaoList {
+				fmt.Fprintln(w, "")
+				plane := tracker.GetPlane(icao)
+				encoded, _ := json.MarshalIndent(plane, "", "  ")
+				fmt.Fprintf(w, "%s", string(encoded))
+			}
+
 		case "/":
 			http.ServeFile(w, r, path.Join(htdocsPath, "/index.html"))
 		default:

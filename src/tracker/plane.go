@@ -24,6 +24,10 @@ type CprLocation struct {
 	latitudeIndex                        int32
 
 	oddFrame, evenFrame                  bool
+
+	nl0, nl1                             int32
+
+	globalSurfaceRange                   float64
 }
 
 type PlaneLocation struct {
@@ -174,6 +178,13 @@ func CleanPlanes() {
 
 	planeAccessMutex.Unlock()
 }
+
+func NukePlanes() {
+	planeAccessMutex.Lock()
+	planeList = make(PlaneList, 2000)
+	planeAccessMutex.Unlock()
+}
+
 func (p *Plane) String() string {
 	var id, alt, position, direction, special, strength string
 
@@ -301,10 +312,11 @@ func (p *Plane) DecodeCpr() error {
 	// attempt to decode the CPR LAT/LON
 	var loc PlaneLocation
 	var err error
+
 	if p.Location.onGround {
-		loc, err = p.cprLocation.decodeGround()
+		loc, err = p.cprLocation.decodeSurface(p.Location.Latitude, p.Location.Longitude)
 	} else {
-		loc, err = p.cprLocation.decodeAir()
+		loc, err = p.cprLocation.decodeGlobalAir()
 	}
 
 	if nil != err {
@@ -317,13 +329,78 @@ func (p *Plane) DecodeCpr() error {
 	return nil
 }
 
-func (cpr *CprLocation) decodeGround() (PlaneLocation, error) {
+func (cpr *CprLocation) computeLatitudeIndex() {
+	cpr.latitudeIndex = int32(math.Floor((((59 * cpr.even_lat) - (60 * cpr.odd_lat)) / 131072) + 0.5))
+}
+
+func (cpr *CprLocation) computeAirDLatRLat() {
+	cpr.airDLat0 = cpr.globalSurfaceRange / 60.0
+	cpr.airDLat1 = cpr.globalSurfaceRange / 59.0
+	cpr.rlat0 = cpr.airDLat0 * (cprModFunction(cpr.latitudeIndex, 60) + (cpr.even_lat / 131072))
+	cpr.rlat1 = cpr.airDLat1 * (cprModFunction(cpr.latitudeIndex, 59) + (cpr.odd_lat / 131072))
+	//log.Printf("j=%d rlat0=%0.6f rlat1=%0.6f", cpr.latitudeIndex, cpr.rlat0, cpr.rlat1)
+}
+
+func (cpr *CprLocation) computeLongitudeZone() error {
+	cpr.nl0 = getNumLongitudeZone(cpr.rlat0)
+	cpr.nl1 = getNumLongitudeZone(cpr.rlat1)
+
+	if cpr.nl0 != cpr.nl1 {
+		return fmt.Errorf("Incorrect NL Calculation %d!=%d (for lat/lon %0.13f / %0.13f)", cpr.nl0, cpr.nl1, cpr.rlat0, cpr.rlat1)
+	}
+
+	return nil
+}
+
+func (cpr *CprLocation) checkFrameTiming() error {
+	if cpr.time1.After(cpr.time0.Add(10 * time.Second)) {
+		return fmt.Errorf("Unable to decode this CPR Pair. they are too far apart in time (%s, %s)", cpr.time0.Format(time.RFC822Z), cpr.time1.Format(time.RFC822Z))
+	}
+	return nil
+}
+
+func (cpr *CprLocation) computeLatLon() (PlaneLocation, error) {
 	var loc PlaneLocation
+	if cpr.time1.Before(cpr.time0) {
+		//log.Println("Odd Decode")
+		// this assumes we are using the odd packet to decode
+		/* Compute ni and the longitude index 'm' */
+		ni := cprNFunction(cpr.rlat1, 1)
+		//log.Printf("	ni = %d", ni)
+		m := math.Floor((((cpr.even_lon * float64(cpr.nl1 - 1)) - (cpr.odd_lon * float64(cpr.nl1))) / 131072.0) + 0.5)
+		//log.Printf("	m = %0.2f", m)
+
+		loc.Longitude = cpr.dlonFunction(cpr.rlat1, 1) * (cprModFunction(int32(m), ni) + (cpr.odd_lon / 131072))
+		loc.Latitude = cpr.rlat1
+		//log.Printf("	rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
+	} else {
+		// do even decode
+		//log.Println("Even Decode")
+		ni := cprNFunction(cpr.rlat0, 0);
+		//log.Printf("	ni = %d", ni)
+		m := math.Floor((((cpr.even_lon * float64(cpr.nl0 - 1)) - (cpr.odd_lon * float64(cpr.nl0))) / 131072) + 0.5);
+		//log.Printf("	m = %0.2f", m)
+		loc.Longitude = cpr.dlonFunction(cpr.rlat0, 0) * (cprModFunction(int32(m), ni) + cpr.even_lon / 131072);
+		loc.Latitude = cpr.rlat0;
+		//log.Printf("	rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
+	}
+
+	if loc.Longitude > 180.0 {
+		loc.Longitude -= 180.0
+	}
+	//log.Printf("post normalise rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
+
+	if loc.Latitude < -90 || loc.Latitude > 90 {
+		return PlaneLocation{}, fmt.Errorf("Failed to decode CPR Lat %0.13f is out of range", loc.Latitude)
+	}
+
 	return loc, nil
 }
 
-func (cpr *CprLocation) decodeAir() (PlaneLocation, error) {
+func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (PlaneLocation, error) {
 	var loc PlaneLocation
+	var err error
+	cpr.globalSurfaceRange = 90.0
 
 	// basic check - make sure we have both frames
 	if !(cpr.oddFrame && cpr.evenFrame) {
@@ -336,15 +413,90 @@ func (cpr *CprLocation) decodeAir() (PlaneLocation, error) {
 		return loc, fmt.Errorf("Need both odd and even frames before decoding, %s", s)
 	}
 
+	// Compute the Latitude Index "j"
+	cpr.computeLatitudeIndex()
+	cpr.computeAirDLatRLat()
+
+	// Pick the quadrant that's closest to the reference location -
+	// this is not necessarily the same quadrant that contains the
+	// reference location.
+	//
+	// There are also only two valid quadrants: -90..0 and 0..90;
+	// no correct message would try to encoding a latitude in the
+	// ranges -180..-90 and 90..180.
+	//
+	// If the computed latitude is more than 45 degrees north of
+	// the reference latitude (using the northern hemisphere
+	// solution), then the southern hemisphere solution will be
+	// closer to the refernce latitude.
+	//
+	// e.g. reflat=0, rlat=44, use rlat=44
+	//      reflat=0, rlat=46, use rlat=46-90 = -44
+	//      reflat=40, rlat=84, use rlat=84
+	//      reflat=40, rlat=86, use rlat=86-90 = -4
+	//      reflat=-40, rlat=4, use rlat=4
+	//      reflat=-40, rlat=6, use rlat=6-90 = -84
+
+	// As a special case, -90, 0 and +90 all encode to zero, so
+	// there's a little extra work to do there.
+
+	if cpr.rlat0 == 0 {
+		if refLat < -45 {
+			cpr.rlat0 = -90
+		}    else if refLat > 45 {
+			cpr.rlat0 = 90
+		}
+	} else if (cpr.rlat0 - refLat) > 45 {
+		cpr.rlat0 -= 90
+	}
+
+	if cpr.rlat1 == 0 {
+		if refLat < -45 {
+			cpr.rlat1 = -90
+		} else if refLat > 45 {
+			cpr.rlat1 = 90
+		}
+	} else if (cpr.rlat1 - refLat) > 45 {
+		cpr.rlat1 -= 90;
+	}
+
+	// Check to see that the latitude is in range: -90 .. +90
+	if cpr.rlat0 < -90 || cpr.rlat0 > 90 || cpr.rlat1 < -90 || cpr.rlat1 > 90 {
+		return PlaneLocation{}, fmt.Errorf("Failed to decode CPR. Lat out of bounds")
+	}
+
+	if err = cpr.computeLongitudeZone(); nil != err {
+		return PlaneLocation{}, err
+	}
+
+	if err = cpr.checkFrameTiming(); nil != err {
+		return PlaneLocation{}, err
+	}
+
+	return cpr.computeLatLon()
+}
+
+func (cpr *CprLocation) decodeGlobalAir() (PlaneLocation, error) {
+	var loc PlaneLocation
+	var err error
+
+	// basic check - make sure we have both frames
+	if !(cpr.oddFrame && cpr.evenFrame) {
+		var s string
+		if (cpr.oddFrame) {
+			s = "Have Odd Frame";
+		} else {
+			s = "Have Even Frame"
+		}
+		return loc, fmt.Errorf("Need both odd and even frames before decoding, %s", s)
+	}
+	cpr.globalSurfaceRange = 360.0
+
 	// 1. Compute the latitude index (J):
-	cpr.latitudeIndex = int32(math.Floor((((59 * cpr.even_lat) - (60 * cpr.odd_lat)) / 131072) + 0.5))
+	cpr.computeLatitudeIndex()
 
 	// 2. Compute the values of rlat0 and rlat1:
-	cpr.airDLat0 = 360 / 60.0
-	cpr.airDLat1 = 360 / 59.0
-	cpr.rlat0 = cpr.airDLat0 * (cprModFunction(cpr.latitudeIndex, 60) + (cpr.even_lat / 131072))
-	cpr.rlat1 = cpr.airDLat1 * (cprModFunction(cpr.latitudeIndex, 59) + (cpr.odd_lat / 131072))
-	//log.Printf("j=%d rlat0=%0.6f rlat1=%0.6f", cpr.latitudeIndex, cpr.rlat0, cpr.rlat1)
+	cpr.computeAirDLatRLat()
 
 	// Note: Southern hemisphere values are 270° to 360°. Subtract 360°.
 	if cpr.rlat0 > 270 {
@@ -354,47 +506,15 @@ func (cpr *CprLocation) decodeAir() (PlaneLocation, error) {
 		cpr.rlat1 = cpr.rlat1 - 360
 	}
 
-	nl0 := getNumLongitudeZone(cpr.rlat0)
-	nl1 := getNumLongitudeZone(cpr.rlat1)
-
-	if nl0 != nl1 {
-		return loc, fmt.Errorf("Incorrect NL Calculation %d!=%d (for lat/lon %0.13f / %0.13f)", nl0, nl1, cpr.rlat0, cpr.rlat1)
+	if err = cpr.computeLongitudeZone(); nil != err {
+		return loc, err
 	}
 
-	if cpr.time1.After(cpr.time0.Add(10 * time.Second)) {
-		return loc, fmt.Errorf("Unable to decode this CPR Pair. they are too far apart in time (%s, %s)", cpr.time0.Format(time.RFC822Z), cpr.time1.Format(time.RFC822Z))
+	if err = cpr.checkFrameTiming(); nil != err {
+		return loc, err
 	}
 
-	if cpr.time1.Before(cpr.time0) {
-		//log.Println("Odd Decode")
-		// this assumes we are using the odd packet to decode
-		/* Compute ni and the longitude index 'm' */
-		ni := cprNFunction(cpr.rlat1, 1)
-		//log.Printf("	ni = %d", ni)
-		m := math.Floor((((cpr.even_lon * float64(nl1 - 1)) - (cpr.odd_lon * float64(nl1))) / 131072.0) + 0.5)
-		//log.Printf("	m = %0.2f", m)
-
-		loc.Longitude = cprDlonFunction(cpr.rlat1, 1) * (cprModFunction(int32(m), ni) + (cpr.odd_lon / 131072))
-		loc.Latitude = cpr.rlat1
-		//log.Printf("	rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
-	} else {
-		// do even decode
-		//log.Println("Even Decode")
-		ni := cprNFunction(cpr.rlat0, 0);
-		//log.Printf("	ni = %d", ni)
-		m := math.Floor((((cpr.even_lon * float64(nl0 - 1)) - (cpr.odd_lon * float64(nl0))) / 131072) + 0.5);
-		//log.Printf("	m = %0.2f", m)
-		loc.Longitude = cprDlonFunction(cpr.rlat0, 0) * (cprModFunction(int32(m), ni) + cpr.even_lon / 131072);
-		loc.Latitude = cpr.rlat0;
-		//log.Printf("	rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
-	}
-
-	if loc.Longitude > 180.0 {
-		loc.Longitude -= 180.0
-	}
-	//log.Printf("post normalise rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
-
-	return loc, nil
+	return cpr.computeLatLon()
 }
 
 // NL - The NL function uses the precomputed table from 1090-WP-9-14
@@ -420,8 +540,8 @@ func cprNFunction(lat float64, isOdd int32) int32 {
 	return nl
 }
 
-func cprDlonFunction(lat float64, isOdd int32) float64 {
-	return 360.0 / float64(cprNFunction(lat, isOdd))
+func (cpr * CprLocation) dlonFunction(lat float64, isOdd int32) float64 {
+	return cpr.globalSurfaceRange / float64(cprNFunction(lat, isOdd))
 }
 
 /* Always positive MOD operation, used for CPR decoding. */
@@ -435,5 +555,6 @@ func cprModFunction(a, b int32) float64 {
 }
 
 func (pl *PlaneLocation) SetDirection(heading float64, speed int32) {
-
+	pl.Heading = heading
+	pl.Velocity = float64(speed)
 }
