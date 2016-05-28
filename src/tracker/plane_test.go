@@ -12,14 +12,14 @@ func TestFunkyLatLon(t *testing.T) {
 	plane = GetPlane(7777)
 
 	plane.SetCprEvenLocation(92095, 39846, time.Now())
-	_, err = plane.cprLocation.decode()
+	_, err = plane.cprLocation.decodeAir()
 	if nil == err {
 		t.Error("We should fail CPR decode with only an even location set")
 	}
 	plane.ZeroCpr();
 
 	plane.SetCprOddLocation(88385, 125818, time.Now())
-	_, err = plane.cprLocation.decode()
+	_, err = plane.cprLocation.decodeAir()
 	if nil == err {
 		t.Error("We should fail CPR decode with only an odd location set")
 	}
@@ -29,7 +29,7 @@ func TestFunkyLatLon(t *testing.T) {
 	plane.SetCprEvenLocation(92095, 39846, time.Now())
 	plane.SetCprOddLocation(88385, 125818, time.Now())
 
-	_, err = plane.cprLocation.decode()
+	_, err = plane.cprLocation.decodeAir()
 	if nil != err {
 		t.Error("We should be able to decode with both odd and even CPR locations")
 	}
@@ -87,7 +87,7 @@ func TestGetPlane(t *testing.T) {
 	SetPlane(plane)
 
 	plane = GetPlane(1234)
-	location, err := plane.cprLocation.decode()
+	location, err := plane.cprLocation.decodeAir()
 
 	// ensure the intermediary calculations are correct
 
@@ -124,7 +124,7 @@ func TestDecodeFailsOnBadData(t *testing.T) {
 	plane.SetCprEvenLocation(1, 2, time.Now())
 	plane.SetCprOddLocation(888888, 888888, time.Now())
 
-	location, err := plane.cprLocation.decode()
+	location, err := plane.cprLocation.decodeAir()
 
 	if nil == err {
 		t.Errorf("Failed to Fail! we should not be able to decode incomprehensible CPR locations")
@@ -139,7 +139,7 @@ func TestDecodeFailsOnNoOddLoc(t *testing.T) {
 	plane := GetPlane(1235)
 	plane.SetCprEvenLocation(92095, 39846, time.Now())
 
-	location, err := plane.cprLocation.decode()
+	location, err := plane.cprLocation.decodeAir()
 
 	if nil == err {
 		t.Errorf("Failed to Fail! we should not be able to decode when there is no odd CPR location")
@@ -153,7 +153,7 @@ func TestDecodeFailsOnNoEvenLoc(t *testing.T) {
 	plane := GetPlane(1236)
 	plane.SetCprOddLocation(88385, 125818, time.Now())
 
-	location, err := plane.cprLocation.decode()
+	location, err := plane.cprLocation.decodeAir()
 
 	if nil == err {
 		t.Errorf("Failed to Fail! we should not be able to decode when there is no even CPR location")

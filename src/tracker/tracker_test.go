@@ -44,7 +44,7 @@ func TestCprDecode(t *testing.T) {
 		plane.SetCprOddLocation(d.odd_lat, d.odd_lon, time.Now())
 		time.Sleep(2)
 		plane.SetCprEvenLocation(d.even_lat, d.even_lon, time.Now())
-		loc, err := plane.cprLocation.decode()
+		loc, err := plane.cprLocation.decodeAir()
 		if err != nil {
 			t.Error(err)
 		}
@@ -69,7 +69,7 @@ func TestCprDecode(t *testing.T) {
 		plane.SetCprEvenLocation(d.even_lat, d.even_lon, time.Now())
 		time.Sleep(2)
 		plane.SetCprOddLocation(d.odd_lat, d.odd_lon, time.Now())
-		loc, err = plane.cprLocation.decode()
+		loc, err = plane.cprLocation.decodeAir()
 		if err != nil {
 			t.Error(err)
 		}

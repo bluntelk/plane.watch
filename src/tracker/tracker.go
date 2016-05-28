@@ -139,7 +139,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				} else {
 					plane.SetCprOddLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
 				}
-				plane.DecodeCpr(0, frame.AltitudeUnits())
+				plane.DecodeCpr()
 
 				plane.Location.TimeStamp = time.Now()
 
@@ -164,7 +164,8 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				}
 
 				altitude, _ := frame.Altitude()
-				plane.DecodeCpr(altitude, frame.AltitudeUnits())
+				plane.SetAltitude(altitude, frame.AltitudeUnits())
+				plane.DecodeCpr()
 
 				break
 			}

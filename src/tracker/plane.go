@@ -290,14 +290,22 @@ func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) error {
 	return nil
 }
 
-func (p *Plane) DecodeCpr(altitude int32, altitude_units string) error {
-
+func (p *Plane) SetAltitude(altitude int32, altitude_units string) {
 	// set the current altitude
 	p.Location.Altitude = altitude
 	p.Location.AltitudeUnits = altitude_units
+}
+
+func (p *Plane) DecodeCpr() error {
 
 	// attempt to decode the CPR LAT/LON
-	loc, err := p.cprLocation.decode()
+	var loc PlaneLocation
+	var err error
+	if p.Location.onGround {
+		loc, err = p.cprLocation.decodeGround()
+	} else {
+		loc, err = p.cprLocation.decodeAir()
+	}
 
 	if nil != err {
 		return err
@@ -309,7 +317,12 @@ func (p *Plane) DecodeCpr(altitude int32, altitude_units string) error {
 	return nil
 }
 
-func (cpr *CprLocation) decode() (PlaneLocation, error) {
+func (cpr *CprLocation) decodeGround() (PlaneLocation, error) {
+	var loc PlaneLocation
+	return loc, nil
+}
+
+func (cpr *CprLocation) decodeAir() (PlaneLocation, error) {
 	var loc PlaneLocation
 
 	// basic check - make sure we have both frames

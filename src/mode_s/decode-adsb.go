@@ -47,6 +47,7 @@ func (f *Frame) decodeAdsb() {
 			f.heading = float64(((((f.message[5] << 4) | (f.message[6] >> 4)) & 0x007F) * 45) >> 4)
 			f.validHeading = true
 		}
+
 	case 9, 10, 11, 12, 13, 14, 15, 16, 17, 18:
 		/* Airborne position Message */
 		f.messageSubType = 0
