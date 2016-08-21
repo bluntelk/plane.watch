@@ -2,15 +2,39 @@
 	"version": 0,
 	"dependencies": [
 		{
+			"importpath": "github.com/BurntSushi/toml",
+			"repository": "https://github.com/BurntSushi/toml",
+			"revision": "99064174e013895bbd9b025c31100bd1d9b590ca",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/codegangsta/cli",
 			"repository": "https://github.com/codegangsta/cli",
 			"revision": "bc465becccd1d527002fda095fc3c19d9c115029",
 			"branch": "master"
 		},
 		{
+			"importpath": "github.com/jonas-p/go-shp",
+			"repository": "https://github.com/jonas-p/go-shp",
+			"revision": "6eb7c6fa8ff9a245e3bda53eb9fbb4420f463ea2",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/kpawlik/geojson",
+			"repository": "https://github.com/kpawlik/geojson",
+			"revision": "03fc5b389cd1027cb3f5ce4aa97f0e6af61d8579",
+			"branch": "master"
+		},
+		{
 			"importpath": "github.com/streadway/amqp",
 			"repository": "https://github.com/streadway/amqp",
 			"revision": "2e25825abdbd7752ff08b270d313b93519a0a232",
+			"branch": "master"
+		},
+		{
+			"importpath": "github.com/urfave/cli",
+			"repository": "https://github.com/urfave/cli",
+			"revision": "168c95418e66e019fe17b8f4f5c45aa62ff80e23",
 			"branch": "master"
 		},
 		{

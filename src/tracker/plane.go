@@ -5,7 +5,8 @@ import (
 	"math"
 	"time"
 	"sync"
-//"log"
+	//"log"
+	"log"
 )
 
 const (
@@ -53,7 +54,7 @@ type Plane struct {
 	Icao             string
 	SquawkIdentity   uint32
 	Flight           Flight
-	locationHistory  []PlaneLocation
+	LocationHistory  []PlaneLocation
 	Location         PlaneLocation
 	cprLocation      CprLocation
 	Special          string
@@ -65,9 +66,12 @@ type Plane struct {
 
 type PlaneList map[uint32]Plane
 
+type PlaneIterator func(p Plane)
+
 var (
 	planeList PlaneList
 	planeAccessMutex sync.Mutex
+	MaxLocationHistory int = 10
 )
 
 var NLTable = map[int32]float64{
@@ -134,6 +138,7 @@ var NLTable = map[int32]float64{
 func init() {
 	planeList = make(PlaneList, 2000)
 }
+
 func GetPlane(ICAO uint32) Plane {
 	planeAccessMutex.Lock()
 
@@ -144,7 +149,7 @@ func GetPlane(ICAO uint32) Plane {
 	var p Plane
 	p.IcaoIdentifier = ICAO
 	p.Icao = fmt.Sprintf("%06X", ICAO)
-	p.locationHistory = make([]PlaneLocation, 0)
+	p.LocationHistory = make([]PlaneLocation, 0)
 	p.ZeroCpr()
 	planeList[ICAO] = p
 
@@ -152,13 +157,22 @@ func GetPlane(ICAO uint32) Plane {
 	return p
 }
 
-func SetPlane(p Plane) {
+func SetPlane(p Plane, ts time.Time) {
 	planeAccessMutex.Lock()
-	p.lastSeen = time.Now()
+	p.lastSeen = ts
 	p.NumUpdates++
 	delete(planeList, p.IcaoIdentifier)
 	planeList[p.IcaoIdentifier] = p
 	planeAccessMutex.Unlock()
+}
+
+func Each(pi PlaneIterator) {
+	planeAccessMutex.Lock()
+	defer planeAccessMutex.Unlock()
+
+	for _, p := range planeList {
+		pi(p)
+	}
 }
 
 // todo: fix this. it deletes everything
@@ -219,7 +233,8 @@ func (p *Plane) String() string {
 	return id + alt + position + direction + special + strength + "\033[0m";
 }
 
-func (p *Plane) MarkFrameTime() {
+// todo: reimplement as a last seens timestamp? how do we do a count of packets? do we need it?
+func (p *Plane) MarkFrameTime(ts time.Time) {
 	// cull anything older than 10 seconds
 	frameTimes := make([]time.Time, 0)
 	cutOff := time.Now().Add(time.Second * -10)
@@ -228,16 +243,30 @@ func (p *Plane) MarkFrameTime() {
 			frameTimes = append(frameTimes, t)
 		}
 	}
-	frameTimes = append(frameTimes, time.Now())
+	frameTimes = append(frameTimes, ts)
 	p.frameTimes = frameTimes
 	p.RecentFrameCount = len(p.frameTimes)
 }
 
-func (p *Plane) AddLatLong(lat, lon float64) {
-	if len(p.locationHistory) >= 10 {
-		p.locationHistory = p.locationHistory[1:]
+var PointCounter int
+func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) {
+
+	duration := float64(ts.Sub(p.Location.TimeStamp) / time.Second)
+	println(ts.Format(time.RFC3339Nano))
+
+	if p.Location.Latitude != 0.0 && p.Location.Longitude != 0.0 {
+		d := distance(lat, lon, p.Location.Latitude, p.Location.Longitude)
+		if d > 5000 { // 5 kilometres
+			log.Printf("The distance (%0.2fm) between {%0.4f,%0.4f} and {%0.4f,%0.4f} is too great for %0.2f seconds, ignoring...", d, lat, lon, p.Location.Latitude, p.Location.Longitude, duration)
+			return
+		}
 	}
-	p.locationHistory = append(p.locationHistory, p.Location)
+	PointCounter++
+
+	if MaxLocationHistory > 0 && len(p.LocationHistory) >= MaxLocationHistory {
+		p.LocationHistory = p.LocationHistory[1:]
+	}
+	p.LocationHistory = append(p.LocationHistory, p.Location)
 
 	var newLocation PlaneLocation
 
@@ -249,7 +278,7 @@ func (p *Plane) AddLatLong(lat, lon float64) {
 	newLocation.Latitude = lat
 	newLocation.Longitude = lon
 	newLocation.onGround = p.Location.onGround
-	newLocation.TimeStamp = time.Now()
+	newLocation.TimeStamp = ts
 	newLocation.Velocity = p.Location.Velocity
 
 	p.Location = newLocation
@@ -307,7 +336,7 @@ func (p *Plane) SetAltitude(altitude int32, altitude_units string) {
 	p.Location.AltitudeUnits = altitude_units
 }
 
-func (p *Plane) DecodeCpr() error {
+func (p *Plane) DecodeCpr(ts time.Time) error {
 
 	// attempt to decode the CPR LAT/LON
 	var loc PlaneLocation
@@ -323,7 +352,7 @@ func (p *Plane) DecodeCpr() error {
 		return err
 	}
 	p.Location.hasLatLon = true
-	p.AddLatLong(loc.Latitude, loc.Longitude)
+	p.AddLatLong(loc.Latitude, loc.Longitude, ts)
 
 	//p.ZeroCpr()
 	return nil
@@ -402,6 +431,10 @@ func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (PlaneLocation, er
 	var err error
 	cpr.globalSurfaceRange = 90.0
 
+	if 0 == refLat && 0 == refLon {
+		return loc, fmt.Errorf("Invalid Reference Location")
+	}
+
 	// basic check - make sure we have both frames
 	if !(cpr.oddFrame && cpr.evenFrame) {
 		var s string
@@ -443,7 +476,7 @@ func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (PlaneLocation, er
 	if cpr.rlat0 == 0 {
 		if refLat < -45 {
 			cpr.rlat0 = -90
-		}    else if refLat > 45 {
+		} else if refLat > 45 {
 			cpr.rlat0 = 90
 		}
 	} else if (cpr.rlat0 - refLat) > 45 {
@@ -540,7 +573,7 @@ func cprNFunction(lat float64, isOdd int32) int32 {
 	return nl
 }
 
-func (cpr * CprLocation) dlonFunction(lat float64, isOdd int32) float64 {
+func (cpr *CprLocation) dlonFunction(lat float64, isOdd int32) float64 {
 	return cpr.globalSurfaceRange / float64(cprNFunction(lat, isOdd))
 }
 
@@ -557,4 +590,37 @@ func cprModFunction(a, b int32) float64 {
 func (pl *PlaneLocation) SetDirection(heading float64, speed int32) {
 	pl.Heading = heading
 	pl.Velocity = float64(speed)
+}
+
+
+
+// haversin(θ) function
+func hsin(theta float64) float64 {
+	return math.Pow(math.Sin(theta/2), 2)
+}
+
+// Distance function returns the distance (in meters) between two points of
+//     a given longitude and latitude relatively accurately (using a spherical
+//     approximation of the Earth) through the Haversin Distance Formula for
+//     great arc distance on a sphere with accuracy for small distances
+//
+// point coordinates are supplied in degrees and converted into rad. in the func
+//
+// distance returned is METERS!!!!!!
+// http://en.wikipedia.org/wiki/Haversine_formula
+func distance(lat1, lon1, lat2, lon2 float64) float64 {
+	// convert to radians
+	// must cast radius as float to multiply later
+	var la1, lo1, la2, lo2, r float64
+	la1 = lat1 * math.Pi / 180
+	lo1 = lon1 * math.Pi / 180
+	la2 = lat2 * math.Pi / 180
+	lo2 = lon2 * math.Pi / 180
+
+	r = 6378100 // Earth radius in METERS
+
+	// calculate
+	h := hsin(la2-la1) + math.Cos(la1)*math.Cos(la2)*hsin(lo2-lo1)
+
+	return 2 * r * math.Asin(math.Sqrt(h))
 }
