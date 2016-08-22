@@ -252,7 +252,6 @@ var PointCounter int
 func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) {
 
 	duration := float64(ts.Sub(p.Location.TimeStamp) / time.Second)
-	println(ts.Format(time.RFC3339Nano))
 
 	if p.Location.Latitude != 0.0 && p.Location.Longitude != 0.0 {
 		d := distance(lat, lon, p.Location.Latitude, p.Location.Longitude)

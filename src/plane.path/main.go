@@ -11,9 +11,18 @@ import (
 	"tracker"
 	"io/ioutil"
 	"fmt"
+	"strings"
+	"compress/gzip"
+	"compress/bzip2"
 )
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Failed to run: %s", r)
+		}
+	}()
+
 	app := cli.NewApp()
 
 	app.Version = "0.0.1"
@@ -41,7 +50,38 @@ func main() {
 	app.Run(os.Args)
 }
 
-// TODO: learn to read compressed files (.gz, .zip etc)
+func readFile(inFileName string) (chan string, error) {
+	outChan := make(chan string, 50)
+
+	inFile, err := os.Open(inFileName);
+	if err != nil {
+		return outChan, fmt.Errorf("Failed to open file {%s}: %s", inFileName, err)
+	}
+
+	isGzip := strings.ToLower(inFileName[len(inFileName)-2:]) == "gz"
+	isBzip2 := strings.ToLower(inFileName[len(inFileName)-3:]) == "bz2"
+
+	go func() {
+		defer inFile.Close()
+
+		var scanner *bufio.Scanner
+		if isGzip {
+			gzipFile, _ := gzip.NewReader(inFile)
+			scanner = bufio.NewScanner(gzipFile)
+		} else if isBzip2 {
+			bzip2File := bzip2.NewReader(inFile)
+			scanner = bufio.NewScanner(bzip2File)
+		} else {
+			scanner = bufio.NewScanner(inFile)
+		}
+		for scanner.Scan() {
+			outChan <- scanner.Text()
+		}
+		close(outChan)
+	}()
+	return outChan, nil
+}
+
 func renderAvr(c *cli.Context) error {
 	inFileName := c.Args().First()
 	outFileName := c.Args().Get(1)
@@ -64,22 +104,18 @@ func renderAvr(c *cli.Context) error {
 	if !verbose {
 		tracker.SetDebugOutput(ioutil.Discard)
 	}
+	go mode_s.DecodeStringWorker(jobChan, resultChan, errorChan)
+	inFile, err := readFile(inFileName)
+	if nil != err {
+		panic(err)
+	}
 
 	go func() {
-		inFile, err := os.Open(inFileName);
-		if err != nil {
-			println("Could not open file: " + inFileName)
-			return
-		}
-		defer inFile.Close()
-
-		go mode_s.DecodeStringWorker(jobChan, resultChan, errorChan)
 
 		var ts time.Time
-		scanner := bufio.NewScanner(inFile)
-		for scanner.Scan() {
+		for line := range inFile {
 			ts = ts.Add(500 * time.Millisecond)
-			jobChan <- mode_s.ReceivedFrame{Time:ts, Frame:scanner.Text()}
+			jobChan <- mode_s.ReceivedFrame{Time:ts, Frame:line}
 		}
 
 		for len(jobChan) > 0 {
@@ -91,6 +127,9 @@ func renderAvr(c *cli.Context) error {
 
 	select {
 	case <-exitChan:
+		close(jobChan)
+		close(resultChan)
+		close(errorChan)
 	}
 
 	fmt.Printf("We have %d points tracked\n", tracker.PointCounter)
