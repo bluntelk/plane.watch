@@ -253,6 +253,11 @@ func (p *Plane) MarkFrameTime(ts time.Time) {
 var PointCounter int
 
 func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) {
+	if lat < -95.0 || lat > 95 || lon < -180 || lon > 180 {
+		log.Printf("Invalid Coordinate {%0.6f, %0.6f}", lat, lon)
+		return
+	}
+
 	var distanceTravelled float64
 	var durationTravelled float64
 	numHistoryItems := len(p.LocationHistory)
