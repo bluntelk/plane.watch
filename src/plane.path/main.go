@@ -10,6 +10,8 @@ import (
 	"github.com/urfave/cli"
 	"os"
 	"strings"
+	"time"
+	"tracker"
 )
 
 func main() {
@@ -37,6 +39,7 @@ func main() {
 		},
 		{
 			Name:   "sbs",
+			Aliases: []string{"sbs1"},
 			Usage:  "Renders all the plane paths found in an SBS file",
 			Action: parseSbs,
 		},
@@ -47,6 +50,8 @@ func main() {
 			Usage: "verbose debugging output",
 		},
 	}
+
+	tracker.MaxLocationHistory = -1
 
 	app.Run(os.Args)
 }
@@ -78,12 +83,40 @@ func readFile(inFileName string) (chan string, error) {
 		for scanner.Scan() {
 			outChan <- scanner.Text()
 		}
+		for len(outChan) > 0 {
+			time.Sleep(100 * time.Millisecond)
+		}
 		close(outChan)
 	}()
 	return outChan, nil
 }
 
-func writeResult(outFileName string, fc *geojson.FeatureCollection) error {
+func writeResult(outFileName string) error {
+	fc := geojson.NewFeatureCollection([]*geojson.Feature{})
+	var coordCounter, planeCounter int
+
+	tracker.Each(func(p tracker.Plane) {
+		if 0 == len(p.LocationHistory) {
+			return
+		}
+		planeCounter++
+		coords := make(geojson.Coordinates, 0, len(p.LocationHistory))
+		for _, l := range p.LocationHistory {
+			if l.Latitude == 0.0 && l.Longitude == 0.0 {
+				continue
+			}
+			coordCounter++
+			coords = append(coords, geojson.Coordinate{geojson.CoordType(l.Longitude), geojson.CoordType(l.Latitude)})
+		}
+		props := make(map[string]interface{})
+		props["icao"] = p.Icao
+		if len(coords) > 1 {
+			fc.AddFeatures(geojson.NewFeature(geojson.NewLineString(coords), props, p.IcaoIdentifier))
+		}
+	})
+	fmt.Printf("We have %d coords tracked from %d planes\n", coordCounter, planeCounter)
+
+
 	jsonContent, err := json.Marshal(fc)
 	//jsonContent, err := json.MarshalIndent(fc, "", "  ")
 	if nil != err {

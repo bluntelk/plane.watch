@@ -52,7 +52,7 @@ func TestGetPlane(t *testing.T) {
 		t.Errorf("Expected planes ICAO identifier to be moo, got %d", plane.IcaoIdentifier)
 	}
 
-	SetPlane(plane)
+	SetPlane(plane, time.Now())
 
 	plane = GetPlane(1234)
 	err = plane.SetCprOddLocation(88385, 125818, time.Now())
@@ -68,7 +68,7 @@ func TestGetPlane(t *testing.T) {
 	if 125818 != plane.cprLocation.odd_lon {
 		t.Errorf("Even Lon not recorded properly. expected 125818, got: %0.2f", plane.cprLocation.odd_lon)
 	}
-	SetPlane(plane)
+	SetPlane(plane, time.Now())
 
 	err = plane.SetCprEvenLocation(92095, 39846, time.Now())
 	if nil != err {
@@ -84,7 +84,7 @@ func TestGetPlane(t *testing.T) {
 		t.Errorf("Even Lon not recorded properly. expected 39846, got: %0.2f", plane.cprLocation.even_lon)
 	}
 
-	SetPlane(plane)
+	SetPlane(plane, time.Now())
 
 	plane = GetPlane(1234)
 	location, err := plane.cprLocation.decodeGlobalAir()
@@ -115,8 +115,8 @@ func TestGetPlane(t *testing.T) {
 		t.Errorf("Latitude Calculation was incorrect: expected 10.2162144547802, got %0.13f", location.Latitude)
 	}
 
-	plane.AddLatLong(location.Latitude, location.Longitude)
-	SetPlane(plane)
+	plane.AddLatLong(location.Latitude, location.Longitude, time.Now())
+	SetPlane(plane, time.Now())
 }
 
 func TestDecodeFailsOnBadData(t *testing.T) {

@@ -1,11 +1,13 @@
 package tracker
 
 import (
-	"log"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"log"
 	"mode_s"
 	"os"
-	"io"
+	"sbs1"
 )
 
 func SetDebugOutput(out io.Writer) {
@@ -30,7 +32,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 	debugMessage := func(sfmt string, a ...interface{}) {
 		if debug {
 			planeFormat = fmt.Sprintf("DF%02d - \033[0;97mPlane (\033[38;5;118m%s %-8s\033[0;97m)", frame.DownLinkType(), plane.Icao, plane.Flight.Identifier)
-			fmt.Printf(planeFormat + sfmt + "\n", a...)
+			fmt.Printf(planeFormat+sfmt+"\n", a...)
 		}
 	}
 
@@ -145,7 +147,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				hasChanged = true
 				break
 			}
-		case mode_s.DF17_FRAME_AIR_POS_BARO:// "Airborne Position (with Barometric Altitude)"
+		case mode_s.DF17_FRAME_AIR_POS_BARO: // "Airborne Position (with Barometric Altitude)"
 			{
 				if frame.VerticalStatusValid() {
 					plane.Location.onGround, _ = frame.OnGround()
@@ -242,4 +244,33 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 	} else {
 		return nil
 	}
+}
+
+func HandleSbs1Frame(frame sbs1.Frame, debug bool) *Plane {
+	var hasChanged bool
+	icaoAddr, err := IcaoStringToInt(frame.Icao)
+	if err != nil {
+		if debug {
+			log.Println(err)
+		}
+		return nil
+	}
+	plane := GetPlane(icaoAddr)
+	if frame.HasPosition {
+		plane.AddLatLong(frame.Lat, frame.Lon, frame.Received)
+		hasChanged = true
+	}
+	SetPlane(plane, frame.Received)
+	if hasChanged {
+		return &plane
+	}
+	return nil
+}
+
+func IcaoStringToInt(icao string) (uint32, error) {
+	btoi, err := hex.DecodeString(icao)
+	if nil != err {
+		return 0, fmt.Errorf("Failed to decode ICAO HEX (%s) into UINT32. %s", icao, err)
+	}
+	return uint32(btoi[0])<<16 | uint32(btoi[1])<<8 | uint32(btoi[2]), nil
 }

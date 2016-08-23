@@ -25,7 +25,7 @@ const (
 	sbs_on_ground_field     = 21
 )
 
-type Sbs1Frame struct {
+type Frame struct {
 	Icao         string
 	Received     time.Time
 	CallSign     string
@@ -42,9 +42,9 @@ type Sbs1Frame struct {
 	HasPosition bool
 }
 
-func Parse(sbsString string) (Sbs1Frame, error) {
+func Parse(sbsString string) (Frame, error) {
 	// decode the string
-	var plane Sbs1Frame
+	var plane Frame
 
 	bits := strings.Split(sbsString, ",")
 	if len(bits) != 22 {
