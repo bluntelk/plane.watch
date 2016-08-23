@@ -2,11 +2,10 @@ package tracker
 
 import (
 	"fmt"
-	"math"
-	"time"
-	"sync"
-	//"log"
 	"log"
+	"math"
+	"sync"
+	"time"
 )
 
 const (
@@ -17,18 +16,18 @@ const (
 type CprLocation struct {
 	even_lat, odd_lat, even_lon, odd_lon float64
 
-	time0, time1                         time.Time
+	time0, time1 time.Time
 
 	// working out values
-	rlat0, rlat1, airDLat0, airDLat1     float64
+	rlat0, rlat1, airDLat0, airDLat1 float64
 
-	latitudeIndex                        int32
+	latitudeIndex int32
 
-	oddFrame, evenFrame                  bool
+	oddFrame, evenFrame bool
 
-	nl0, nl1                             int32
+	nl0, nl1 int32
 
-	globalSurfaceRange                   float64
+	globalSurfaceRange float64
 }
 
 type PlaneLocation struct {
@@ -40,6 +39,9 @@ type PlaneLocation struct {
 	TimeStamp            time.Time
 	onGround, hasHeading bool
 	hasLatLon            bool
+	DistanceTravelled    float64
+	DurationTravelled    float64
+	TrackFinished        bool
 }
 
 type Flight struct {
@@ -69,8 +71,8 @@ type PlaneList map[uint32]Plane
 type PlaneIterator func(p Plane)
 
 var (
-	planeList PlaneList
-	planeAccessMutex sync.Mutex
+	planeList          PlaneList
+	planeAccessMutex   sync.Mutex
 	MaxLocationHistory int = 10
 )
 
@@ -224,13 +226,13 @@ func (p *Plane) String() string {
 		direction += fmt.Sprintf(" heading %s%0.2f%s, speed %s%0.2f%s knots", orange, p.Location.Heading, white, orange, p.Location.Velocity, white)
 	}
 
-	strength = fmt.Sprintf(" %0.2f pps", float64(p.RecentFrameCount) / 10.0)
+	strength = fmt.Sprintf(" %0.2f pps", float64(p.RecentFrameCount)/10.0)
 
 	if "" != p.Special {
 		special = " " + red + p.Special + white + ", "
 	}
 
-	return id + alt + position + direction + special + strength + "\033[0m";
+	return id + alt + position + direction + special + strength + "\033[0m"
 }
 
 // todo: reimplement as a last seens timestamp? how do we do a count of packets? do we need it?
@@ -249,26 +251,44 @@ func (p *Plane) MarkFrameTime(ts time.Time) {
 }
 
 var PointCounter int
+
 func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) {
+	var distanceTravelled float64
+	var durationTravelled float64
+	numHistoryItems := len(p.LocationHistory)
+	if numHistoryItems > 0 && p.Location.Latitude != 0 && p.Location.Longitude != 0 {
+		referenceTime := p.LocationHistory[numHistoryItems-1].TimeStamp
+		if !referenceTime.IsZero() {
+			durationTravelled = float64(ts.Sub(referenceTime)) / float64(time.Second)
+			if 0.0 == durationTravelled {
+				durationTravelled = 1
+			}
+			acceptableMaxDistance := durationTravelled * 343 // mach1 in metres/second seems fast enough...
+			if acceptableMaxDistance > 50000 {
+				acceptableMaxDistance = 50000
+			}
 
-	duration := float64(ts.Sub(p.Location.TimeStamp) / time.Second)
+			distanceTravelled = distance(lat, lon, p.Location.Latitude, p.Location.Longitude)
 
-	if p.Location.Latitude != 0.0 && p.Location.Longitude != 0.0 {
-		d := distance(lat, lon, p.Location.Latitude, p.Location.Longitude)
-		if d > 5000 { // 5 kilometres
-			log.Printf("The distance (%0.2fm) between {%0.4f,%0.4f} and {%0.4f,%0.4f} is too great for %0.2f seconds, ignoring...", d, lat, lon, p.Location.Latitude, p.Location.Longitude, duration)
-			return
+			//log.Printf("%s travelled %0.2fm in %0.2f seconds (%s -> %s)", p.Icao, distanceTravelled, durationTravelled, referenceTime.Format(time.RFC3339Nano), ts.Format(time.RFC3339Nano))
+
+			if distanceTravelled > acceptableMaxDistance {
+				log.Printf("The distance (%0.2fm) between {%0.4f,%0.4f} and {%0.4f,%0.4f} is too great for %s to travel in %0.2f seconds. New Track", distanceTravelled, lat, lon, p.Location.Latitude, p.Location.Longitude, p.Icao, durationTravelled)
+				p.Location.TrackFinished = true
+			}
 		}
+
 	}
 	PointCounter++
 
-	if MaxLocationHistory > 0 && len(p.LocationHistory) >= MaxLocationHistory {
+	if MaxLocationHistory > 0 && numHistoryItems >= MaxLocationHistory {
 		p.LocationHistory = p.LocationHistory[1:]
 	}
 	p.LocationHistory = append(p.LocationHistory, p.Location)
 
 	var newLocation PlaneLocation
-
+	newLocation.DistanceTravelled = distanceTravelled
+	newLocation.DurationTravelled = durationTravelled
 	newLocation.Altitude = p.Location.Altitude
 	newLocation.AltitudeUnits = p.Location.AltitudeUnits
 	newLocation.hasHeading = p.Location.hasHeading
@@ -342,7 +362,7 @@ func (p *Plane) DecodeCpr(ts time.Time) error {
 	var err error
 
 	if p.Location.onGround {
-		loc, err = p.cprLocation.decodeSurface(p.Location.Latitude, p.Location.Longitude)
+		//loc, err = p.cprLocation.decodeSurface(p.Location.Latitude, p.Location.Longitude)
 	} else {
 		loc, err = p.cprLocation.decodeGlobalAir()
 	}
@@ -395,7 +415,7 @@ func (cpr *CprLocation) computeLatLon() (PlaneLocation, error) {
 		/* Compute ni and the longitude index 'm' */
 		ni := cprNFunction(cpr.rlat1, 1)
 		//log.Printf("	ni = %d", ni)
-		m := math.Floor((((cpr.even_lon * float64(cpr.nl1 - 1)) - (cpr.odd_lon * float64(cpr.nl1))) / 131072.0) + 0.5)
+		m := math.Floor((((cpr.even_lon * float64(cpr.nl1-1)) - (cpr.odd_lon * float64(cpr.nl1))) / 131072.0) + 0.5)
 		//log.Printf("	m = %0.2f", m)
 
 		loc.Longitude = cpr.dlonFunction(cpr.rlat1, 1) * (cprModFunction(int32(m), ni) + (cpr.odd_lon / 131072))
@@ -404,12 +424,12 @@ func (cpr *CprLocation) computeLatLon() (PlaneLocation, error) {
 	} else {
 		// do even decode
 		//log.Println("Even Decode")
-		ni := cprNFunction(cpr.rlat0, 0);
+		ni := cprNFunction(cpr.rlat0, 0)
 		//log.Printf("	ni = %d", ni)
-		m := math.Floor((((cpr.even_lon * float64(cpr.nl0 - 1)) - (cpr.odd_lon * float64(cpr.nl0))) / 131072) + 0.5);
+		m := math.Floor((((cpr.even_lon * float64(cpr.nl0-1)) - (cpr.odd_lon * float64(cpr.nl0))) / 131072) + 0.5)
 		//log.Printf("	m = %0.2f", m)
-		loc.Longitude = cpr.dlonFunction(cpr.rlat0, 0) * (cprModFunction(int32(m), ni) + cpr.even_lon / 131072);
-		loc.Latitude = cpr.rlat0;
+		loc.Longitude = cpr.dlonFunction(cpr.rlat0, 0) * (cprModFunction(int32(m), ni) + cpr.even_lon/131072)
+		loc.Latitude = cpr.rlat0
 		//log.Printf("	rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
 	}
 
@@ -437,8 +457,8 @@ func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (PlaneLocation, er
 	// basic check - make sure we have both frames
 	if !(cpr.oddFrame && cpr.evenFrame) {
 		var s string
-		if (cpr.oddFrame) {
-			s = "Have Odd Frame";
+		if cpr.oddFrame {
+			s = "Have Odd Frame"
 		} else {
 			s = "Have Even Frame"
 		}
@@ -489,7 +509,7 @@ func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (PlaneLocation, er
 			cpr.rlat1 = 90
 		}
 	} else if (cpr.rlat1 - refLat) > 45 {
-		cpr.rlat1 -= 90;
+		cpr.rlat1 -= 90
 	}
 
 	// Check to see that the latitude is in range: -90 .. +90
@@ -515,8 +535,8 @@ func (cpr *CprLocation) decodeGlobalAir() (PlaneLocation, error) {
 	// basic check - make sure we have both frames
 	if !(cpr.oddFrame && cpr.evenFrame) {
 		var s string
-		if (cpr.oddFrame) {
-			s = "Have Odd Frame";
+		if cpr.oddFrame {
+			s = "Have Odd Frame"
 		} else {
 			s = "Have Even Frame"
 		}
@@ -590,8 +610,6 @@ func (pl *PlaneLocation) SetDirection(heading float64, speed int32) {
 	pl.Heading = heading
 	pl.Velocity = float64(speed)
 }
-
-
 
 // haversin(θ) function
 func hsin(theta float64) float64 {

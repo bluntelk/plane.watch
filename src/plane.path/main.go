@@ -38,10 +38,10 @@ func main() {
 			Action: parseAvr,
 		},
 		{
-			Name:   "sbs",
+			Name:    "sbs",
 			Aliases: []string{"sbs1"},
-			Usage:  "Renders all the plane paths found in an SBS file",
-			Action: parseSbs,
+			Usage:   "Renders all the plane paths found in an SBS file",
+			Action:  parseSbs,
 		},
 	}
 	app.Flags = []cli.Flag{
@@ -94,28 +94,42 @@ func readFile(inFileName string) (chan string, error) {
 func writeResult(outFileName string) error {
 	fc := geojson.NewFeatureCollection([]*geojson.Feature{})
 	var coordCounter, planeCounter int
+	var trackCounter int
+
+	addFeature := func(coordinates geojson.Coordinates, p tracker.Plane) {
+		trackCounter++
+		props := make(map[string]interface{})
+		props["icao"] = p.Icao
+		props["trackNo"] = trackCounter
+		if len(coordinates) > 1 {
+			fc.AddFeatures(geojson.NewFeature(geojson.NewLineString(coordinates), props, fmt.Sprintf("%s_%d",p.Icao, trackCounter)))
+		}
+	}
 
 	tracker.Each(func(p tracker.Plane) {
+		var coords geojson.Coordinates
 		if 0 == len(p.LocationHistory) {
 			return
 		}
 		planeCounter++
-		coords := make(geojson.Coordinates, 0, len(p.LocationHistory))
-		for _, l := range p.LocationHistory {
+		numLocations := len(p.LocationHistory)
+		coords = make(geojson.Coordinates, 0, numLocations)
+		for index, l := range p.LocationHistory {
 			if l.Latitude == 0.0 && l.Longitude == 0.0 {
 				continue
 			}
+
 			coordCounter++
 			coords = append(coords, geojson.Coordinate{geojson.CoordType(l.Longitude), geojson.CoordType(l.Latitude)})
-		}
-		props := make(map[string]interface{})
-		props["icao"] = p.Icao
-		if len(coords) > 1 {
-			fc.AddFeatures(geojson.NewFeature(geojson.NewLineString(coords), props, p.IcaoIdentifier))
-		}
-	})
-	fmt.Printf("We have %d coords tracked from %d planes\n", coordCounter, planeCounter)
 
+			if l.TrackFinished {
+				addFeature(coords, p)
+				coords = make(geojson.Coordinates, 0, numLocations-index)
+			}
+		}
+		addFeature(coords, p)
+	})
+	fmt.Printf("We have %d coords tracked over %d tracks from %d planes\n", coordCounter, trackCounter, planeCounter)
 
 	jsonContent, err := json.Marshal(fc)
 	//jsonContent, err := json.MarshalIndent(fc, "", "  ")

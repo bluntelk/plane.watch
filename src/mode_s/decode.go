@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"errors"
 )
 
 const (
@@ -46,11 +47,11 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 
 	// let's ensure that we have some correct data...
 	if "" == encodedFrame {
-		return frame, fmt.Errorf("Cannot Decode Empty String")
+		return frame, errors.New("Cannot Decode Empty String")
 	}
 
 	if len(encodedFrame) < 14 {
-		return frame, fmt.Errorf("Frame too short to be a Mode S frame")
+		return frame, errors.New("Frame too short to be a Mode S frame")
 	}
 
 
@@ -77,7 +78,7 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	// let's get our frame data in order!
 
 	if rawFrame == "*00000000000000;" {
-		return frame, fmt.Errorf("Heartbeat Received.")
+		return frame, errors.New("Heartbeat Received.")
 	}
 
 	frame.raw = encodedFrame[frameStart:len(encodedFrame)]

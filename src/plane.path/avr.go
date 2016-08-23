@@ -81,8 +81,8 @@ func handleErrors(errors chan error, verbose bool) {
 	for {
 		select {
 		case err := <-errors:
-			if verbose {
-				fmt.Println(err)
+			if verbose && nil != err{
+				fmt.Println("Error: ", err)
 			}
 		}
 	}

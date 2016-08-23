@@ -164,6 +164,9 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				altitude, _ := frame.Altitude()
 				plane.SetAltitude(altitude, frame.AltitudeUnits())
 				plane.DecodeCpr(frame.TimeStamp())
+				if plane.Location.DistanceTravelled > 0 {
+					debugMessage(" travelled %0.2f metres %0.2f seconds", plane.Location.DistanceTravelled, plane.Location.DurationTravelled)
+				}
 
 				break
 			}

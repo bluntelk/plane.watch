@@ -11,6 +11,8 @@ const (
 	sbs_msg_type_field      = 0
 	sbs_msg_sub_cat_field   = 1
 	sbs_icao_field          = 4
+	sbs_recv_date           = 6
+	sbs_recv_time           = 7
 	sbs_callsign_field      = 10
 	sbs_altitude_field      = 11
 	sbs_ground_speed_field  = 12
@@ -45,6 +47,7 @@ type Frame struct {
 func Parse(sbsString string) (Frame, error) {
 	// decode the string
 	var plane Frame
+	var err error
 
 	bits := strings.Split(sbsString, ",")
 	if len(bits) != 22 {
@@ -52,17 +55,28 @@ func Parse(sbsString string) (Frame, error) {
 	}
 
 	plane.Icao = bits[sbs_icao_field]
-	plane.Received = time.Now()
+	sTime := bits[sbs_recv_date] + " " + bits[sbs_recv_time]
+	//2016/06/03 00:00:38.350
+	plane.Received, err = time.Parse("2006/01/02 15:04:05.999999999", sTime)
+	if nil != err {
+		plane.Received = time.Now()
+	}
 
 	switch bits[sbs_msg_type_field] { // message type
-	case "SEL":
+	case "SEL": // SELECTION_CHANGE
 		plane.CallSign = bits[sbs_callsign_field]
-	case "ID":
+	case "ID": // NEW_ID
 		plane.CallSign = bits[sbs_callsign_field]
-	case "AIR":
-	case "STA":
-	case "CLK":
-	case "MSG":
+	case "AIR": // NEW_AIRCRAFT - just indicates when a new aircraft pops up
+	case "STA": // STATUS_AIRCRAFT
+	// call sign field (10) contains one of:
+	//	PL (Position Lost)
+	// 	SL (Signal Lost)
+	// 	RM (Remove)
+	// 	AD (Delete)
+	// 	OK (used to reset time-outs if aircraft returns into cover).
+	case "CLK": // CLICK
+	case "MSG": // TRANSMISSION
 		switch bits[sbs_msg_sub_cat_field] {
 		case "1": // ES Identification and Category
 			plane.CallSign = bits[sbs_callsign_field]
