@@ -7,17 +7,31 @@ import (
 	"mode_s"
 	"time"
 	"tracker"
+	"os"
 )
 
 func parseAvr(c *cli.Context) error {
-	inFileName := c.Args().First()
-	outFileName := c.Args().Get(1)
+	stdOut := c.GlobalBool("stdout")
 	verbose := c.GlobalBool("v")
 
-	if "" == inFileName {
-		println("Usage: <file with avr frames to read> <file to export geojson to or stdout if omitted>")
-		return nil
+	var outFileName string
+	var dataFiles []string
+	if stdOut {
+		dataFiles = c.Args()
+	} else {
+		outFileName = c.Args().First()
+		dataFiles = c.Args()[1:]
 	}
+
+	if 0 == len(dataFiles) {
+		fmt.Fprintf(os.Stderr, "Usage: %s %s [output-file.json] input [input...]\n", os.Args[0], c.Command.Name)
+	}
+
+	if !verbose {
+		tracker.SetDebugOutput(ioutil.Discard)
+	}
+
+	inputLines, errChan := readFiles(dataFiles)
 
 	jobChan := make(chan mode_s.ReceivedFrame, 1000)
 	resultChan := make(chan mode_s.Frame, 1000)
@@ -25,19 +39,16 @@ func parseAvr(c *cli.Context) error {
 	exitChan := make(chan bool)
 
 	go handleReceived(resultChan, verbose)
+	go handleErrors(errChan, verbose)
 	go handleErrors(errorChan, verbose)
 	if !verbose {
 		tracker.SetDebugOutput(ioutil.Discard)
 	}
 	go mode_s.DecodeStringWorker(jobChan, resultChan, errorChan)
-	inFile, err := readFile(inFileName)
-	if nil != err {
-		panic(err)
-	}
 
 	go func() {
 		var ts time.Time
-		for line := range inFile {
+		for line := range inputLines {
 			ts = ts.Add(500 * time.Millisecond)
 			jobChan <- mode_s.ReceivedFrame{Time: ts, Frame: line}
 		}
@@ -56,7 +67,7 @@ func parseAvr(c *cli.Context) error {
 		close(errorChan)
 	}
 
-	fmt.Printf("We have %d points tracked\n", tracker.PointCounter)
+	fmt.Fprintf(os.Stderr,"We have %d points tracked\n", tracker.PointCounter)
 
 	return writeResult(outFileName)
 }
@@ -71,7 +82,7 @@ func handleReceived(results chan mode_s.Frame, verbose bool) {
 			if nil != plane {
 				// whee plane changed - now has it moved from its last position?
 				if resultCounter%1000 == 0 {
-					fmt.Printf("Results: %d (buf %d)\r", resultCounter, len(results))
+					fmt.Fprintf(os.Stderr,"Results: %d (buf %d)\r", resultCounter, len(results))
 				}
 			}
 		}
@@ -82,7 +93,7 @@ func handleErrors(errors chan error, verbose bool) {
 		select {
 		case err := <-errors:
 			if verbose && nil != err{
-				fmt.Println("Error: ", err)
+				fmt.Fprintln(os.Stderr, err)
 			}
 		}
 	}

@@ -23,9 +23,9 @@ func main() {
 
 	app := cli.NewApp()
 
-	app.Version = "0.0.1"
+	app.Version = "v0.0.2"
 	app.Name = "Plane Watch Flight Path Renderer"
-	app.Usage = "Reads AVR frames from a file and generates a GeoJSON file"
+	app.Usage = "Reads AVR frames or SBS1 data from a file and generates a GeoJSON file"
 	app.Authors = []cli.Author{
 		{Name: "Jason Playne", Email: "jason@jasonplayne.com"},
 	}
@@ -36,18 +36,24 @@ func main() {
 			Name:   "avr",
 			Usage:  "Renders all the plane paths found in an AVR file",
 			Action: parseAvr,
+			ArgsUsage: "[outfile if not --stdout] input-file.txt [input-file.gz [input-file.bz2]]",
 		},
 		{
 			Name:    "sbs",
 			Aliases: []string{"sbs1"},
 			Usage:   "Renders all the plane paths found in an SBS file",
 			Action:  parseSbs,
+			ArgsUsage: "[outfile if not --stdout] input-file.txt [input-file.gz [input-file.bz2]]",
 		},
 	}
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "v",
 			Usage: "verbose debugging output",
+		},
+		cli.BoolFlag{
+			Name:  "stdout",
+			Usage: "Output to stdout instead of to a file (disables any other output)",
 		},
 	}
 
@@ -56,38 +62,47 @@ func main() {
 	app.Run(os.Args)
 }
 
-func readFile(inFileName string) (chan string, error) {
+func readFiles(inFileNames []string) (chan string, chan error) {
 	outChan := make(chan string, 50)
-
-	inFile, err := os.Open(inFileName)
-	if err != nil {
-		return outChan, fmt.Errorf("Failed to open file {%s}: %s", inFileName, err)
-	}
-
-	isGzip := strings.ToLower(inFileName[len(inFileName)-2:]) == "gz"
-	isBzip2 := strings.ToLower(inFileName[len(inFileName)-3:]) == "bz2"
+	errChan := make(chan error, 50)
 
 	go func() {
-		defer inFile.Close()
+		for _, inFileName := range inFileNames {
+			inFile, err := os.Open(inFileName)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to open file {%s}: %s", inFileName, err)
+				continue
+			}
 
-		var scanner *bufio.Scanner
-		if isGzip {
-			gzipFile, _ := gzip.NewReader(inFile)
-			scanner = bufio.NewScanner(gzipFile)
-		} else if isBzip2 {
-			bzip2File := bzip2.NewReader(inFile)
-			scanner = bufio.NewScanner(bzip2File)
-		} else {
-			scanner = bufio.NewScanner(inFile)
+			isGzip := strings.ToLower(inFileName[len(inFileName)-2:]) == "gz"
+			isBzip2 := strings.ToLower(inFileName[len(inFileName)-3:]) == "bz2"
+
+			var scanner *bufio.Scanner
+			if isGzip {
+				gzipFile, err := gzip.NewReader(inFile)
+				if nil != err {
+					errChan <- err
+					continue
+				}
+				scanner = bufio.NewScanner(gzipFile)
+			} else if isBzip2 {
+				bzip2File := bzip2.NewReader(inFile)
+				scanner = bufio.NewScanner(bzip2File)
+			} else {
+				scanner = bufio.NewScanner(inFile)
+			}
+			for scanner.Scan() {
+				outChan <- scanner.Text()
+			}
+			inFile.Close()
 		}
-		for scanner.Scan() {
-			outChan <- scanner.Text()
-		}
+		// and wait for our outChan to be empty
 		for len(outChan) > 0 {
 			time.Sleep(100 * time.Millisecond)
 		}
 		close(outChan)
 	}()
+
 	return outChan, nil
 }
 
@@ -102,7 +117,7 @@ func writeResult(outFileName string) error {
 		props["icao"] = p.Icao
 		props["trackNo"] = trackCounter
 		if len(coordinates) > 1 {
-			fc.AddFeatures(geojson.NewFeature(geojson.NewLineString(coordinates), props, fmt.Sprintf("%s_%d",p.Icao, trackCounter)))
+			fc.AddFeatures(geojson.NewFeature(geojson.NewLineString(coordinates), props, fmt.Sprintf("%s_%d", p.Icao, trackCounter)))
 		}
 	}
 
@@ -129,7 +144,7 @@ func writeResult(outFileName string) error {
 		}
 		addFeature(coords, p)
 	})
-	fmt.Printf("We have %d coords tracked over %d tracks from %d planes\n", coordCounter, trackCounter, planeCounter)
+	fmt.Fprintf(os.Stderr,"We have %d coords tracked over %d tracks from %d planes\n", coordCounter, trackCounter, planeCounter)
 
 	jsonContent, err := json.Marshal(fc)
 	//jsonContent, err := json.MarshalIndent(fc, "", "  ")

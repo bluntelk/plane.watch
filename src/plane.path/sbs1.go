@@ -7,39 +7,53 @@ import (
 	"time"
 	"tracker"
 	"io/ioutil"
+	"os"
 )
 
 func parseSbs(c *cli.Context) error {
-	inFileName := c.Args().First()
-	outFileName := c.Args().Get(1)
+	stdOut := c.GlobalBool("stdout")
 	verbose := c.GlobalBool("v")
-
-	if "" == inFileName {
-		println("Usage: <file with SBS frames to read> <file to export geojson to or stdout if omitted>")
-		return nil
+	if c.NArg() == 0 {
+		return fmt.Errorf("you need to specify some files")
 	}
+
+	var outFileName string
+	var dataFiles []string
+	if stdOut {
+		dataFiles = c.Args()
+	} else {
+		outFileName = c.Args().First()
+		dataFiles = c.Args()[1:]
+	}
+
+	if 0 == len(dataFiles) {
+		return fmt.Errorf("you need to specify some files")
+	}
+
 	if !verbose {
 		tracker.SetDebugOutput(ioutil.Discard)
 	}
 
-	inFile, err := readFile(inFileName)
-	if nil != err {
-		panic(err)
-	}
+	inputLines, errChan := readFiles(dataFiles)
 
 	trackingChan := make(chan sbs1.Frame, 50)
 	go handleSbs1Tracking(trackingChan, verbose)
+	go func() {
+		for err := range errChan {
+			fmt.Fprintln(os.Stderr, err)
+		}
+	}()
 
 	var lineCounter uint
-	for line := range inFile {
+	for line := range inputLines {
 		lineCounter++
 		if 0 == lineCounter%10000 {
-			fmt.Printf("Processing line: %d\r", lineCounter)
+			fmt.Fprintf(os.Stderr, "Processing line: %d\r", lineCounter)
 		}
 		frame, err := sbs1.Parse(line)
 		if nil != err {
 			if verbose {
-				fmt.Println("Failed to parse SBS1 Frame.", err)
+				fmt.Fprintln(os.Stderr, "Failed to parse SBS1 Frame.", err)
 			}
 			continue
 		}
