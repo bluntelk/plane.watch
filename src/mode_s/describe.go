@@ -200,54 +200,54 @@ var asdbFeatures = map[byte][]featureBreakdown{
 	17: featureDF17AirPosition,
 	18: featureDF17AirPosition,
 	19: featureDF17AirVelocity,
-	23: []featureBreakdown{
-		{name: "SUB", start:37, end: 40},
+	23: {
+		{name: "SUB", start: 37, end: 40},
 		{name: "ID", start: 40, end: 53},
 		{name: "  ", start: 53, end: 88},
 	},
-	28: []featureBreakdown{
-		{name: "SUB", start:37, end: 40},
-		{name: "??", start: 40, end: 88, subFields:map[byte][]featureBreakdown{
-			0:[]featureBreakdown{
+	28: {
+		{name: "SUB", start: 37, end: 40},
+		{name: "??", start: 40, end: 88, subFields: map[byte][]featureBreakdown{
+			0: {
 				{name: "??", start: 40, end: 88},
 			},
-			1:[]featureBreakdown{// EMERGENCY (or priority), Status
+			1: { // EMERGENCY (or priority), Status
 				{name: "EID", start: 40, end: 43},
 				{name: "ID", start: 43, end: 56},
 				{name: "  ", start: 56, end: 88},
 			},
-			2:[]featureBreakdown{// TCAS Resolution Advisory
+			2: { // TCAS Resolution Advisory
 				{name: "??", start: 40, end: 88},
 			},
-			3:[]featureBreakdown{
+			3: {
 				{name: "??", start: 40, end: 88},
 			},
-			4:[]featureBreakdown{
+			4: {
 				{name: "??", start: 40, end: 88},
 			},
-			5:[]featureBreakdown{
+			5: {
 				{name: "??", start: 40, end: 88},
 			},
-			6:[]featureBreakdown{
+			6: {
 				{name: "??", start: 40, end: 88},
 			},
-			7:[]featureBreakdown{
+			7: {
 				{name: "??", start: 40, end: 88},
 			},
 		},
 		},
 	},
-	29: []featureBreakdown{
-		{name: "SUB", start:37, end: 40},
+	29: {
+		{name: "SUB", start: 37, end: 40},
 		{name: "??", start: 40, end: 88},
 	},
-	31: []featureBreakdown{
-		{name: "SUB", start:37, end: 40},
-		{name: "CCC", start: 40, end: 56, subFields:map[byte][]featureBreakdown{
-			0:[]featureBreakdown{// airborne
+	31: {
+		{name: "SUB", start: 37, end: 40},
+		{name: "CCC", start: 40, end: 56, subFields: map[byte][]featureBreakdown{
+			0: { // airborne
 				{name: "CCC", start: 40, end: 56},
 			},
-			1:[]featureBreakdown{//surface
+			1: { //surface
 				{name: "??", start: 40, end: 44},
 				{name: "CCC", start: 44, end: 52},
 				{name: "APLW", start: 52, end: 56},
@@ -255,108 +255,108 @@ var asdbFeatures = map[byte][]featureBreakdown{
 		},
 		},
 		{name: "OMC", start: 56, end: 72},
-		{name: "VER", start: 72, end: 75}, //VERSION
+		{name: "VER", start: 72, end: 75},  //VERSION
 		{name: "NICp", start: 75, end: 76}, //Navigation Integrity Category Supplement A
 		{name: "NACv", start: 76, end: 80}, //Navigation Accuracy Category Position
-		{name: "GVA", start: 80, end: 82}, // geometric_vertical_accuracy
-		{name: "SIL", start: 82, end: 84}, // sil
-		{name: "NTH", start: 84, end: 85}, //nic_trk_hdg
-		{name: "HRD", start: 85, end: 86}, // hrd
+		{name: "GVA", start: 80, end: 82},  // geometric_vertical_accuracy
+		{name: "SIL", start: 82, end: 84},  // sil
+		{name: "NTH", start: 84, end: 85},  //nic_trk_hdg
+		{name: "HRD", start: 85, end: 86},  // hrd
 		{name: "??", start: 86, end: 88},
 	},
 }
 
 var frameFeatures = map[byte][]featureBreakdown{
 
-	0: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "VS", start:5, end: 6},
-		{name: "CC", start:6, end: 7},
-		{name: "  ", start:7, end: 8},
-		{name: "SL", start:8, end: 11},
-		{name: "  ", start:11, end: 13},
-		{name: "RI", start:13, end: 17},
-		{name: "  ", start:17, end: 20},
-		{name: "AC", start:20, end: 32},
-		{name: "AP", start:32, end: 56},
+	0: {
+		{name: "DF", start: 0, end: 5},
+		{name: "VS", start: 5, end: 6},
+		{name: "CC", start: 6, end: 7},
+		{name: "  ", start: 7, end: 8},
+		{name: "SL", start: 8, end: 11},
+		{name: "  ", start: 11, end: 13},
+		{name: "RI", start: 13, end: 17},
+		{name: "  ", start: 17, end: 20},
+		{name: "AC", start: 20, end: 32},
+		{name: "AP", start: 32, end: 56},
 	},
-	4: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "FS", start:5, end: 8},
-		{name: "DR", start:8, end: 13},
-		{name: "UM", start:13, end: 19},
-		{name: "AC", start:19, end: 32},
-		{name: "AP", start:32, end: 56},
+	4: {
+		{name: "DF", start: 0, end: 5},
+		{name: "FS", start: 5, end: 8},
+		{name: "DR", start: 8, end: 13},
+		{name: "UM", start: 13, end: 19},
+		{name: "AC", start: 19, end: 32},
+		{name: "AP", start: 32, end: 56},
 	},
-	5: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "FS", start:5, end: 8},
-		{name: "DR", start:8, end: 13},
-		{name: "UM", start:13, end: 19},
-		{name: "ID", start:19, end: 32},
-		{name: "AP", start:32, end: 56},
-	},
-
-	11: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "CA", start:5, end: 8},
-		{name: "AA", start:8, end: 32},
-		{name: "PI", start:32, end: 56},
+	5: {
+		{name: "DF", start: 0, end: 5},
+		{name: "FS", start: 5, end: 8},
+		{name: "DR", start: 8, end: 13},
+		{name: "UM", start: 13, end: 19},
+		{name: "ID", start: 19, end: 32},
+		{name: "AP", start: 32, end: 56},
 	},
 
-	16: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "VS", start:5, end: 6},
-		{name: "  ", start:6, end: 8},
-		{name: "SL", start:8, end: 11},
-		{name: "  ", start:11, end: 13},
-		{name: "RI", start:13, end: 17},
-		{name: "  ", start:17, end: 19},
-		{name: "AC", start:19, end: 32},
-		{name: "MV", start:32, end: 88},
-		{name: "AP", start:88, end: 112},
+	11: {
+		{name: "DF", start: 0, end: 5},
+		{name: "CA", start: 5, end: 8},
+		{name: "AA", start: 8, end: 32},
+		{name: "PI", start: 32, end: 56},
 	},
-	17: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "CA", start:5, end: 8},
-		{name: "AA", start:8, end: 32},
-		{name: "TC", start:32, end: 37},
-		{name: "ME", start:40, end: 88, subFields: asdbFeatures},
-		{name: "PI", start:88, end: 112},
+
+	16: {
+		{name: "DF", start: 0, end: 5},
+		{name: "VS", start: 5, end: 6},
+		{name: "  ", start: 6, end: 8},
+		{name: "SL", start: 8, end: 11},
+		{name: "  ", start: 11, end: 13},
+		{name: "RI", start: 13, end: 17},
+		{name: "  ", start: 17, end: 19},
+		{name: "AC", start: 19, end: 32},
+		{name: "MV", start: 32, end: 88},
+		{name: "AP", start: 88, end: 112},
 	},
-	18: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "??", start:5, end: 88},
-		{name: "CRC", start:88, end: 112},
+	17: {
+		{name: "DF", start: 0, end: 5},
+		{name: "CA", start: 5, end: 8},
+		{name: "AA", start: 8, end: 32},
+		{name: "TC", start: 32, end: 37},
+		{name: "ME", start: 40, end: 88, subFields: asdbFeatures},
+		{name: "PI", start: 88, end: 112},
 	},
-	19: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
+	18: {
+		{name: "DF", start: 0, end: 5},
+		{name: "??", start: 5, end: 88},
+		{name: "CRC", start: 88, end: 112},
 	},
-	20: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "FS", start:5, end: 8},
-		{name: "DR", start:8, end: 13},
-		{name: "UM", start:13, end: 19},
-		{name: "AC", start:19, end: 32},
-		{name: "MB", start:32, end: 88},
-		{name: "AP", start:88, end: 112},
+	19: {
+		{name: "DF", start: 0, end: 5},
 	},
-	21: []featureBreakdown{
-		{name: "DF", start:0, end: 5},
-		{name: "FS", start:5, end: 8},
-		{name: "DR", start:8, end: 13}, //
-		{name: "UM", start:13, end: 19},
-		{name: "ID", start:19, end: 32},
-		{name: "MB", start:32, end: 88},
-		{name: "AP", start:88, end: 112},
+	20: {
+		{name: "DF", start: 0, end: 5},
+		{name: "FS", start: 5, end: 8},
+		{name: "DR", start: 8, end: 13},
+		{name: "UM", start: 13, end: 19},
+		{name: "AC", start: 19, end: 32},
+		{name: "MB", start: 32, end: 88},
+		{name: "AP", start: 88, end: 112},
 	},
-	24: []featureBreakdown{
-		{name: "DF", start:0, end: 2},
-		{name: "  ", start:2, end: 3},
-		{name: "KE", start:3, end: 4},
-		{name: "ND", start:4, end: 8},
-		{name: "MD", start:8, end: 88},
-		{name: "AP", start:88, end: 112},
+	21: {
+		{name: "DF", start: 0, end: 5},
+		{name: "FS", start: 5, end: 8},
+		{name: "DR", start: 8, end: 13}, //
+		{name: "UM", start: 13, end: 19},
+		{name: "ID", start: 19, end: 32},
+		{name: "MB", start: 32, end: 88},
+		{name: "AP", start: 88, end: 112},
+	},
+	24: {
+		{name: "DF", start: 0, end: 2},
+		{name: "  ", start: 2, end: 3},
+		{name: "KE", start: 3, end: 4},
+		{name: "ND", start: 4, end: 8},
+		{name: "MD", start: 8, end: 88},
+		{name: "AP", start: 88, end: 112},
 	},
 }
 
@@ -425,9 +425,9 @@ func (f *Frame) showVerticalStatus(output io.Writer) {
 		return
 	}
 	if f.onGround {
-		fmt.Fprintln(output, "VS: Vertical Status : On The Ground");
+		fmt.Fprintln(output, "VS: Vertical Status : On The Ground")
 	} else {
-		fmt.Fprintln(output, "VS: Vertical Status : Airborne");
+		fmt.Fprintln(output, "VS: Vertical Status : Airborne")
 	}
 }
 
@@ -555,7 +555,7 @@ func (f *Frame) showNavAccuracyCat(output io.Writer) {
 
 func (f *Frame) showCprLatLon(output io.Writer) {
 	fmt.Fprintln(output, "Before Decoding : Half of vehicle location")
-	var oddEven string = "Odd"
+	var oddEven = "Odd"
 	if f.IsEven() {
 		oddEven = "Even"
 	}
@@ -613,13 +613,13 @@ func (f *Frame) showAdsb(output io.Writer) {
 	case 23:
 		f.showAdsbMsgSubType(output)
 		if 7 == f.messageSubType {
-			f.showIdentity(output);
+			f.showIdentity(output)
 		}
 	case 28:
 		f.showAdsbMsgSubType(output)
 		if 1 == f.messageSubType {
-			f.showIdentity(output);
-			f.showAlert(output);
+			f.showIdentity(output)
+			f.showAlert(output)
 		} else if 2 == f.messageSubType {
 			// TCAS RA
 		}
@@ -646,7 +646,7 @@ func (f *Frame) showAdsbMsgSubType(output io.Writer) {
 }
 
 func (f *Frame) showCapabilityClassInfo(output io.Writer) {
-	if (f.validCompatibilityClass) {
+	if f.validCompatibilityClass {
 		if nil != f.cccHasLowTxPower {
 			fmt.Fprintf(output, "  Low TX Power      : %t\n", *f.cccHasLowTxPower)
 		}
@@ -732,7 +732,7 @@ func (f *Frame) formatBitString(features []featureBreakdown) string {
 		if realLen > padLen {
 			padLen = realLen
 		}
-		shownBitCount += (f.end - f.start)
+		shownBitCount += f.end - f.start
 		bitFmt = fmt.Sprintf(" %%- %ds |", padLen)
 		header += fmt.Sprintf(bitFmt, f.name)
 		separator += strings.Repeat("-", padLen + 2) + "+"
@@ -758,11 +758,11 @@ func (f *Frame) formatBitString(features []featureBreakdown) string {
 		footer += fmt.Sprintf(" %s \t%d bit%s\t %s: %s\n", f.name, realLen, suffix, feature.field, feature.meaning)
 	}
 
-	for _, f := range features {
-		if 0 == len(f.subFields[f.messageType]) {
-			doMakeBitString(f)
+	for _, feat := range features {
+		if 0 == len(feat.subFields[f.messageType]) {
+			doMakeBitString(feat)
 		} else {
-			for _, sf := range f.subFields[f.messageType] {
+			for _, sf := range feat.subFields[f.messageType] {
 				if 0 == len(sf.subFields[f.messageSubType]) {
 					doMakeBitString(sf)
 				} else {

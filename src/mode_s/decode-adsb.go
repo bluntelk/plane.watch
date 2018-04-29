@@ -72,7 +72,7 @@ func (f *Frame) decodeAdsb() {
 		f.validNacV = true
 		f.nacV = (f.message[5] & 0x38) >> 3
 
-		var verticalRateSign int = int((f.message[8] & 0x8) >> 3)
+		var verticalRateSign = int((f.message[8] & 0x8) >> 3)
 		f.verticalRate = (int(f.message[8] & 7) << 6) | (int(f.message[9] & 0xfc) >> 2)
 		if f.verticalRate != 0 {
 			f.verticalRate--
@@ -127,15 +127,15 @@ func (f *Frame) decodeAdsb() {
 			}
 		} else if f.messageSubType == 3 || f.messageSubType == 4 {
 			// Air Speed -- ground speed not available
-			var airspeed int = int(((f.message[7] & 0x7f) << 3) | (f.message[8] >> 5));
+			var airspeed = int(((f.message[7] & 0x7f) << 3) | (f.message[8] >> 5))
 			if airspeed != 0 {
-				airspeed -= 1;
+				airspeed -= 1
 				if f.messageSubType == 4 {
 					// If (supersonic) unit is 4 kts
 					f.superSonic = true
-					airspeed = airspeed << 2;
+					airspeed = airspeed << 2
 				}
-				f.velocity = float64(airspeed);
+				f.velocity = float64(airspeed)
 				f.validVelocity = true
 			}
 
@@ -145,14 +145,14 @@ func (f *Frame) decodeAdsb() {
 			}
 		}
 
-		if (f.message[10] > 0) {
+		if f.message[10] > 0 {
 			f.validHae = true
-			f.haeDirection = (f.message[10] & 0x80) >> 7;
-			var multiplier int = -25;
+			f.haeDirection = (f.message[10] & 0x80) >> 7
+			var multiplier = -25
 			if f.haeDirection == 0 {
 				multiplier = 25
 			}
-			f.haeDelta = multiplier * int((f.message[10] & 0x7f) - 1);
+			f.haeDelta = multiplier * int((f.message[10] & 0x7f) - 1)
 		}
 	case 20, 21, 22:
 	//NoOp -- Airborne Position with GNSS instead of Baro
@@ -170,7 +170,7 @@ func (f *Frame) decodeAdsb() {
 		if f.messageSubType == 1 {
 			// EMERGENCY (or priority), EMERGENCY, THERE'S AN EMERGENCY GOING ON
 			f.decodeSquawkIdentity(5, 6)
-			var emergencyId int = int((f.message[5] & 0xe0) >> 5)
+			var emergencyId = int((f.message[5] & 0xe0) >> 5)
 			f.alert = emergencyId != 0
 			f.special = emergencyStateTable[emergencyId]
 
@@ -201,7 +201,7 @@ func (f *Frame) decodeAdsb() {
 				f.cccHasAirRefVel = bp((f.compatibilityClass & 0x200) != 0)
 				f.cccHasTargetStateRpt = bp((f.compatibilityClass & 0x100) != 0)
 
-				changeRpt := (f.compatibilityClass & 0xC0)
+				changeRpt := f.compatibilityClass & 0xC0
 				f.cccHasTargetChangeRpt = bp(changeRpt == 1 || changeRpt == 2)
 				f.cccHasUATReceiver = (f.compatibilityClass & 0x20) != 0
 			}

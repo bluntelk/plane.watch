@@ -10,16 +10,16 @@ import (
 )
 
 const (
-	MODES_LONG_MSG_BYTES = 14
-	MODES_SHORT_MSG_BYTES = 7
-	MODES_LONG_MSG_BITS = (MODES_LONG_MSG_BYTES * 8)
-	MODES_SHORT_MSG_BITS = (MODES_SHORT_MSG_BYTES * 8)
+	modesLongMsgBytes  = 14
+	modesShortMsgBytes = 7
+	modesLongMsgBits   = modesLongMsgBytes * 8
+	modesShortMsgBits  = modesShortMsgBytes * 8
 )
 
-type icaoList struct {
-	icao     int
-	lastSeen time.Time
-}
+//type icaoList struct {
+//	icao     int
+//	lastSeen time.Time
+//}
 
 type ReceivedFrame struct {
 	Frame string
@@ -47,11 +47,11 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 
 	// let's ensure that we have some correct data...
 	if "" == encodedFrame {
-		return frame, errors.New("Cannot Decode Empty String")
+		return frame, errors.New("cannot decode empty string")
 	}
 
 	if len(encodedFrame) < 14 {
-		return frame, errors.New("Frame too short to be a Mode S frame")
+		return frame, errors.New("frame too short to be a Mode S frame")
 	}
 
 
@@ -78,10 +78,10 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	// let's get our frame data in order!
 
 	if rawFrame == "*00000000000000;" {
-		return frame, errors.New("Heartbeat Received.")
+		return frame, errors.New("heartbeat received")
 	}
 
-	frame.raw = encodedFrame[frameStart:len(encodedFrame)]
+	frame.raw = encodedFrame[frameStart:]
 	err = frame.parseRawToMessage()
 	if nil != err {
 		return frame, err
@@ -91,7 +91,7 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 
 	// now see if the message we got matches up with the DF format we decoded
 	if int(frame.getMessageLengthBytes()) != len(frame.message) {
-		return frame, fmt.Errorf("Frame has Incorrect length %d != %d", frame.getMessageLengthBytes(), len(frame.message))
+		return frame, fmt.Errorf("frame has incorrect length %d != %d", frame.getMessageLengthBytes(), len(frame.message))
 	}
 
 	err = frame.checkCrc()
@@ -185,13 +185,13 @@ func (f *Frame) parseRawToMessage() error {
 
 	// cheap bitwise even number check!
 	if 0 != (frameLen & 1) {
-		return fmt.Errorf("Frame is an odd length (%d), cannot decode unless length is even", frameLen)
+		return fmt.Errorf("frame is an odd length (%d), cannot decode unless length is even", frameLen)
 	}
 
 	messageLen := frameLen / 2
 
-	if ! (messageLen == MODES_SHORT_MSG_BYTES || messageLen == MODES_LONG_MSG_BYTES) {
-		return fmt.Errorf("Frame is incorrect length. %d != 7 or 14", messageLen)
+	if ! (messageLen == modesShortMsgBytes || messageLen == modesLongMsgBytes) {
+		return fmt.Errorf("frame is incorrect length. %d != 7 or 14", messageLen)
 	}
 
 	f.message = make([]byte, messageLen)
@@ -333,9 +333,9 @@ func (f *Frame) decode13bitAltitudeCode() error {
 		f.unit = modesUnitFeet
 
 		/* N is the 11 bit integer resulting from the removal of bit Q and M */
-		var msg2 int32 = int32(f.message[2])
-		var msg3 int32 = int32(f.message[3])
-		var n int32 = int32((msg2 & 31) << 6) | ((msg3 & 0x80) >> 2) | ((msg3 & 0x20) >> 1) | (msg3 & 15)
+		var msg2 = int32(f.message[2])
+		var msg3 = int32(f.message[3])
+		var n = int32((msg2 & 31) << 6) | ((msg3 & 0x80) >> 2) | ((msg3 & 0x20) >> 1) | (msg3 & 15)
 
 		if f.acQ {
 			// 25 ft increments
@@ -366,19 +366,19 @@ func (f *Frame) getMessageLengthBits() uint32 {
 	//if f.downLinkFormat & 0x10 != 0 {
 	if f.downLinkFormat & 0x10 != 0 {
 		if len(f.raw) == 14 {
-			return MODES_SHORT_MSG_BITS
+			return modesShortMsgBits
 		}
-		return MODES_LONG_MSG_BITS
+		return modesLongMsgBits
 	} else {
-		return MODES_SHORT_MSG_BITS
+		return modesShortMsgBits
 	}
 }
 
 func (f *Frame) getMessageLengthBytes() uint32 {
 	if f.downLinkFormat & 0x10 != 0 {
-		return MODES_LONG_MSG_BYTES
+		return modesLongMsgBytes
 	} else {
-		return MODES_SHORT_MSG_BYTES
+		return modesShortMsgBytes
 	}
 }
 
