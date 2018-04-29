@@ -11,22 +11,22 @@ import (
 )
 
 const (
-	MODES_UNIT_FEET = 0
-	MODES_UNIT_METRES = 1
-	DF17_FRAME_ID_CAT = "Aircraft Identification and Category"
-	DF17_FRAME_SURFACE_POS = "Surface Position"
-	DF17_FRAME_AIR_POS_BARO = "Airborne Position (with Barometric Altitude)"
-	DF17_FRAME_AIR_VELOCITY = "Airborne Velocity"
-	DF17_FRAME_AIR_VELOCITY_UNKNOWN = "Airborne Velocity (unknown sub type)"
-	DF17_FRAME_AIR_POS_GNSS = "Airborne Position (with GNSS Height)"
-	DF17_FRAME_TEST_MSG = "Test Message"
-	DF17_FRAME_TEST_MSG_SQUAWK = "Test Message with Squawk"
-	DF17_FRAME_SURFACE_SYS_STATUS = "Surface System Status"
-	DF17_FRAME_EMERG_PRIORITY = "Extended Squitter Aircraft Status (Emergency Or Priority)"
-	DF17_FRAME_EMERG_PRIORITY_UNKNOWN = "Unknown Emergency or Priority message"
-	DF17_FRAME_TCAS_RA = "Extended Squitter Aircraft Status (1090ES TCAS Resolution Advisory)"
-	DF17_FRAME_STATE_STATUS = "Target State and Status Message"
-	DF17_FRAME_AIRCRAFT_OPER = "Aircraft Operational Status Message"
+	modesUnitFeet                     = 0
+	modesUnitMetres                   = 1
+	DF17FrameIdCat                    = "Aircraft Identification and Category"
+	DF17FrameSurfacePos               = "Surface Position"
+	DF17FrameAirPositionBarometric    = "Airborne Position (with Barometric Altitude)"
+	DF17FrameAirVelocity              = "Airborne Velocity"
+	DF17FrameAirVelocityUnknown       = "Airborne Velocity (unknown sub type)"
+	DF17FrameAirPositionGnss          = "Airborne Position (with GNSS Height)"
+	DF17FrameTestMessage              = "Test Message"
+	DF17FrameTestMessageSquawk        = "Test Message with Squawk"
+	DF17FrameSurfaceSystemStatus      = "Surface System Status"
+	DF17FrameEmergencyPriority        = "Extended Squitter Aircraft Status (Emergency Or Priority)"
+	DF17FrameEmergencyPriorityUnknown = "Unknown Emergency or Priority message"
+	DF17FrameTcasRA                   = "Extended Squitter Aircraft Status (1090ES TCAS Resolution Advisory)"
+	DF17FrameTargetStateStatus        = "Target State and Status Message"
+	DF17FrameAircraftOperational      = "Aircraft Operational Status Message"
 )
 
 type Position struct {
@@ -79,14 +79,14 @@ type df17 struct {
 	cccHasUATReceiver       bool
 	validNacV               bool
 
-	operationalModeCode     int
-	adsbVersion             byte
-	nacP                    byte   // Navigation accuracy category - position
-	geoVertAccuracy         byte   // geometric vertical accuracy
-	sil                     byte
-	airframe_width_len      byte
-	nicCrossCheck           byte   // whether or not the alt or heading is cross checked
-	northReference          byte   // 0=true north, 1 = magnetic north
+	operationalModeCode int
+	adsbVersion         byte
+	nacP                byte   // Navigation accuracy category - position
+	geoVertAccuracy     byte   // geometric vertical accuracy
+	sil                 byte
+	airframeWidthLen    byte
+	nicCrossCheck       byte   // whether or not the alt or heading is cross checked
+	northReference      byte   // 0=true north, 1 = magnetic north
 
 	surveillanceStatus      byte
 	nicSupplementA          byte
@@ -99,7 +99,7 @@ type df17 struct {
 	nacV                    byte
 }
 
-type raw_fields struct {
+type rawFields struct {
 	// fields named what they are. see describe.go for what they mean
 
 	df, vs, ca, cc, sl, ri, dr, um, fs byte
@@ -108,7 +108,7 @@ type raw_fields struct {
 	md                                 [10]byte
 
 	// altitude decoding
-	ac_q, ac_m                         bool
+	acQ, acM bool
 
 	// adsb decoding
 	catType, catSubType                byte
@@ -116,7 +116,7 @@ type raw_fields struct {
 }
 
 type Frame struct {
-	raw_fields
+	rawFields
 	bds
 	df17
 	Position
@@ -183,7 +183,7 @@ var (
 		5:  "Unlawful interference (squawk 7500)",
 		6:  "Downed Aircraft",
 		7:  "Reserved",
-	};
+	}
 
 	replyInformationField = map[byte]string{
 		0: "No on-board TCAS.",
@@ -215,7 +215,7 @@ var (
 		"TCAS sensitivity level 7.",
 	}
 
-	aisCharset string = "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456789??????"
+	aisCharset = "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456789??????"
 
 	downlinkRequestField = []string{
 		0: "No downlink request.",
@@ -322,47 +322,47 @@ var (
 	}
 )
 
-func (df *Frame) MessageTypeString() string {
-	var name string = "Unknown"
-	if df.messageType >= 1 && df.messageType <= 4 {
-		name = DF17_FRAME_ID_CAT
-	} else if df.messageType >= 5 && df.messageType <= 8 {
-		name = DF17_FRAME_SURFACE_POS
-	} else if df.messageType >= 9 && df.messageType <= 18 {
-		name = DF17_FRAME_AIR_POS_BARO
-	} else if df.messageType == 19 {
-		if df.messageSubType >= 1 && df.messageSubType <= 4 {
-			name = DF17_FRAME_AIR_VELOCITY
+func (f *Frame) MessageTypeString() string {
+	name := "Unknown"
+	if f.messageType >= 1 && f.messageType <= 4 {
+		name = DF17FrameIdCat
+	} else if f.messageType >= 5 && f.messageType <= 8 {
+		name = DF17FrameSurfacePos
+	} else if f.messageType >= 9 && f.messageType <= 18 {
+		name = DF17FrameAirPositionBarometric
+	} else if f.messageType == 19 {
+		if f.messageSubType >= 1 && f.messageSubType <= 4 {
+			name = DF17FrameAirVelocity
 		} else {
-			name = DF17_FRAME_AIR_VELOCITY_UNKNOWN
+			name = DF17FrameAirVelocityUnknown
 		}
-	} else if df.messageType >= 20 && df.messageType <= 22 {
-		name = DF17_FRAME_AIR_POS_GNSS
-	} else if df.messageType == 23 {
-		if df.messageSubType == 7 {
-			name = DF17_FRAME_TEST_MSG_SQUAWK
+	} else if f.messageType >= 20 && f.messageType <= 22 {
+		name = DF17FrameAirPositionGnss
+	} else if f.messageType == 23 {
+		if f.messageSubType == 7 {
+			name = DF17FrameTestMessageSquawk
 		} else {
-			name = DF17_FRAME_TEST_MSG
+			name = DF17FrameTestMessage
 		}
-	} else if df.messageType == 24 && df.messageSubType == 1 {
-		name = DF17_FRAME_SURFACE_SYS_STATUS
-	} else if df.messageType == 28 {
-		if df.messageSubType == 1 {
-			name = DF17_FRAME_EMERG_PRIORITY
+	} else if f.messageType == 24 && f.messageSubType == 1 {
+		name = DF17FrameSurfaceSystemStatus
+	} else if f.messageType == 28 {
+		if f.messageSubType == 1 {
+			name = DF17FrameEmergencyPriority
 
-		} else if df.messageSubType == 2 {
-			name = DF17_FRAME_TCAS_RA
+		} else if f.messageSubType == 2 {
+			name = DF17FrameTcasRA
 		} else {
-			name = DF17_FRAME_EMERG_PRIORITY_UNKNOWN
+			name = DF17FrameEmergencyPriorityUnknown
 		}
-	} else if df.messageType == 29 {
-		if (df.messageSubType == 0 || df.messageSubType == 1) {
-			name = DF17_FRAME_STATE_STATUS
+	} else if f.messageType == 29 {
+		if f.messageSubType == 0 || f.messageSubType == 1 {
+			name = DF17FrameTargetStateStatus
 		} else {
-			name = fmt.Sprintf("%s (Unknown Sub Message %d)", DF17_FRAME_STATE_STATUS, df.messageSubType);
+			name = fmt.Sprintf("%s (Unknown Sub Message %d)", DF17FrameTargetStateStatus, f.messageSubType)
 		}
-	} else if df.messageType == 31 && (df.messageSubType == 0 || df.messageSubType == 1) {
-		name = DF17_FRAME_AIRCRAFT_OPER
+	} else if f.messageType == 31 && (f.messageSubType == 0 || f.messageSubType == 1) {
+		name = DF17FrameAircraftOperational
 	}
 	return name
 }
@@ -390,11 +390,11 @@ func (f *Frame) Altitude() (int32, error) {
 	if f.validAltitude {
 		return f.altitude, nil
 	}
-	return 0, fmt.Errorf("Altitude is not valid")
+	return 0, fmt.Errorf("altitude is not valid")
 }
 
 func (f *Frame) AltitudeUnits() string {
-	if f.unit == MODES_UNIT_METRES {
+	if f.unit == modesUnitMetres {
 		return "metres"
 	} else {
 		return "feet"
@@ -417,7 +417,7 @@ func (f *Frame) Velocity() (float64, error) {
 	if f.validVelocity {
 		return f.velocity, nil
 	}
-	return 0, fmt.Errorf("Velocity is not valid")
+	return 0, fmt.Errorf("velocity is not valid")
 }
 
 func (f *Frame) VelocityValid() bool {
@@ -428,7 +428,7 @@ func (f *Frame) Heading() (float64, error) {
 	if f.validHeading {
 		return f.heading, nil
 	}
-	return 0, fmt.Errorf("Heading is not valid")
+	return 0, fmt.Errorf("heading is not valid")
 }
 
 func (f *Frame) HeadingValid() bool {
@@ -439,7 +439,7 @@ func (f *Frame) VerticalRate() (int, error) {
 	if f.validVerticalRate {
 		return f.verticalRate, nil
 	}
-	return 0, fmt.Errorf("Vertical Rate is not valid")
+	return 0, fmt.Errorf("vertical rate (VR) is not valid")
 }
 
 func (f *Frame) VerticalRateValid() bool {
@@ -462,7 +462,7 @@ func (f *Frame) OnGround() (bool, error) {
 	if f.validVerticalStatus {
 		return f.onGround, nil
 	}
-	return false, fmt.Errorf("Vertical Status is not valid")
+	return false, fmt.Errorf("vertical status (VS) is not valid")
 }
 func (f *Frame) VerticalStatusValid() bool {
 	return f.validVerticalStatus
@@ -479,21 +479,21 @@ func (f *Frame) Category() string {
 	return aircraftCategory[f.catType][f.catSubType]
 }
 
-func (df *Frame) MessageType() byte {
-	return df.messageType
+func (f *Frame) MessageType() byte {
+	return f.messageType
 }
 
-func (df *Frame) MessageSubType() byte {
-	return df.messageSubType
+func (f *Frame) MessageSubType() byte {
+	return f.messageSubType
 }
 
 // Whether or not this frame is even or odd, for CPR Location
-func (df *Frame) IsEven() bool {
-	return df.cprFlagOddEven == 0
+func (f *Frame) IsEven() bool {
+	return f.cprFlagOddEven == 0
 }
 
-func (df *Frame) FlightNumber() string {
-	return string(df.flight)
+func (f *Frame) FlightNumber() string {
+	return string(f.flight)
 }
 
 /**
@@ -503,31 +503,31 @@ func (df *Frame) FlightNumber() string {
  * Note: For ADS-B versions < 2, this is inaccurate for NIC class 6, since there was
  * no NIC supplement B in earlier versions.
  */
-func (f *Frame) ContainmentRadiusLimit(nic_suppl_a bool) (float64, error) {
+func (f *Frame) ContainmentRadiusLimit(nicSupplA bool) (float64, error) {
 	var radius float64
 	var err error
 	if f.downLinkFormat != 17 {
 		return radius, fmt.Errorf("ContainmentRadiusLimit Only valid for ADS-B Airborne Position Messages")
 	}
-	switch (f.messageType) {
+	switch f.messageType {
 	case 0, 18, 22:
-		err = fmt.Errorf("Unknown Containment Radius")
+		err = fmt.Errorf("unknown containment radius")
 	case 9, 20:
-		radius = 7.5;
+		radius = 7.5
 	case 10, 21:
-		radius = 25;
+		radius = 25
 	case 11:
-		if nic_suppl_a {
+		if nicSupplA {
 			radius = 75
 		} else {
 			radius = 185.2
 		}
 	case 12:
-		radius = 370.4;
+		radius = 370.4
 	case 13:
 		if 0 == f.nicSupplementB {
 			radius = 926
-		} else if nic_suppl_a {
+		} else if nicSupplA {
 			radius = 1111.2
 		} else {
 			radius = 555.6
@@ -537,57 +537,57 @@ func (f *Frame) ContainmentRadiusLimit(nic_suppl_a bool) (float64, error) {
 	case 15:
 		radius = 3704
 	case 16:
-		if nic_suppl_a {
+		if nicSupplA {
 			radius = 7408
 		} else {
 			radius = 14816
 		}
 	case 17:
-		radius = 37040;
+		radius = 37040
 	default:
-		radius = 0;
+		radius = 0
 	}
 
 	return radius, err
 }
 
-func (f *Frame) NavigationIntegrityCategory(nic_suppl_a bool) (byte, error) {
+func (f *Frame) NavigationIntegrityCategory(nicSupplA bool) (byte, error) {
 	var nic byte
 	var err error
 	if f.downLinkFormat != 17 {
 		return nic, fmt.Errorf("ContainmentRadiusLimit Only valid for ADS-B Airborne Position Messages")
 	}
-	switch (f.messageType) {
+	switch f.messageType {
 	case 0, 18, 22:
-		err = fmt.Errorf("Unknown Navigation Integrity Category");
+		err = fmt.Errorf("unknown navigation integrity category")
 	case 9, 20:
-		nic = 11;
+		nic = 11
 	case 10: case 21:
-		nic = 10;
+		nic = 10
 	case 11:
-		if nic_suppl_a {
-			nic = 9;
+		if nicSupplA {
+			nic = 9
 		}else {
 			nic = 8
 		}
 	case 12:
-		nic = 7;
+		nic = 7
 	case 13:
-		nic = 6;
+		nic = 6
 	case 14:
-		nic = 5;
+		nic = 5
 	case 15:
-		nic = 4;
+		nic = 4
 	case 16:
-		if nic_suppl_a {
+		if nicSupplA {
 			nic = 3
 		} else {
 			nic = 2
 		}
 	case 17:
-		nic = 1;
+		nic = 1
 	default:
-		nic = 0;
+		nic = 0
 	}
 
 	return nic, err
@@ -598,12 +598,12 @@ func (f *Frame) NavigationIntegrityCategory(nic_suppl_a bool) (byte, error) {
  */
 func (f *Frame)getAirplaneLengthWidth() (float32, float32, error) {
 	if ! (f.messageType == 31 && f.messageSubType == 1) {
-		return 0, 0, fmt.Errorf("Can only get aircraft size from ADSB message 31 sub type 1")
+		return 0, 0, fmt.Errorf("can only get aircraft size from ADSB message 31 sub type 1")
 	}
 	var length, width float32
 	var err error
 
-	switch (f.airframe_width_len) {
+	switch f.airframeWidthLen {
 	case 1:
 		length = 15
 		width = 23
@@ -650,7 +650,7 @@ func (f *Frame)getAirplaneLengthWidth() (float32, float32, error) {
 		length = 85
 		width = 90
 	default:
-		err = fmt.Errorf("Unable to determine airframes size")
+		err = fmt.Errorf("unable to determine airframes size")
 	}
 
 	return length, width, err

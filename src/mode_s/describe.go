@@ -360,63 +360,63 @@ var frameFeatures = map[byte][]featureBreakdown{
 	},
 }
 
-func (frame *Frame) Describe(output io.Writer) {
+func (f *Frame) Describe(output io.Writer) {
 	fmt.Fprintf(output, "MODE S Packet:\n")
-	fmt.Fprintf(output, "Length              : %d bits\n", frame.getMessageLengthBits())
-	fmt.Fprintf(output, "Frame               : %s\n", frame.raw)
-	fmt.Fprintf(output, "DF: Downlink Format : (%d) %s\n", frame.downLinkFormat, frame.DownLinkFormat())
+	fmt.Fprintf(output, "Length              : %d bits\n", f.getMessageLengthBits())
+	fmt.Fprintf(output, "Frame               : %s\n", f.raw)
+	fmt.Fprintf(output, "DF: Downlink Format : (%d) %s\n", f.downLinkFormat, f.DownLinkFormat())
 	// decode the specific DF type
-	switch frame.downLinkFormat {
+	switch f.downLinkFormat {
 	case 0:
-		frame.showVerticalStatus(output)
-		frame.showCrossLinkCapability(output)
-		frame.showSensitivityLevel(output)
-		frame.showReplyInformation(output)
-		frame.showAltitude(output)
+		f.showVerticalStatus(output)
+		f.showCrossLinkCapability(output)
+		f.showSensitivityLevel(output)
+		f.showReplyInformation(output)
+		f.showAltitude(output)
 	case 4:
-		frame.showFlightStatus(output)
-		frame.showDownLinkRequest(output)
-		frame.showUtilityMessage(output)
-		frame.showAltitude(output)
+		f.showFlightStatus(output)
+		f.showDownLinkRequest(output)
+		f.showUtilityMessage(output)
+		f.showAltitude(output)
 	case 5:
-		frame.showFlightStatus(output)
-		frame.showDownLinkRequest(output)
-		frame.showUtilityMessage(output)
-		frame.showIdentity(output)
+		f.showFlightStatus(output)
+		f.showDownLinkRequest(output)
+		f.showUtilityMessage(output)
+		f.showIdentity(output)
 	case 11:
-		frame.showCapability(output)
-		frame.showICAO(output)
+		f.showCapability(output)
+		f.showICAO(output)
 	case 16:
-		frame.showVerticalStatus(output)
-		frame.showSensitivityLevel(output)
-		frame.showReplyInformation(output)
-		frame.showAltitude(output)
+		f.showVerticalStatus(output)
+		f.showSensitivityLevel(output)
+		f.showReplyInformation(output)
+		f.showAltitude(output)
 	case 17:
-		frame.showCapability(output)
-		frame.showICAO(output)
-		frame.showAdsb(output)
+		f.showCapability(output)
+		f.showICAO(output)
+		f.showAdsb(output)
 	case 18: //DF_18
-		//frame.showCapability() // control field
-		if 0 == frame.ca {
-			frame.showCapability(output)
-			frame.showICAO(output)
-			frame.showAdsb(output)
+		//f.showCapability() // control field
+		if 0 == f.ca {
+			f.showCapability(output)
+			f.showICAO(output)
+			f.showAdsb(output)
 		} else {
-			fmt.Fprintln(output, "Unable to decode DF18 Capability:", frame.ca)
+			fmt.Fprintln(output, "Unable to decode DF18 Capability:", f.ca)
 		}
 	case 20: //DF_20
-		frame.showFlightStatus(output)
-		frame.showAltitude(output)
-		frame.showFlightNumber(output)
-		frame.showBdsData(output)
+		f.showFlightStatus(output)
+		f.showAltitude(output)
+		f.showFlightNumber(output)
+		f.showBdsData(output)
 	case 21: //DF_21
-		frame.showFlightStatus(output)
-		frame.showIdentity(output) // gillham encoded squawk
-		frame.showFlightNumber(output)
-		frame.showBdsData(output)
+		f.showFlightStatus(output)
+		f.showIdentity(output) // gillham encoded squawk
+		f.showFlightNumber(output)
+		f.showBdsData(output)
 	}
 
-	frame.showBitString(output)
+	f.showBitString(output)
 
 }
 
@@ -445,7 +445,7 @@ func (f *Frame) showCrossLinkCapability(output io.Writer) {
 
 func (f *Frame) showAltitude(output io.Writer) {
 	if f.validAltitude {
-		fmt.Fprintf(output, "AC: Altitude        : %d %s (q bit: %t, m bit: %t)\n", f.altitude, f.AltitudeUnits(), f.ac_q, f.ac_m)
+		fmt.Fprintf(output, "AC: Altitude        : %d %s (q bit: %t, m bit: %t)\n", f.altitude, f.AltitudeUnits(), f.acQ, f.acM)
 	} else {
 		fmt.Fprintln(output, "AC: Altitude        : Invalid")
 	}
@@ -718,11 +718,11 @@ func (f *Frame) showBitString(output io.Writer) {
 	}
 }
 
-func (frame *Frame) formatBitString(features []featureBreakdown) string {
+func (f *Frame) formatBitString(features []featureBreakdown) string {
 	var header, separator, bits, rawBits, bitFmt, bitDesc, footer, suffix string
 	var padLen, realLen, shownBitCount, i int
 
-	for _, i := range frame.message {
+	for _, i := range f.message {
 		rawBits += fmt.Sprintf("%08s", strconv.FormatUint(uint64(i), 2))
 	}
 
@@ -759,14 +759,14 @@ func (frame *Frame) formatBitString(features []featureBreakdown) string {
 	}
 
 	for _, f := range features {
-		if 0 == len(f.subFields[frame.messageType]) {
+		if 0 == len(f.subFields[f.messageType]) {
 			doMakeBitString(f)
 		} else {
-			for _, sf := range f.subFields[frame.messageType] {
-				if 0 == len(sf.subFields[frame.messageSubType]) {
+			for _, sf := range f.subFields[f.messageType] {
+				if 0 == len(sf.subFields[f.messageSubType]) {
 					doMakeBitString(sf)
 				} else {
-					for _, ssf := range sf.subFields[frame.messageSubType] {
+					for _, ssf := range sf.subFields[f.messageSubType] {
 						doMakeBitString(ssf)
 					}
 				}
@@ -774,5 +774,5 @@ func (frame *Frame) formatBitString(features []featureBreakdown) string {
 		}
 	}
 
-	return fmt.Sprintf("\n%s\n%s\n%s\n%s\n%s\n\n%s\n%d/%d bits shown\n", header, separator, bits, separator, bitDesc, footer, shownBitCount, frame.getMessageLengthBits())
+	return fmt.Sprintf("\n%s\n%s\n%s\n%s\n%s\n\n%s\n%d/%d bits shown\n", header, separator, bits, separator, bitDesc, footer, shownBitCount, f.getMessageLengthBits())
 }

@@ -210,7 +210,7 @@ func (f *Frame) decodeAdsb() {
 			f.validVerticalStatus = true
 			f.onGround = true
 			f.compatibilityClass = int(f.message[5]) << 4 | int(f.message[6] & 0xF0) >> 4
-			f.airframe_width_len = f.message[6] & 0x0F
+			f.airframeWidthLen = f.message[6] & 0x0F
 
 			if f.compatibilityClass & 0xC000 == 0 {
 				f.cccHasLowTxPower = bp((f.compatibilityClass & 0x200) != 0)

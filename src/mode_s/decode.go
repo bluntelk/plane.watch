@@ -323,21 +323,21 @@ func (f *Frame) decode13bitAltitudeCode() error {
 	f.ac = uint32(f.message[2] & 0xf) << 8 | uint32(f.message[3])
 
 	// altitude
-	f.ac_m = f.ac & 0x40 == 0x40 // bit 26 of message. 0 == feet, 1 = metres
+	f.acM = f.ac & 0x40 == 0x40 // bit 26 of message. 0 == feet, 1 = metres
 	// resolution
-	f.ac_q = f.ac & 0x10 == 0x10 // bit 28 of message. 1 = 25 ft encoding, 0 = Gillham Mode C encoding
+	f.acQ = f.ac & 0x10 == 0x10 // bit 28 of message. 1 = 25 ft encoding, 0 = Gillham Mode C encoding
 
 	// make sure all the bits are good
 
-	if !f.ac_m {
-		f.unit = MODES_UNIT_FEET
+	if !f.acM {
+		f.unit = modesUnitFeet
 
 		/* N is the 11 bit integer resulting from the removal of bit Q and M */
 		var msg2 int32 = int32(f.message[2])
 		var msg3 int32 = int32(f.message[3])
 		var n int32 = int32((msg2 & 31) << 6) | ((msg3 & 0x80) >> 2) | ((msg3 & 0x20) >> 1) | (msg3 & 15)
 
-		if f.ac_q {
+		if f.acQ {
 			// 25 ft increments
 			/* The final altitude is due to the resulting number multiplied
 			 * by 25, minus 1000. */
@@ -357,7 +357,7 @@ func (f *Frame) decode13bitAltitudeCode() error {
 			f.validAltitude = true
 		}
 	} else {
-		f.unit = MODES_UNIT_METRES
+		f.unit = modesUnitMetres
 	}
 	return nil
 }

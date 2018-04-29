@@ -112,7 +112,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 		// if performance is an issue, change over to byte comparing
 		messageType := frame.MessageTypeString()
 		switch messageType {
-		case mode_s.DF17_FRAME_ID_CAT: // "Aircraft Identification and Category"
+		case mode_s.DF17FrameIdCat: // "Aircraft Identification and Category"
 			{
 				plane.Flight.Identifier = frame.FlightNumber()
 				if frame.ValidCategory() {
@@ -121,7 +121,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				hasChanged = true
 				break
 			}
-		case mode_s.DF17_FRAME_SURFACE_POS: // "Surface Position"
+		case mode_s.DF17FrameSurfacePos: // "Surface Position"
 			{
 				if frame.HeadingValid() {
 					plane.Location.Heading, _ = frame.Heading()
@@ -147,7 +147,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				hasChanged = true
 				break
 			}
-		case mode_s.DF17_FRAME_AIR_POS_BARO: // "Airborne Position (with Barometric Altitude)"
+		case mode_s.DF17FrameAirPositionBarometric: // "Airborne Position (with Barometric Altitude)"
 			{
 				if frame.VerticalStatusValid() {
 					plane.Location.onGround, _ = frame.OnGround()
@@ -170,7 +170,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 
 				break
 			}
-		case mode_s.DF17_FRAME_AIR_VELOCITY: // "Airborne Velocity"
+		case mode_s.DF17FrameAirVelocity: // "Airborne Velocity"
 			{
 				if frame.HeadingValid() {
 					plane.Location.Heading, _ = frame.Heading()
@@ -191,17 +191,17 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				hasChanged = true
 				break
 			}
-		case mode_s.DF17_FRAME_AIR_POS_GNSS: // "Airborne Position (GNSS Height)"
+		case mode_s.DF17FrameAirPositionGnss: // "Airborne Position (GNSS Height)"
 			{
 				debugMessage("\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
 			}
-		case mode_s.DF17_FRAME_TEST_MSG: //, "Test Message":
+		case mode_s.DF17FrameTestMessage: //, "Test Message":
 			if debug {
 				debugMessage("\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 			}
 			break
-		case mode_s.DF17_FRAME_TEST_MSG_SQUAWK: //, "Test Message":
+		case mode_s.DF17FrameTestMessageSquawk: //, "Test Message":
 			{
 				if frame.SquawkIdentity() > 0 {
 					hasChanged = plane.SquawkIdentity != frame.SquawkIdentity()
@@ -209,12 +209,12 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				}
 				break
 			}
-		case mode_s.DF17_FRAME_SURFACE_SYS_STATUS: //, "Surface System Status":
+		case mode_s.DF17FrameSurfaceSystemStatus: //, "Surface System Status":
 			{
 				debugMessage("\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
 			}
-		case mode_s.DF17_FRAME_EMERG_PRIORITY: //, "Extended Squitter Aircraft Status (Emergency)":
+		case mode_s.DF17FrameEmergencyPriority: //, "Extended Squitter Aircraft Status (Emergency)":
 			{
 				debugMessage("\033[2m %s\033[0m", messageType)
 				plane.Special = "Emergency"
@@ -222,17 +222,17 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 				hasChanged = true
 				break
 			}
-		case mode_s.DF17_FRAME_TCAS_RA: //, "Extended Squitter Aircraft Status (1090ES TCAS RA)":
+		case mode_s.DF17FrameTcasRA: //, "Extended Squitter Aircraft Status (1090ES TCAS RA)":
 			{
 				debugMessage("\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
 			}
-		case mode_s.DF17_FRAME_STATE_STATUS: //, "Target State and Status Message":
+		case mode_s.DF17FrameTargetStateStatus: //, "Target State and Status Message":
 			{
 				debugMessage("\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
 			}
-		case mode_s.DF17_FRAME_AIRCRAFT_OPER: //, "Aircraft Operational Status Message":
+		case mode_s.DF17FrameAircraftOperational: //, "Aircraft Operational Status Message":
 			{
 				debugMessage("\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
