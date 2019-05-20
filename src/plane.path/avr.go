@@ -5,9 +5,9 @@ import (
 	"github.com/urfave/cli"
 	"io/ioutil"
 	"mode_s"
+	"os"
 	"time"
 	"tracker"
-	"os"
 )
 
 func parseAvr(c *cli.Context) error {

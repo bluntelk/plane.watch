@@ -33,16 +33,16 @@ func main() {
 
 	app.Commands = []cli.Command{
 		{
-			Name:   "avr",
-			Usage:  "Renders all the plane paths found in an AVR file",
-			Action: parseAvr,
+			Name:      "avr",
+			Usage:     "Renders all the plane paths found in an AVR file",
+			Action:    parseAvr,
 			ArgsUsage: "[outfile if not --stdout] input-file.txt [input-file.gz [input-file.bz2]]",
 		},
 		{
-			Name:    "sbs",
-			Aliases: []string{"sbs1"},
-			Usage:   "Renders all the plane paths found in an SBS file",
-			Action:  parseSbs,
+			Name:      "sbs",
+			Aliases:   []string{"sbs1"},
+			Usage:     "Renders all the plane paths found in an SBS file",
+			Action:    parseSbs,
 			ArgsUsage: "[outfile if not --stdout] input-file.txt [input-file.gz [input-file.bz2]]",
 		},
 	}

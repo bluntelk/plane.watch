@@ -1,0 +1,12 @@
+github.com/BurntSushi/toml v0.0.0-20160717150709-99064174e013/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
+github.com/jonas-p/go-shp v0.0.0-20160202124213-6eb7c6fa8ff9/go.mod h1:MRIhyxDQ6VVp0oYeD7yPGr5RSTNScUFKCDsI5DR7PtI=
+github.com/kpawlik/geojson v0.0.0-20160808105647-03fc5b389cd1 h1:yz8+106y9bmjmTcj4n59bTvZxWtxbbdEYkSdltbjPr4=
+github.com/kpawlik/geojson v0.0.0-20160808105647-03fc5b389cd1/go.mod h1:qKaqI0FuzSzLI6RtBrhVXqM5wjknuGYU2e8KVG+Z1MM=
+github.com/kpawlik/geojson v0.0.0-20171201195549-1a4f120c6b41 h1:hmhQApZRZctFnYW02XZBC9jKR31R7c4QbXbqBtQGZeg=
+github.com/kpawlik/geojson v0.0.0-20171201195549-1a4f120c6b41/go.mod h1:qKaqI0FuzSzLI6RtBrhVXqM5wjknuGYU2e8KVG+Z1MM=
+github.com/streadway/amqp v0.0.0-20160311215503-2e25825abdbd/go.mod h1:1WNBiOZtZQLpVAyu0iTduoJL9hEsMloAK5XWrtW0xdY=
+github.com/urfave/cli v0.0.0-20160801031116-168c95418e66 h1:m/zAWqYuR3XCQ/dBvyPPs+2wEUru3Ndb41zQlr9z8KQ=
+github.com/urfave/cli v0.0.0-20160801031116-168c95418e66/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
+github.com/urfave/cli v1.20.0 h1:fDqGv3UG/4jbVl/QkFwEdddtEDjh/5Ov6X+0B/3bPaw=
+github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
+gopkg.in/yaml.v2 v2.0.0-20160301204022-a83829b6f129/go.mod h1:JAlM8MvJe8wmxCU4Bli9HhUf9+ttbYbLASfIpnQbh74=

@@ -1,23 +1,23 @@
 package main
 
 import (
-	"github.com/codegangsta/cli"
-	"os"
-	"log"
-	"mode_s"
 	"encoding/json"
-	"time"
-	"tracker"
 	"fmt"
 	"github.com/streadway/amqp"
+	"github.com/urfave/cli"
+	"log"
+	"mode_s"
+	"os"
+	"time"
+	"tracker"
 )
 
 var (
 	pw_host, pw_user, pw_pass, pw_vHost string
-	pw_port int
-	showDebug bool
-	dump1090_host string
-	dump1090_port string
+	pw_port                             int
+	showDebug                           bool
+	dump1090_host                       string
+	dump1090_port                       string
 )
 
 func main() {
@@ -30,76 +30,76 @@ func main() {
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name: "pw_host",
-			Value: "mq.plane.watch",
-			Usage: "How we connect to plane.watch",
+			Name:        "pw_host",
+			Value:       "mq.plane.watch",
+			Usage:       "How we connect to plane.watch",
 			Destination: &pw_host,
-			EnvVar: "PW_HOST",
+			EnvVar:      "PW_HOST",
 		},
 		cli.StringFlag{
-			Name: "pw_user",
-			Value: "",
-			Usage: "user for plane.watch",
+			Name:        "pw_user",
+			Value:       "",
+			Usage:       "user for plane.watch",
 			Destination: &pw_user,
-			EnvVar: "PW_USER",
+			EnvVar:      "PW_USER",
 		},
 		cli.StringFlag{
-			Name: "pw_pass",
-			Value: "",
-			Usage: "plane.watch password",
+			Name:        "pw_pass",
+			Value:       "",
+			Usage:       "plane.watch password",
 			Destination: &pw_pass,
-			EnvVar: "PW_PASS",
+			EnvVar:      "PW_PASS",
 		},
 		cli.IntFlag{
-			Name: "pw_port",
-			Value: 5672,
-			Usage: "How we connect to plane.watch",
+			Name:        "pw_port",
+			Value:       5672,
+			Usage:       "How we connect to plane.watch",
 			Destination: &pw_port,
-			EnvVar: "PW_PORT",
+			EnvVar:      "PW_PORT",
 		},
 		cli.StringFlag{
-			Name: "pw_vhost",
-			Value: "/pw_feedin",
-			Usage: "the virtual host on the plane watch rabbit server",
+			Name:        "pw_vhost",
+			Value:       "/pw_feedin",
+			Usage:       "the virtual host on the plane watch rabbit server",
 			Destination: &pw_vHost,
-			EnvVar: "PW_VHOST",
+			EnvVar:      "PW_VHOST",
 		},
 		cli.StringFlag{
-			Name: "dump1090_host",
-			Value: "localhost",
-			Usage: "The host to read dump1090 from",
+			Name:        "dump1090_host",
+			Value:       "localhost",
+			Usage:       "The host to read dump1090 from",
 			Destination: &dump1090_host,
-			EnvVar: "DUMP1090_HOST",
+			EnvVar:      "DUMP1090_HOST",
 		},
 		cli.StringFlag{
-			Name: "dump1090_port",
-			Value: "30002",
-			Usage: "The port to read dump1090 from",
+			Name:        "dump1090_port",
+			Value:       "30002",
+			Usage:       "The port to read dump1090 from",
 			Destination: &dump1090_port,
-			EnvVar: "DUMP1090_PORT",
+			EnvVar:      "DUMP1090_PORT",
 		},
 		cli.BoolFlag{
-			Name: "debug",
-			Usage: "Show Extra Debug Information",
+			Name:        "debug",
+			Usage:       "Show Extra Debug Information",
 			Destination: &showDebug,
-			EnvVar: "DEBUG",
+			EnvVar:      "DEBUG",
 		},
 	}
 
 	app.Commands = []cli.Command{
 		{
-			Name: "test",
-			Usage: "Tests the configuration",
+			Name:   "test",
+			Usage:  "Tests the configuration",
 			Action: test,
 		},
 		{
-			Name: "loveme",
-			Usage: "Show me some love baby",
+			Name:   "loveme",
+			Usage:  "Show me some love baby",
 			Action: love,
 		},
 		{
-			Name: "run",
-			Usage: "Gather ADSB data and sends it to plane.watch",
+			Name:   "run",
+			Usage:  "Gather ADSB data and sends it to plane.watch",
 			Action: run,
 		},
 	}
@@ -189,10 +189,9 @@ func run(c *cli.Context) {
 
 		if nil != plane {
 			planeJson, _ := json.Marshal(plane);
-
 			msg := amqp.Publishing{
 				ContentType: "application/json",
-				Body: planeJson,
+				Body:        planeJson,
 			}
 			if showDebug {
 				log.Println("Sending message to plane.watch for plane:", plane.Icao)

@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 	"github.com/urfave/cli"
+	"io/ioutil"
+	"os"
 	"sbs1"
 	"time"
 	"tracker"
-	"io/ioutil"
-	"os"
 )
 
 func parseSbs(c *cli.Context) error {
