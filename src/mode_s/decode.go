@@ -1,12 +1,12 @@
 package mode_s
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
-	"errors"
 )
 
 const (
@@ -26,7 +26,7 @@ type ReceivedFrame struct {
 	Time  time.Time
 }
 
-func DecodeStringWorker(jobs <-chan ReceivedFrame, results chan <- Frame, errors chan <- error) {
+func DecodeStringWorker(jobs <-chan ReceivedFrame, results chan<- Frame, errors chan<- error) {
 	for s := range jobs {
 		frame, err := DecodeString(s.Frame, s.Time)
 		if nil != err {
@@ -53,7 +53,6 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	if len(encodedFrame) < 14 {
 		return frame, errors.New("frame too short to be a Mode S frame")
 	}
-
 
 	// determine what type of frame we are dealing with
 	if encodedFrame[0] == '@' {
@@ -106,12 +105,12 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 		frame.decodeCrossLinkCapability()
 		frame.decodeSensitivityLevel()
 		frame.decodeReplyInformation()
-		frame.decode13bitAltitudeCode()
+		_ = frame.decode13bitAltitudeCode()
 	case 4:
 		frame.decodeFlightStatus()
 		frame.decodeDownLinkRequest()
 		frame.decodeUtilityMessage()
-		frame.decode13bitAltitudeCode()
+		_ = frame.decode13bitAltitudeCode()
 	case 5: //DF_5
 		frame.decodeFlightStatus()
 		frame.decodeDownLinkRequest()
@@ -122,14 +121,14 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 		frame.decodeCapability()
 	case 16: //DF_16
 		frame.decodeVerticalStatus()
-		frame.decode13bitAltitudeCode()
+		_ = frame.decode13bitAltitudeCode()
 		frame.decodeReplyInformation()
 		frame.decodeSensitivityLevel()
 	case 17: //DF_17
 		frame.decodeICAO()
 		frame.decodeCapability()
 		frame.decodeAdsb()
-	case 18: //DF_18
+	case 18:                     //DF_18
 		frame.decodeCapability() // control field
 		if 0 == frame.ca {
 			frame.decodeICAO()
@@ -137,7 +136,7 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 		}
 	case 20: //DF_20
 		frame.decodeFlightStatus()
-		frame.decode13bitAltitudeCode()
+		_ = frame.decode13bitAltitudeCode()
 		//frame.decodeCommB()
 	case 21: //DF_21
 		frame.decodeFlightStatus()
@@ -150,7 +149,7 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 
 func (f *Frame) decodeDownLinkFormat() {
 	// DF24 is a little different. if the first two bits of the message are set, it is a DF24 message
-	if f.message[0] & 0xc0 == 0xc0 {
+	if f.message[0]&0xc0 == 0xc0 {
 		f.downLinkFormat = 24
 	} else {
 		// get the down link format (DF) - first 5 bits
@@ -199,7 +198,7 @@ func (f *Frame) parseRawToMessage() error {
 
 	index := 0
 	for i := 0; i < len(f.raw); i += 2 {
-		pair := f.raw[i : i + 2]
+		pair := f.raw[i : i+2]
 		myInt, err := strconv.ParseUint(pair, 16, 8)
 
 		if err != nil {
@@ -261,7 +260,7 @@ func (f *Frame) decodeVerticalStatus() {
 
 // bits 13,14,15 and 16 make up the RI field
 func (f *Frame) decodeReplyInformation() {
-	f.ri = (f.message[1] & 7) << 1 | (f.message[2] & 0x80) >> 7
+	f.ri = (f.message[1]&7)<<1 | (f.message[2]&0x80)>>7
 }
 func (f *Frame) decodeSensitivityLevel() {
 	f.sl = (f.message[1] & 0xe0) >> 5
@@ -271,8 +270,8 @@ func (f *Frame) decodeDownLinkRequest() {
 	f.dr = (f.message[1] & 0xf8) >> 3
 }
 
-func (f *Frame) decodeUtilityMessage(){
-	f.um = (f.message[1] & 0x7) << 3 | (f.message[2] & 0xe0) >> 5
+func (f *Frame) decodeUtilityMessage() {
+	f.um = (f.message[1]&0x7)<<3 | (f.message[2]&0xe0)>>5
 }
 
 // Determines the ICAO address from bytes 2,3 and 4
@@ -284,7 +283,7 @@ func (f *Frame) decodeICAO() {
 		a := uint32(f.message[1])
 		b := uint32(f.message[2])
 		c := uint32(f.message[3])
-		f.icao = a << 16 | b << 8 | c
+		f.icao = a<<16 | b<<8 | c
 	}
 }
 
@@ -312,7 +311,7 @@ func (f *Frame) decodeSquawkIdentity(byte1, byte2 int) {
 	b = ((msg3 & 0x02) << 1) | ((msg3 & 0x08) >> 2) | ((msg3 & 0x20) >> 5)
 	c = ((msg2 & 0x01) << 2) | ((msg2 & 0x04) >> 1) | ((msg2 & 0x10) >> 4)
 	d = ((msg3 & 0x01) << 2) | ((msg3 & 0x04) >> 1) | ((msg3 & 0x10) >> 4)
-	f.identity = a * 1000 + b * 100 + c * 10 + d
+	f.identity = a*1000 + b*100 + c*10 + d
 }
 
 // bits 20-32 are the altitude
@@ -320,12 +319,12 @@ func (f *Frame) decodeSquawkIdentity(byte1, byte2 int) {
 // 00000000 00000000 00011111 1M1Q1111 00000000
 func (f *Frame) decode13bitAltitudeCode() error {
 
-	f.ac = uint32(f.message[2] & 0xf) << 8 | uint32(f.message[3])
+	f.ac = uint32(f.message[2]&0xf)<<8 | uint32(f.message[3])
 
 	// altitude
-	f.acM = f.ac & 0x40 == 0x40 // bit 26 of message. 0 == feet, 1 = metres
+	f.acM = f.ac&0x40 == 0x40 // bit 26 of message. 0 == feet, 1 = metres
 	// resolution
-	f.acQ = f.ac & 0x10 == 0x10 // bit 28 of message. 1 = 25 ft encoding, 0 = Gillham Mode C encoding
+	f.acQ = f.ac&0x10 == 0x10 // bit 28 of message. 1 = 25 ft encoding, 0 = Gillham Mode C encoding
 
 	// make sure all the bits are good
 
@@ -335,7 +334,7 @@ func (f *Frame) decode13bitAltitudeCode() error {
 		/* N is the 11 bit integer resulting from the removal of bit Q and M */
 		var msg2 = int32(f.message[2])
 		var msg3 = int32(f.message[3])
-		var n = int32((msg2 & 31) << 6) | ((msg3 & 0x80) >> 2) | ((msg3 & 0x20) >> 1) | (msg3 & 15)
+		var n = int32((msg2&31)<<6) | ((msg3 & 0x80) >> 2) | ((msg3 & 0x20) >> 1) | (msg3 & 15)
 
 		if f.acQ {
 			// 25 ft increments
@@ -364,7 +363,7 @@ func (f *Frame) decode13bitAltitudeCode() error {
 
 func (f *Frame) getMessageLengthBits() uint32 {
 	//if f.downLinkFormat & 0x10 != 0 {
-	if f.downLinkFormat & 0x10 != 0 {
+	if f.downLinkFormat&0x10 != 0 {
 		if len(f.raw) == 14 {
 			return modesShortMsgBits
 		}
@@ -375,7 +374,7 @@ func (f *Frame) getMessageLengthBits() uint32 {
 }
 
 func (f *Frame) getMessageLengthBytes() uint32 {
-	if f.downLinkFormat & 0x10 != 0 {
+	if f.downLinkFormat&0x10 != 0 {
 		return modesLongMsgBytes
 	} else {
 		return modesShortMsgBytes
@@ -384,14 +383,14 @@ func (f *Frame) getMessageLengthBytes() uint32 {
 
 func (f *Frame) decodeFlightNumber() {
 	f.flight = make([]byte, 8)
-	f.flight[0] = aisCharset[f.message[5] >> 2]
-	f.flight[1] = aisCharset[((f.message[5] & 3) << 4) | (f.message[6] >> 4)]
-	f.flight[2] = aisCharset[((f.message[6] & 15) << 2) | (f.message[7] >> 6)]
-	f.flight[3] = aisCharset[f.message[7] & 63]
-	f.flight[4] = aisCharset[f.message[8] >> 2]
-	f.flight[5] = aisCharset[((f.message[8] & 3) << 4) | (f.message[9] >> 4)]
-	f.flight[6] = aisCharset[((f.message[9] & 15) << 2) | (f.message[10] >> 6)]
-	f.flight[7] = aisCharset[f.message[10] & 63]
+	f.flight[0] = aisCharset[f.message[5]>>2]
+	f.flight[1] = aisCharset[((f.message[5]&3)<<4)|(f.message[6]>>4)]
+	f.flight[2] = aisCharset[((f.message[6]&15)<<2)|(f.message[7]>>6)]
+	f.flight[3] = aisCharset[f.message[7]&63]
+	f.flight[4] = aisCharset[f.message[8]>>2]
+	f.flight[5] = aisCharset[((f.message[8]&3)<<4)|(f.message[9]>>4)]
+	f.flight[6] = aisCharset[((f.message[9]&15)<<2)|(f.message[10]>>6)]
+	f.flight[7] = aisCharset[f.message[10]&63]
 }
 
 func (f *Frame) decodeFlightId() {
