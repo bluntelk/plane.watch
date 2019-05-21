@@ -1,18 +1,18 @@
 package main
 
 import (
-	"github.com/codegangsta/cli"
-	"os"
-	"net/http"
-	"fmt"
-	"mode_s"
-	"time"
-	"path"
-	"runtime/debug"
-	"log"
-	"strings"
-	"tracker"
 	"encoding/json"
+	"fmt"
+	"github.com/urfave/cli"
+	"log"
+	"net/http"
+	"os"
+	"path"
+	"plane.watch/pkg/mode_s"
+	"plane.watch/pkg/tracker"
+	"runtime/debug"
+	"strings"
+	"time"
 )
 
 // this is a website where you put in one or more Mode S frames and they are decoded

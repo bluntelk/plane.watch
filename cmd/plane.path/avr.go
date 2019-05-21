@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/urfave/cli"
 	"io/ioutil"
-	"mode_s"
 	"os"
+	"plane.watch/pkg/mode_s"
+	"plane.watch/pkg/tracker"
 	"time"
-	"tracker"
 )
 
 func parseAvr(c *cli.Context) error {

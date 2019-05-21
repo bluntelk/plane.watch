@@ -2,9 +2,9 @@ package main
 
 import (
 	"testing"
-	"mode_s"
+	"plane.watch/mode_s"
 	"time"
-	"tracker"
+	"plane.watch/tracker"
 	"fmt"
 	"os"
 )

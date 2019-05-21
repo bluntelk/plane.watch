@@ -6,10 +6,10 @@ import (
 	"github.com/streadway/amqp"
 	"github.com/urfave/cli"
 	"log"
-	"mode_s"
 	"os"
+	"plane.watch/pkg/mode_s"
+	"plane.watch/pkg/tracker"
 	"time"
-	"tracker"
 )
 
 var (

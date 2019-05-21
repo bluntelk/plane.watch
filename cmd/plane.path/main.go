@@ -9,9 +9,9 @@ import (
 	"github.com/kpawlik/geojson"
 	"github.com/urfave/cli"
 	"os"
+	"plane.watch/pkg/tracker"
 	"strings"
 	"time"
-	"tracker"
 )
 
 func main() {

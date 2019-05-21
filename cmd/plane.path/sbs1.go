@@ -5,9 +5,9 @@ import (
 	"github.com/urfave/cli"
 	"io/ioutil"
 	"os"
-	"sbs1"
+	"plane.watch/pkg/sbs1"
+	"plane.watch/pkg/tracker"
 	"time"
-	"tracker"
 )
 
 func parseSbs(c *cli.Context) error {

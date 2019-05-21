@@ -1,12 +1,12 @@
 package main
 
 import (
-	"os"
 	"bufio"
-	"mode_s"
-	"time"
-	"strings"
 	"fmt"
+	"os"
+	"plane.watch/pkg/mode_s"
+	"strings"
+	"time"
 )
 
 func gatherSamples(filePath string) {
