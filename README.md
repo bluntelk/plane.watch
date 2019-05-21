@@ -1,15 +1,8 @@
-== Plane Watch
-is awesome
+# Plane.Watch
 
-=== Tools
-These tools are used to decode mode-s frames, send them on to plane.watch and have the stuff displayed
+This repo has a few of the things I have done around plane.watch.
 
-=== Contributing
+There are some tools (in cmd/) for dealing with various things
 
-This project uses the go project manager gb (http://getgb.io)
-
-you will need to install that before building this project.
-
-if you are building a release you can do
-
-gb build -f -ldflags='-w -s'
+using golang 1.12 you should have no problems compiling this go modules
+enabled project.
