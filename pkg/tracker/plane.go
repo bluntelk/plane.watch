@@ -9,12 +9,12 @@ import (
 )
 
 const (
-	MAX_17_BITS = 131071
+	max17Bits = 131071
 )
 
 // meanings: 0 is even frame, 1 is odd frame
 type CprLocation struct {
-	even_lat, odd_lat, even_lon, odd_lon float64
+	evenLat, oddLat, evenLon, oddLon float64
 
 	time0, time1 time.Time
 
@@ -73,7 +73,7 @@ type PlaneIterator func(p Plane)
 var (
 	planeList          PlaneList
 	planeAccessMutex   sync.Mutex
-	MaxLocationHistory int = 10
+	MaxLocationHistory = 10
 )
 
 var NLTable = map[int32]float64{
@@ -309,10 +309,10 @@ func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) {
 }
 
 func (p *Plane) ZeroCpr() {
-	p.cprLocation.even_lat = 0
-	p.cprLocation.even_lon = 0
-	p.cprLocation.odd_lat = 0
-	p.cprLocation.odd_lon = 0
+	p.cprLocation.evenLat = 0
+	p.cprLocation.evenLon = 0
+	p.cprLocation.oddLat = 0
+	p.cprLocation.oddLon = 0
 	p.cprLocation.rlat0 = 0
 	p.cprLocation.rlat1 = 0
 	p.cprLocation.time0 = time.Unix(0, 0)
@@ -324,12 +324,12 @@ func (p *Plane) ZeroCpr() {
 func (p *Plane) SetCprEvenLocation(lat, lon float64, t time.Time) error {
 
 	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
-	if lat > MAX_17_BITS || lat < 0 || lon > MAX_17_BITS || lon < 0 {
-		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %0.4f,%0.4f", MAX_17_BITS, lat, lon)
+	if lat > max17Bits || lat < 0 || lon > max17Bits || lon < 0 {
+		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %0.4f,%0.4f", max17Bits, lat, lon)
 	}
 
-	p.cprLocation.even_lat = lat
-	p.cprLocation.even_lon = lon
+	p.cprLocation.evenLat = lat
+	p.cprLocation.evenLon = lon
 	p.cprLocation.time0 = t
 	p.cprLocation.evenFrame = true
 	return nil
@@ -338,8 +338,8 @@ func (p *Plane) SetCprEvenLocation(lat, lon float64, t time.Time) error {
 func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) error {
 
 	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
-	if lat > MAX_17_BITS || lat < 0 || lon > MAX_17_BITS || lon < 0 {
-		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %0.4f,%0.4f", MAX_17_BITS, lat, lon)
+	if lat > max17Bits || lat < 0 || lon > max17Bits || lon < 0 {
+		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %0.4f,%0.4f", max17Bits, lat, lon)
 	}
 
 	// only set the odd frame after the even frame is set
@@ -347,17 +347,17 @@ func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) error {
 	//	return
 	//}
 
-	p.cprLocation.odd_lat = lat
-	p.cprLocation.odd_lon = lon
+	p.cprLocation.oddLat = lat
+	p.cprLocation.oddLon = lon
 	p.cprLocation.time1 = t
 	p.cprLocation.oddFrame = true
 	return nil
 }
 
-func (p *Plane) SetAltitude(altitude int32, altitude_units string) {
+func (p *Plane) SetAltitude(altitude int32, altitudeUnits string) {
 	// set the current altitude
 	p.Location.Altitude = altitude
-	p.Location.AltitudeUnits = altitude_units
+	p.Location.AltitudeUnits = altitudeUnits
 }
 
 func (p *Plane) DecodeCpr(ts time.Time) error {
@@ -383,14 +383,14 @@ func (p *Plane) DecodeCpr(ts time.Time) error {
 }
 
 func (cpr *CprLocation) computeLatitudeIndex() {
-	cpr.latitudeIndex = int32(math.Floor((((59 * cpr.even_lat) - (60 * cpr.odd_lat)) / 131072) + 0.5))
+	cpr.latitudeIndex = int32(math.Floor((((59 * cpr.evenLat) - (60 * cpr.oddLat)) / 131072) + 0.5))
 }
 
 func (cpr *CprLocation) computeAirDLatRLat() {
 	cpr.airDLat0 = cpr.globalSurfaceRange / 60.0
 	cpr.airDLat1 = cpr.globalSurfaceRange / 59.0
-	cpr.rlat0 = cpr.airDLat0 * (cprModFunction(cpr.latitudeIndex, 60) + (cpr.even_lat / 131072))
-	cpr.rlat1 = cpr.airDLat1 * (cprModFunction(cpr.latitudeIndex, 59) + (cpr.odd_lat / 131072))
+	cpr.rlat0 = cpr.airDLat0 * (cprModFunction(cpr.latitudeIndex, 60) + (cpr.evenLat / 131072))
+	cpr.rlat1 = cpr.airDLat1 * (cprModFunction(cpr.latitudeIndex, 59) + (cpr.oddLat / 131072))
 	//log.Printf("j=%d rlat0=%0.6f rlat1=%0.6f", cpr.latitudeIndex, cpr.rlat0, cpr.rlat1)
 }
 
@@ -420,10 +420,10 @@ func (cpr *CprLocation) computeLatLon() (PlaneLocation, error) {
 		/* Compute ni and the longitude index 'm' */
 		ni := cprNFunction(cpr.rlat1, 1)
 		//log.Printf("	ni = %d", ni)
-		m := math.Floor((((cpr.even_lon * float64(cpr.nl1-1)) - (cpr.odd_lon * float64(cpr.nl1))) / 131072.0) + 0.5)
+		m := math.Floor((((cpr.evenLon * float64(cpr.nl1-1)) - (cpr.oddLon * float64(cpr.nl1))) / 131072.0) + 0.5)
 		//log.Printf("	m = %0.2f", m)
 
-		loc.Longitude = cpr.dlonFunction(cpr.rlat1, 1) * (cprModFunction(int32(m), ni) + (cpr.odd_lon / 131072))
+		loc.Longitude = cpr.dlonFunction(cpr.rlat1, 1) * (cprModFunction(int32(m), ni) + (cpr.oddLon / 131072))
 		loc.Latitude = cpr.rlat1
 		//log.Printf("	rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
 	} else {
@@ -431,9 +431,9 @@ func (cpr *CprLocation) computeLatLon() (PlaneLocation, error) {
 		//log.Println("Even Decode")
 		ni := cprNFunction(cpr.rlat0, 0)
 		//log.Printf("	ni = %d", ni)
-		m := math.Floor((((cpr.even_lon * float64(cpr.nl0-1)) - (cpr.odd_lon * float64(cpr.nl0))) / 131072) + 0.5)
+		m := math.Floor((((cpr.evenLon * float64(cpr.nl0-1)) - (cpr.oddLon * float64(cpr.nl0))) / 131072) + 0.5)
 		//log.Printf("	m = %0.2f", m)
-		loc.Longitude = cpr.dlonFunction(cpr.rlat0, 0) * (cprModFunction(int32(m), ni) + cpr.even_lon/131072)
+		loc.Longitude = cpr.dlonFunction(cpr.rlat0, 0) * (cprModFunction(int32(m), ni) + cpr.evenLon/131072)
 		loc.Latitude = cpr.rlat0
 		//log.Printf("	rlat = %0.6f, rlon = %0.6f\n", loc.Latitude, loc.Longitude);
 	}

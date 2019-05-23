@@ -188,7 +188,7 @@ func run(c *cli.Context) {
 		plane := tracker.HandleModeSFrame(frame, showDebug)
 
 		if nil != plane {
-			planeJson, _ := json.Marshal(plane);
+			planeJson, _ := json.Marshal(plane)
 			msg := amqp.Publishing{
 				ContentType: "application/json",
 				Body:        planeJson,
