@@ -42,7 +42,7 @@ func TestDecodeString_DF17_EVEN_LAT(t *testing.T) {
 	}
 
 	if 11 != frame.messageType {
-		t.Errorf("Expected DF Message 11 (type: %s) but got type %d", frame.MessageType(), frame.messageType)
+		t.Errorf("Expected DF Message 11 (type: %d) but got type %d", frame.MessageType(), frame.messageType)
 	}
 
 	if 0 != frame.messageSubType {
@@ -99,7 +99,7 @@ func TestDecodeString_DF17_ODD_LAT(t *testing.T) {
 	}
 
 	if 11 != frame.messageType {
-		t.Errorf("Expected DF Message 11 (type: %s) but got type %d", frame.MessageType(), frame.messageType)
+		t.Errorf("Expected DF Message 11 (type: %d) but got type %d", frame.MessageType(), frame.messageType)
 	}
 
 	if 0 != frame.messageSubType {
@@ -258,7 +258,7 @@ func TestBadFuzz(t *testing.T) {
 	for _, msg := range messages {
 		_, err = DecodeString(msg, time.Now())
 		if nil == err {
-			t.Error("Bad input %s was valid", msg)
+			t.Errorf("Bad input %s was valid", msg)
 		}
 	}
 }

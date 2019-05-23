@@ -325,7 +325,7 @@ func (p *Plane) SetCprEvenLocation(lat, lon float64, t time.Time) error {
 
 	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
 	if lat > MAX_17_BITS || lat < 0 || lon > MAX_17_BITS || lon < 0 {
-		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %d,%d", MAX_17_BITS, lat, lon)
+		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %0.4f,%0.4f", MAX_17_BITS, lat, lon)
 	}
 
 	p.cprLocation.even_lat = lat
@@ -339,7 +339,7 @@ func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) error {
 
 	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
 	if lat > MAX_17_BITS || lat < 0 || lon > MAX_17_BITS || lon < 0 {
-		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %d,%d", MAX_17_BITS, lat, lon)
+		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %0.4f,%0.4f", MAX_17_BITS, lat, lon)
 	}
 
 	// only set the odd frame after the even frame is set
