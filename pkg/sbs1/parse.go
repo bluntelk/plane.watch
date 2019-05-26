@@ -8,23 +8,23 @@ import (
 )
 
 const (
-	sbs_msg_type_field      = 0
-	sbs_msg_sub_cat_field   = 1
-	sbs_icao_field          = 4
-	sbs_recv_date           = 6
-	sbs_recv_time           = 7
-	sbs_callsign_field      = 10
-	sbs_altitude_field      = 11
-	sbs_ground_speed_field  = 12
-	sbs_track_field         = 13
-	sbs_lat_field           = 14
-	sbs_lon_field           = 15
-	sbs_vertical_rate_field = 16
-	sbs_squawk_field        = 17
-	sbs_alert_squawk_field  = 18
-	sbs_emergency_field     = 19
-	sbs_spi_ident_field     = 20
-	sbs_on_ground_field     = 21
+	sbsMsgTypeField      = 0
+	sbsMsgSubCatField    = 1
+	sbsIcaoField         = 4
+	sbsRecvDate          = 6
+	sbsRecvTime          = 7
+	sbsCallsignField     = 10
+	sbsAltitudeField     = 11
+	sbsGroundSpeedField  = 12
+	sbsTrackField        = 13
+	sbsLatField          = 14
+	sbsLonField          = 15
+	sbsVerticalRateField = 16
+	sbsSquawkField       = 17
+	sbsAlertSquawkField  = 18
+	sbsEmergencyField    = 19
+	sbsSpiIdentField     = 20
+	sbsOnGroundField     = 21
 )
 
 type Frame struct {
@@ -54,19 +54,19 @@ func Parse(sbsString string) (Frame, error) {
 		return plane, fmt.Errorf("Failed to Parse Input - not enough parameters: %s", sbsString)
 	}
 
-	plane.Icao = bits[sbs_icao_field]
-	sTime := bits[sbs_recv_date] + " " + bits[sbs_recv_time]
+	plane.Icao = bits[sbsIcaoField]
+	sTime := bits[sbsRecvDate] + " " + bits[sbsRecvTime]
 	//2016/06/03 00:00:38.350
 	plane.Received, err = time.Parse("2006/01/02 15:04:05.999999999", sTime)
 	if nil != err {
 		plane.Received = time.Now()
 	}
 
-	switch bits[sbs_msg_type_field] { // message type
+	switch bits[sbsMsgTypeField] { // message type
 	case "SEL": // SELECTION_CHANGE
-		plane.CallSign = bits[sbs_callsign_field]
+		plane.CallSign = bits[sbsCallsignField]
 	case "ID": // NEW_ID
-		plane.CallSign = bits[sbs_callsign_field]
+		plane.CallSign = bits[sbsCallsignField]
 	case "AIR": // NEW_AIRCRAFT - just indicates when a new aircraft pops up
 	case "STA": // STATUS_AIRCRAFT
 	// call sign field (10) contains one of:
@@ -77,57 +77,57 @@ func Parse(sbsString string) (Frame, error) {
 	// 	OK (used to reset time-outs if aircraft returns into cover).
 	case "CLK": // CLICK
 	case "MSG": // TRANSMISSION
-		switch bits[sbs_msg_sub_cat_field] {
+		switch bits[sbsMsgSubCatField] {
 		case "1": // ES Identification and Category
-			plane.CallSign = bits[sbs_callsign_field]
+			plane.CallSign = bits[sbsCallsignField]
 
 		case "2": // ES Surface Position Message
-			plane.Altitude, _ = strconv.Atoi(bits[sbs_altitude_field])
-			plane.GroundSpeed, _ = strconv.Atoi(bits[sbs_ground_speed_field])
-			plane.Track, _ = strconv.ParseFloat(bits[sbs_track_field], 32)
-			plane.Lat, _ = strconv.ParseFloat(bits[sbs_lat_field], 32)
-			plane.Lon, _ = strconv.ParseFloat(bits[sbs_lon_field], 32)
+			plane.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
+			plane.GroundSpeed, _ = strconv.Atoi(bits[sbsGroundSpeedField])
+			plane.Track, _ = strconv.ParseFloat(bits[sbsTrackField], 32)
+			plane.Lat, _ = strconv.ParseFloat(bits[sbsLatField], 32)
+			plane.Lon, _ = strconv.ParseFloat(bits[sbsLonField], 32)
 			plane.HasPosition = true
-			plane.OnGround = "-1" == bits[sbs_on_ground_field]
+			plane.OnGround = "-1" == bits[sbsOnGroundField]
 
 		case "3": // ES Airborne Position Message
-			plane.Altitude, _ = strconv.Atoi(bits[sbs_altitude_field])
-			plane.Lat, _ = strconv.ParseFloat(bits[sbs_lat_field], 32)
-			plane.Lon, _ = strconv.ParseFloat(bits[sbs_lon_field], 32)
+			plane.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
+			plane.Lat, _ = strconv.ParseFloat(bits[sbsLatField], 32)
+			plane.Lon, _ = strconv.ParseFloat(bits[sbsLonField], 32)
 			plane.HasPosition = true
-			plane.Alert = bits[sbs_alert_squawk_field]
-			plane.Emergency = bits[sbs_emergency_field]
-			plane.OnGround = "-1" == bits[sbs_on_ground_field]
+			plane.Alert = bits[sbsAlertSquawkField]
+			plane.Emergency = bits[sbsEmergencyField]
+			plane.OnGround = "-1" == bits[sbsOnGroundField]
 		//SPI Flag Ignored
 
 		case "4": // ES Airborne Velocity Message
-			plane.GroundSpeed, _ = strconv.Atoi(bits[sbs_ground_speed_field])
-			plane.Track, _ = strconv.ParseFloat(bits[sbs_track_field], 32)
-			plane.VerticalRate, _ = strconv.Atoi(bits[sbs_vertical_rate_field])
-			plane.OnGround = "-1" == bits[sbs_on_ground_field]
+			plane.GroundSpeed, _ = strconv.Atoi(bits[sbsGroundSpeedField])
+			plane.Track, _ = strconv.ParseFloat(bits[sbsTrackField], 32)
+			plane.VerticalRate, _ = strconv.Atoi(bits[sbsVerticalRateField])
+			plane.OnGround = "-1" == bits[sbsOnGroundField]
 
 		case "5": // Surveillance Alt Message
-			plane.Altitude, _ = strconv.Atoi(bits[sbs_altitude_field])
-			plane.Alert = bits[sbs_alert_squawk_field]
-			plane.OnGround = "-1" == bits[sbs_on_ground_field]
-			plane.CallSign = bits[sbs_callsign_field]
+			plane.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
+			plane.Alert = bits[sbsAlertSquawkField]
+			plane.OnGround = "-1" == bits[sbsOnGroundField]
+			plane.CallSign = bits[sbsCallsignField]
 		//SPI Flag Ignored
 
 		case "6": // Surveillance ID Message
-			plane.CallSign = bits[sbs_callsign_field]
-			plane.Altitude, _ = strconv.Atoi(bits[sbs_altitude_field])
-			plane.Squawk = bits[sbs_squawk_field]
-			plane.Alert = bits[sbs_alert_squawk_field]
-			plane.Emergency = bits[sbs_emergency_field]
-			plane.OnGround = "-1" == bits[sbs_on_ground_field]
+			plane.CallSign = bits[sbsCallsignField]
+			plane.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
+			plane.Squawk = bits[sbsSquawkField]
+			plane.Alert = bits[sbsAlertSquawkField]
+			plane.Emergency = bits[sbsEmergencyField]
+			plane.OnGround = "-1" == bits[sbsOnGroundField]
 		//SPI Flag Ignored
 
 		case "7": //Air To Air Message
-			plane.Altitude, _ = strconv.Atoi(bits[sbs_altitude_field])
-			plane.OnGround = "-1" == bits[sbs_on_ground_field]
+			plane.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
+			plane.OnGround = "-1" == bits[sbsOnGroundField]
 
 		case "8": // All Call Reply
-			plane.OnGround = "-1" == bits[sbs_on_ground_field]
+			plane.OnGround = "-1" == bits[sbsOnGroundField]
 		}
 	}
 

@@ -48,8 +48,8 @@ func TestGetPlane(t *testing.T) {
 		t.Error("Plane List should be longer")
 	}
 
-	if 1234 != plane.IcaoIdentifier {
-		t.Errorf("Expected planes ICAO identifier to be moo, got %d", plane.IcaoIdentifier)
+	if 1234 != plane.IcaoIdentifier() {
+		t.Errorf("Expected planes ICAO identifier to be moo, got %d", plane.IcaoIdentifier())
 	}
 
 	SetPlane(plane, time.Now())
