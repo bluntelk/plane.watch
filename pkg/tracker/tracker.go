@@ -27,7 +27,7 @@ func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
 	var hasChanged bool
 
 	plane := GetPlane(icao)
-	//plane.MarkFrameTime(frame.TimeStamp()) // todo, make this fast!
+	plane.MarkFrameTime(frame.TimeStamp()) // todo, make this fast!
 
 	debugMessage := func(sfmt string, a ...interface{}) {
 		if debug {

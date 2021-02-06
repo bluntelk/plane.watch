@@ -44,6 +44,10 @@ func (f *Frame) decodeModeSChecksum() bool {
 }
 
 func (f *Frame) checkCrc() error {
+	if "MLAT" == f.mode {
+		// not currently able to checksum beast AVR timestamp format messages
+		return nil
+	}
 	switch f.downLinkFormat {
 	case 0,4,5,16,20,21,24:
 		// decoding/checking CRC here is tricky. Field Type AP

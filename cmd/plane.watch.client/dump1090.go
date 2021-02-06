@@ -1,10 +1,10 @@
 package main
 
 import (
-	"net"
-	"time"
 	"bufio"
 	"log"
+	"net"
+	"time"
 )
 
 type Dump1090Reader struct {
@@ -65,7 +65,7 @@ func (d *Dump1090Reader) Connect() error {
 				return
 			case txt = <-d.messageChan:
 			// we have a message we need to process
-				if (d.handler != nil) {
+				if d.handler != nil {
 					d.handler(txt)
 				}
 			}

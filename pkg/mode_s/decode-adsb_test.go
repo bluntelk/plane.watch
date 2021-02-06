@@ -23,7 +23,7 @@ func TestDecodeDF17BaroAlt1(t *testing.T) {
 	}
 }
 
-// mlat format test
+// Beast AVR Timestamp Format
 func TestDecodeDF17BaroAlt2(t *testing.T) {
 	frame, err := DecodeString("@000000EF31C08d8960c66055972f34137e0be0a2;", time.Now())
 	if nil != err {
@@ -98,5 +98,22 @@ func TestDecodeDF17MT19ST1(t *testing.T) {
 	if frame.superSonic {
 		t.Errorf("Wow, this plane is going a lot faster than it should be! why is it thinking it is supersonic?")
 	}
+}
 
+func TestBeastAvrTimestampDecode112BitModeS(t *testing.T) {
+	// info taken from https://wiki.jetvision.de/wiki/Mode-S_Beast:Data_Output_Formats#:~:text=The%20Mode%2DS%20Beast%20supports,time%20and%20signal%20level%20information
+
+	raw := "@016CE3671AA88D00199A8BB80030A8000628F400;"
+	t1 := time.Now()
+	frame, err := DecodeString(raw, t1)
+	if nil != err {
+		t.Errorf("Failed to decode frame: %s", err)
+	}
+
+	if raw != frame.full + ";"{
+		t.Errorf("Failed to se the correct full frame")
+	}
+	if "MLAT" != frame.mode {
+		t.Errorf("Failed to identify frame as Beast AVR")
+	}
 }

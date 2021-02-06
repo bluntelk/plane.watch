@@ -121,8 +121,9 @@ type Frame struct {
 	df17
 	Position
 	mode           string
+	// the timestamp we are processing this message at
 	timeStamp      time.Time
-	raw            string
+	raw, full      string
 	message        []byte
 	downLinkFormat byte // Down link Format (DF)
 	icao           uint32

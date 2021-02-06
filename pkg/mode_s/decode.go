@@ -3,6 +3,7 @@ package mode_s
 import (
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -24,6 +25,12 @@ const (
 type ReceivedFrame struct {
 	Frame string
 	Time  time.Time
+}
+
+var beastAvrBootTime time.Time
+
+func init() {
+	beastAvrBootTime = time.Now()
 }
 
 func DecodeStringWorker(jobs <-chan ReceivedFrame, results chan<- Frame, errors chan<- error) {
@@ -51,16 +58,18 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	}
 
 	if len(encodedFrame) < 14 {
-		return frame, errors.New("frame too short to be a Mode S frame")
+		return frame, fmt.Errorf("frame (%s) too short to be a Mode S frame", rawFrame)
 	}
 
 	// determine what type of frame we are dealing with
 	if encodedFrame[0] == '@' {
+		// Beast Timestamp+AVR format
 		frame.mode = "MLAT"
 	} else {
 		frame.mode = "NORMAL"
 	}
 
+	frame.timeStamp = t
 	// ensure we have a timestamp
 	frameStart := 0
 	if "MLAT" == frame.mode {
@@ -70,17 +79,16 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 		frame.SetTimeStamp(timeSlice)
 	} else if "*" == encodedFrame[0:1] {
 		frameStart = 1
-		frame.timeStamp = t
-	} else {
-		frame.timeStamp = t
 	}
 	// let's get our frame data in order!
+
 
 	if rawFrame == "*00000000000000;" {
 		return frame, errors.New("heartbeat received")
 	}
 
 	frame.raw = encodedFrame[frameStart:]
+	frame.full = encodedFrame
 	err = frame.parseRawToMessage()
 	if nil != err {
 		return frame, err
@@ -161,16 +169,35 @@ func (f *Frame) decodeDownLinkFormat() {
 func (f *Frame) SetTimeStamp(timeStamp string) {
 	if "" == timeStamp {
 		f.timeStamp = time.Now()
-	} else if "00000000000" == string(timeStamp) {
+	} else if "00000000000" == timeStamp {
 		f.timeStamp = time.Now()
 	} else {
-		// MLAT timestamps from dump 1090 are dependent on when the device started ( 500ns intervals )
-		//tmp, err := strconv.ParseInt(timeStamp, 16, 64)
-		//if err != nil {
-		//	panic(err)
-		//}
-		//fmt.Printf("To Do: Convert int %d to time stamp\n", tmp)
-		f.timeStamp = time.Now()
+		// MLAT timestamps from Beast AVR are dependent on when the device started ( 500ns intervals / 12mhz)
+		// calculated from power on.
+		// 48 bits = 2.81474976711e+14
+		// max: 2,000,000 seconds
+		// Wrinkle: The same 48bites are used in GPS format (from radarcape)
+		//   18 bit second of day, 30bit nanosecond
+		ticksSinceBoot, err := strconv.ParseInt(timeStamp, 16, 64)
+		if err != nil {
+			log.Printf("Failed to decode beast avr timestamp: %s", err)
+			return
+		}
+		// handle rollover
+		oldestBootTime := time.Now().Add(-2000000 * time.Second)
+		if oldestBootTime.After(beastAvrBootTime) {
+			beastAvrBootTime = oldestBootTime
+		}
+
+		guess := f.TimeStamp().Add(time.Duration(ticksSinceBoot * 500) * time.Nanosecond)
+		if guess.Before(beastAvrBootTime) {
+			beastAvrBootTime = guess
+		}
+
+		//duration := time.Duration(ticksSinceBoot * 500)
+		//log.Printf("%0.2f seconds, or %s", duration.Seconds(), duration.String())
+
+		f.timeStamp = beastAvrBootTime.Add(time.Duration(ticksSinceBoot * 500))
 	}
 }
 
