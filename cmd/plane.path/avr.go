@@ -34,7 +34,7 @@ func parseAvr(c *cli.Context) error {
 	inputLines, errChan := readFiles(dataFiles)
 
 	jobChan := make(chan mode_s.ReceivedFrame, 1000)
-	resultChan := make(chan mode_s.Frame, 1000)
+	resultChan := make(chan *mode_s.Frame, 1000)
 	errorChan := make(chan error, 1000)
 	exitChan := make(chan bool)
 
@@ -72,7 +72,7 @@ func parseAvr(c *cli.Context) error {
 	return writeResult(outFileName)
 }
 
-func handleReceived(results chan mode_s.Frame, verbose bool) {
+func handleReceived(results chan *mode_s.Frame, verbose bool) {
 	var resultCounter int
 	for {
 		select {

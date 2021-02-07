@@ -5,6 +5,7 @@ package mode_s
 */
 
 import (
+	"regexp"
 	"time"
 	"strings"
 	"fmt"
@@ -123,6 +124,9 @@ type Frame struct {
 	mode           string
 	// the timestamp we are processing this message at
 	timeStamp      time.Time
+	beastTimeStamp string
+	beastAvrBoot   *time.Time
+	beastAvrUptime time.Duration
 	raw, full      string
 	message        []byte
 	downLinkFormat byte // Down link Format (DF)
@@ -495,6 +499,16 @@ func (f *Frame) IsEven() bool {
 
 func (f *Frame) FlightNumber() string {
 	return string(f.flight)
+}
+
+func (f *Frame) isNoOp() bool {
+	if "" == f.raw {
+		return true
+	}
+	// the first character can be * or @ (or left out)
+	// if the entire string is then 0's, it's a noop
+	re := regexp.MustCompile("^[*@]?0+$")
+	return re.MatchString(f.raw)
 }
 
 /**

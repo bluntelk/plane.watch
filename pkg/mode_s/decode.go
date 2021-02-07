@@ -22,10 +22,15 @@ const (
 //	lastSeen time.Time
 //}
 
-type ReceivedFrame struct {
-	Frame string
-	Time  time.Time
-}
+type (
+	ReceivedFrame struct {
+		Frame string
+		Time  time.Time
+	}
+	AvrDecoder struct {
+		beastAvrBootTime time.Time
+	}
+)
 
 var beastAvrBootTime time.Time
 
@@ -33,7 +38,24 @@ func init() {
 	beastAvrBootTime = time.Now()
 }
 
-func DecodeStringWorker(jobs <-chan ReceivedFrame, results chan<- Frame, errors chan<- error) {
+func NewAvrDecoder() *AvrDecoder {
+	return &AvrDecoder{beastAvrBootTime: time.Now()}
+}
+
+func (d *AvrDecoder) DecodeAvrString(rawFrame string, t time.Time) (*Frame, error) {
+	frame, err := prepareFrame(rawFrame, t)
+	if nil != err {
+		return nil, err
+	}
+	if frame.isNoOp() {
+		return nil, nil
+	}
+	frame.beastAvrBoot = &d.beastAvrBootTime
+	err = frame.Parse()
+	return frame, err
+}
+
+func DecodeStringWorker(jobs <-chan ReceivedFrame, results chan<- *Frame, errors chan<- error) {
 	for s := range jobs {
 		frame, err := DecodeString(s.Frame, s.Time)
 		if nil != err {
@@ -44,9 +66,21 @@ func DecodeStringWorker(jobs <-chan ReceivedFrame, results chan<- Frame, errors 
 	}
 }
 
-func DecodeString(rawFrame string, t time.Time) (Frame, error) {
+func DecodeString(rawFrame string, t time.Time) (*Frame, error) {
+	frame, err := prepareFrame(rawFrame, t)
+	if nil != err {
+		return nil, err
+	}
+	if frame.isNoOp() {
+		return nil, nil
+	}
+	frame.beastAvrBoot = &beastAvrBootTime
+	err = frame.Parse()
+	return frame, err
+}
+
+func prepareFrame(rawFrame string, t time.Time) (*Frame, error) {
 	var frame Frame
-	var err error
 
 	encodedFrame := strings.TrimFunc(rawFrame, func(r rune) bool {
 		return unicode.IsSpace(r) || ';' == r
@@ -54,11 +88,11 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 
 	// let's ensure that we have some correct data...
 	if "" == encodedFrame {
-		return frame, errors.New("cannot decode empty string")
+		return nil, errors.New("cannot decode empty string")
 	}
 
 	if len(encodedFrame) < 14 {
-		return frame, fmt.Errorf("frame (%s) too short to be a Mode S frame", rawFrame)
+		return nil, fmt.Errorf("frame (%s) too short to be a Mode S frame", rawFrame)
 	}
 
 	// determine what type of frame we are dealing with
@@ -75,84 +109,84 @@ func DecodeString(rawFrame string, t time.Time) (Frame, error) {
 	if "MLAT" == frame.mode {
 		frameStart = 13
 		// try and use the provided timestamp
-		timeSlice := encodedFrame[1:12]
-		frame.SetTimeStamp(timeSlice)
+		frame.beastTimeStamp = encodedFrame[1:12]
 	} else if "*" == encodedFrame[0:1] {
 		frameStart = 1
 	}
-	// let's get our frame data in order!
-
-
-	if rawFrame == "*00000000000000;" {
-		return frame, errors.New("heartbeat received")
-	}
-
 	frame.raw = encodedFrame[frameStart:]
 	frame.full = encodedFrame
-	err = frame.parseRawToMessage()
+
+	return &frame, nil
+}
+
+func (f *Frame) Parse() error {
+	var err error
+	f.parseBeastTimeStamp()
+
+	err = f.parseRawToMessage()
 	if nil != err {
-		return frame, err
+		return err
 	}
 
-	frame.decodeDownLinkFormat()
+	f.decodeDownLinkFormat()
 
 	// now see if the message we got matches up with the DF format we decoded
-	if int(frame.getMessageLengthBytes()) != len(frame.message) {
-		return frame, fmt.Errorf("frame has incorrect length %d != %d", frame.getMessageLengthBytes(), len(frame.message))
+	if int(f.getMessageLengthBytes()) != len(f.message) {
+		return fmt.Errorf("f has incorrect length %d != %d", f.getMessageLengthBytes(), len(f.message))
 	}
 
-	err = frame.checkCrc()
+	err = f.checkCrc()
 	if nil != err {
-		return frame, err
+		return err
 	}
 
 	// decode the specific DF type
-	switch frame.downLinkFormat {
+	switch f.downLinkFormat {
 	case 0: // Airborne position, baro altitude only
-		frame.decodeVerticalStatus()
-		frame.decodeCrossLinkCapability()
-		frame.decodeSensitivityLevel()
-		frame.decodeReplyInformation()
-		_ = frame.decode13bitAltitudeCode()
+		f.decodeVerticalStatus()
+		f.decodeCrossLinkCapability()
+		f.decodeSensitivityLevel()
+		f.decodeReplyInformation()
+		err = f.decode13bitAltitudeCode()
 	case 4:
-		frame.decodeFlightStatus()
-		frame.decodeDownLinkRequest()
-		frame.decodeUtilityMessage()
-		_ = frame.decode13bitAltitudeCode()
+		f.decodeFlightStatus()
+		f.decodeDownLinkRequest()
+		f.decodeUtilityMessage()
+		err = f.decode13bitAltitudeCode()
 	case 5: //DF_5
-		frame.decodeFlightStatus()
-		frame.decodeDownLinkRequest()
-		frame.decodeUtilityMessage()
-		frame.decodeSquawkIdentity(2, 3) // gillham encoded squawk
+		f.decodeFlightStatus()
+		f.decodeDownLinkRequest()
+		f.decodeUtilityMessage()
+		f.decodeSquawkIdentity(2, 3) // gillham encoded squawk
 	case 11: //DF_11
-		frame.decodeICAO()
-		frame.decodeCapability()
+		f.decodeICAO()
+		f.decodeCapability()
 	case 16: //DF_16
-		frame.decodeVerticalStatus()
-		_ = frame.decode13bitAltitudeCode()
-		frame.decodeReplyInformation()
-		frame.decodeSensitivityLevel()
+		f.decodeVerticalStatus()
+		err = f.decode13bitAltitudeCode()
+		f.decodeReplyInformation()
+		f.decodeSensitivityLevel()
 	case 17: //DF_17
-		frame.decodeICAO()
-		frame.decodeCapability()
-		frame.decodeAdsb()
-	case 18:                     //DF_18
-		frame.decodeCapability() // control field
-		if 0 == frame.ca {
-			frame.decodeICAO()
-			frame.decodeAdsb()
+		f.decodeICAO()
+		f.decodeCapability()
+		f.decodeAdsb()
+	case 18: //DF_18
+		f.decodeCapability() // control field
+		if 0 == f.ca {
+			f.decodeICAO()
+			f.decodeAdsb()
 		}
 	case 20: //DF_20
-		frame.decodeFlightStatus()
-		_ = frame.decode13bitAltitudeCode()
-		//frame.decodeCommB()
+		f.decodeFlightStatus()
+		err = f.decode13bitAltitudeCode()
+		f.decodeCommB()
 	case 21: //DF_21
-		frame.decodeFlightStatus()
-		frame.decodeSquawkIdentity(2, 3) // gillham encoded squawk
-		//frame.decodeCommB()
+		f.decodeFlightStatus()
+		f.decodeSquawkIdentity(2, 3) // gillham encoded squawk
+		f.decodeCommB()
 	}
 
-	return frame, err
+	return err
 }
 
 func (f *Frame) decodeDownLinkFormat() {
@@ -166,39 +200,40 @@ func (f *Frame) decodeDownLinkFormat() {
 
 }
 
-func (f *Frame) SetTimeStamp(timeStamp string) {
-	if "" == timeStamp {
-		f.timeStamp = time.Now()
-	} else if "00000000000" == timeStamp {
-		f.timeStamp = time.Now()
-	} else {
-		// MLAT timestamps from Beast AVR are dependent on when the device started ( 500ns intervals / 12mhz)
-		// calculated from power on.
-		// 48 bits = 2.81474976711e+14
-		// max: 2,000,000 seconds
-		// Wrinkle: The same 48bites are used in GPS format (from radarcape)
-		//   18 bit second of day, 30bit nanosecond
-		ticksSinceBoot, err := strconv.ParseInt(timeStamp, 16, 64)
-		if err != nil {
-			log.Printf("Failed to decode beast avr timestamp: %s", err)
-			return
-		}
-		// handle rollover
-		oldestBootTime := time.Now().Add(-2000000 * time.Second)
-		if oldestBootTime.After(beastAvrBootTime) {
-			beastAvrBootTime = oldestBootTime
-		}
-
-		guess := f.TimeStamp().Add(time.Duration(ticksSinceBoot * 500) * time.Nanosecond)
-		if guess.Before(beastAvrBootTime) {
-			beastAvrBootTime = guess
-		}
-
-		//duration := time.Duration(ticksSinceBoot * 500)
-		//log.Printf("%0.2f seconds, or %s", duration.Seconds(), duration.String())
-
-		f.timeStamp = beastAvrBootTime.Add(time.Duration(ticksSinceBoot * 500))
+func (f *Frame) parseBeastTimeStamp() {
+	if "" == f.beastTimeStamp || "00000000000" == f.beastTimeStamp {
+		return
 	}
+	// MLAT timestamps from Beast AVR are dependent on when the device started ( 500ns intervals / 12mhz)
+	// calculated from power on.
+	// 48 bits = 2.81474976711e+14
+	// max: 2,000,000 seconds
+	// Wrinkle: The same 48bites are used in GPS format (from radarcape)
+	//   18 bit second of day, 30bit nanosecond
+	ticksSinceBoot, err := strconv.ParseInt(f.beastTimeStamp, 16, 64)
+	if err != nil {
+		log.Printf("Failed to decode beast avr timestamp: %s", err)
+		return
+	}
+	if nil == f.beastAvrBoot {
+		panic(errors.New("Should have set f.beastAvrBoot"))
+	}
+
+	// handle rollover
+	oldestBootTime := time.Now().Add(-2000000 * time.Second)
+	if oldestBootTime.After(*f.beastAvrBoot) {
+		*f.beastAvrBoot = oldestBootTime
+	}
+
+	guess := f.TimeStamp().Add(time.Duration(ticksSinceBoot*500) * time.Nanosecond)
+	if guess.Before(*f.beastAvrBoot) {
+		*f.beastAvrBoot = guess
+	}
+
+	f.beastAvrUptime = time.Duration(ticksSinceBoot * 500)
+	//log.Printf("%0.2f seconds, or %s", duration.Seconds(), duration.String())
+
+	f.timeStamp = beastAvrBootTime.Add(time.Duration(ticksSinceBoot * 500))
 }
 
 func (f *Frame) TimeStamp() time.Time {
@@ -216,7 +251,7 @@ func (f *Frame) parseRawToMessage() error {
 
 	messageLen := frameLen / 2
 
-	if ! (messageLen == modesShortMsgBytes || messageLen == modesLongMsgBytes) {
+	if !(messageLen == modesShortMsgBytes || messageLen == modesLongMsgBytes) {
 		return fmt.Errorf("frame is incorrect length. %d != 7 or 14", messageLen)
 	}
 
@@ -409,15 +444,23 @@ func (f *Frame) getMessageLengthBytes() uint32 {
 }
 
 func (f *Frame) decodeFlightNumber() {
-	f.flight = make([]byte, 8)
-	f.flight[0] = aisCharset[f.message[5]>>2]
-	f.flight[1] = aisCharset[((f.message[5]&3)<<4)|(f.message[6]>>4)]
-	f.flight[2] = aisCharset[((f.message[6]&15)<<2)|(f.message[7]>>6)]
-	f.flight[3] = aisCharset[f.message[7]&63]
-	f.flight[4] = aisCharset[f.message[8]>>2]
-	f.flight[5] = aisCharset[((f.message[8]&3)<<4)|(f.message[9]>>4)]
-	f.flight[6] = aisCharset[((f.message[9]&15)<<2)|(f.message[10]>>6)]
-	f.flight[7] = aisCharset[f.message[10]&63]
+	f.flight = decodeFlightNumber(f.message[5:11])
+}
+
+func decodeFlightNumber(b []byte) []byte {
+	if 6 != len(b) {
+		panic(fmt.Sprintf("attempting to decode a flight number/callsign with too many bytes (%d)", len(b)))
+	}
+	callsign := make([]byte, 8)
+	callsign[0] = aisCharset[b[0]>>2]
+	callsign[1] = aisCharset[((b[0]&3)<<4)|(b[1]>>4)]
+	callsign[2] = aisCharset[((b[1]&15)<<2)|(b[2]>>6)]
+	callsign[3] = aisCharset[b[2]&63]
+	callsign[4] = aisCharset[b[3]>>2]
+	callsign[5] = aisCharset[((b[3]&3)<<4)|(b[4]>>4)]
+	callsign[6] = aisCharset[((b[4]&15)<<2)|(b[5]>>6)]
+	callsign[7] = aisCharset[b[5]&63]
+	return callsign
 }
 
 func (f *Frame) decodeFlightId() {

@@ -30,7 +30,9 @@ func main() {
 
 	app.Action = runHttpServer
 
-	app.Run(os.Args)
+	if err := app.Run(os.Args); nil != err {
+		fmt.Println(err)
+	}
 }
 
 func runHttpServer(c *cli.Context) {
@@ -46,19 +48,19 @@ func runHttpServer(c *cli.Context) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
-				fmt.Fprintln(w, "Failed big time...");
-				fmt.Fprintln(w, r)
-				w.Write(debug.Stack())
+				_, _ = fmt.Fprintln(w, "Failed big time...")
+				_, _ = fmt.Fprintln(w, r)
+				_, _ = w.Write(debug.Stack())
 			}
 		}()
 		switch r.URL.Path {
 		case "/decode":
-			tracker.NukePlanes();
+			tracker.NukePlanes()
 			var submittedPackets string
-			r.ParseForm()
+			_ = r.ParseForm()
 			submittedPackets = r.FormValue("packet")
 			if "" == submittedPackets {
-				fmt.Fprintln(w, "No Packet Provided")
+				_, _ = fmt.Fprintln(w, "No Packet Provided")
 				return
 			}
 			packets := strings.Split(submittedPackets, ";")
@@ -66,31 +68,35 @@ func runHttpServer(c *cli.Context) {
 			for _, packet := range packets {
 				packet = strings.TrimSpace(packet)
 				if "" == packet {
-					continue;
+					continue
 				}
-				println("Decoding Frame:", packet)
+				log.Println("Decoding Frame:", packet)
 				frame, err := mode_s.DecodeString(packet, time.Now())
 				if err != nil {
-					fmt.Fprintln(w, "Failed to decode.", err)
+					_, _ = fmt.Fprintln(w, "Failed to decode.", err)
 					return
 				}
-				tracker.HandleModeSFrame(frame, false);
+				if nil == frame {
+					_, _ = fmt.Fprintln(w, "Not an AVR Frame", err)
+					return
+				}
+				tracker.HandleModeSFrame(frame, false)
 				icaoList[frame.ICAOAddr()] = frame.ICAOAddr()
 				frame.Describe(w)
 			}
 
 			for _, icao := range icaoList {
-				fmt.Fprintln(w, "")
+				_, _ = fmt.Fprintln(w, "")
 				plane := tracker.GetPlane(icao)
 				encoded, _ := json.MarshalIndent(plane, "", "  ")
-				fmt.Fprintf(w, "%s", string(encoded))
+				_, _ = fmt.Fprintf(w, "%s", string(encoded))
 			}
 
 		case "/":
 			http.ServeFile(w, r, path.Join(htdocsPath, "/index.html"))
 		default:
 			http.NotFound(w, r)
-			fmt.Fprintln(w, "<br/>\n" + r.RequestURI)
+			_, _ = fmt.Fprintln(w, "<br/>\n"+r.RequestURI)
 		}
 
 	})

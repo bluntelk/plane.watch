@@ -23,7 +23,7 @@ func TestDecodeDF17BaroAlt1(t *testing.T) {
 	}
 }
 
-// Beast AVR Timestamp Format
+// Beast AVR MLAT Timestamp Format
 func TestDecodeDF17BaroAlt2(t *testing.T) {
 	frame, err := DecodeString("@000000EF31C08d8960c66055972f34137e0be0a2;", time.Now())
 	if nil != err {

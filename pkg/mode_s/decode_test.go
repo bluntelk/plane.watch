@@ -255,10 +255,14 @@ func TestBadFuzz(t *testing.T) {
 		"@00000000000 \n",
 	}
 	var err error
+	var f *Frame
 	for _, msg := range messages {
-		_, err = DecodeString(msg, time.Now())
+		f, err = DecodeString(msg, time.Now())
 		if nil == err {
 			t.Errorf("Bad input %s was valid", msg)
+			if nil != f {
+				t.Error(f.String())
+			}
 		}
 	}
 }

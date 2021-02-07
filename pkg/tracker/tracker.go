@@ -18,7 +18,10 @@ func init() {
 	SetDebugOutput(os.Stdout)
 }
 
-func HandleModeSFrame(frame mode_s.Frame, debug bool) *Plane {
+func HandleModeSFrame(frame *mode_s.Frame, debug bool) *Plane {
+	if nil == frame {
+		return nil
+	}
 	icao := frame.ICAOAddr()
 	if 0 == icao {
 		return nil
