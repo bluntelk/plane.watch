@@ -13,9 +13,9 @@ type featureDescriptionType struct {
 }
 
 type featureBreakdown struct {
-	name, longName       string
-	start, end int
-	subFields  map[string][]featureBreakdown
+	name, longName string
+	start, end     int
+	subFields      map[string][]featureBreakdown
 }
 
 var featureDescription = map[string]featureDescriptionType{
@@ -284,6 +284,59 @@ var bdsFeatures = map[string][]featureBreakdown{
 		{name: "GICB", start: 67, end: 68, longName: "Common usage GICB capability report"},
 		{name: "??ACAS", start: 68, end: 72, longName: "Reserved for ACAS"},
 		{name: "DTE", start: 72, end: 88, longName: "Data terminal equipment (DTE) status"},
+	},
+	"1.7": {
+		{name: "F01", start: 32, end: 33, longName: "0,5 Extended squitter airborne position"},
+		{name: "F02", start: 33, end: 34, longName: "0,6 Extended squitter surface position"},
+		{name: "F03", start: 34, end: 35, longName: "0,7 Extended squitter status"},
+		{name: "F04", start: 35, end: 36, longName: "0,8 Extended squitter identification and category"},
+		{name: "F05", start: 36, end: 37, longName: "0,9 Extended squitter airborne velocity information"},
+		{name: "F06", start: 37, end: 38, longName: "0,A Extended squitter event-driven information"},
+		{name: "F07", start: 38, end: 39, longName: "2,0 Aircraft identification"},
+		{name: "F08", start: 39, end: 40, longName: "2,1 Aircraft registration number"},
+		{name: "F09", start: 40, end: 41, longName: "4,0 Selected vertical intention"},
+		{name: "F11", start: 41, end: 42, longName: "4,1 Next waypoint identifier"},
+		{name: "F11", start: 42, end: 43, longName: "4,2 Next waypoint position"},
+		{name: "F12", start: 43, end: 44, longName: "4,3 Next waypoint information"},
+		{name: "F13", start: 44, end: 45, longName: "4,4 Meteorological routine report"},
+		{name: "F14", start: 45, end: 46, longName: "4,5 Meteorological hazard report"},
+		{name: "F15", start: 46, end: 47, longName: "4.8 VHF channel report"},
+		{name: "F16", start: 47, end: 48, longName: "5,0 Track and turn report"},
+		{name: "F17", start: 48, end: 49, longName: "5,1 Position coarse"},
+		{name: "F18", start: 49, end: 50, longName: "5,2 Position fine"},
+		{name: "F19", start: 50, end: 51, longName: "5,3 Air-referenced state vector"},
+		{name: "F20", start: 51, end: 52, longName: "5,4 Waypoint 1"},
+		{name: "F21", start: 52, end: 53, longName: "5,5 Waypoint 2"},
+		{name: "F22", start: 53, end: 54, longName: "5,6 Waypoint 3"},
+		{name: "F23", start: 54, end: 55, longName: "5,F Quasi-static parameter monitoring"},
+		{name: "F24", start: 55, end: 56, longName: "6,0 Heading and speed report"},
+		{name: "F25", start: 56, end: 57, longName: "Reserved for aircraft capability"},
+		{name: "F26", start: 57, end: 58, longName: "Reserved for aircraft capability"},
+		{name: "F27", start: 58, end: 59, longName: "E,1 Reserved for Mode S BITE (Built In Test Equipment)"},
+		{name: "F28", start: 59, end: 60, longName: "E,2 Reserved for Mode S BITE (Built In Test Equipment)"},
+		{name: "F29", start: 60, end: 61, longName: "F,1 Military applications"},
+		{name: "??", start: 61, end: 88, longName: "Reserved"},
+	},
+	"2.0": {
+		{name: "BDS#", start: 32, end: 40, longName: "BDS Code"},
+		{name: "CHAR", start: 40, end: 46},
+		{name: "CHAR", start: 46, end: 52},
+		{name: "CHAR", start: 52, end: 58},
+		{name: "CHAR", start: 58, end: 64},
+		{name: "CHAR", start: 64, end: 70},
+		{name: "CHAR", start: 70, end: 76},
+		{name: "CHAR", start: 76, end: 82},
+		{name: "CHAR", start: 82, end: 88},
+	},
+	"3.0": {
+		{name: "BDS#", start: 32, end: 40, longName: "BDS Code"},
+		{name: "A RA", start: 40, end: 54, longName: "Active resolution advisories"},
+		{name: "RA C", start: 54, end: 58, longName: "Resolution advisory complements record"},
+		{name: "RA T", start: 58, end: 59, longName: "RA terminated"},
+		{name: "MT", start: 59, end: 60, longName: "Multiple threat encounter"},
+		{name: "TTI", start: 60, end: 62, longName: "Threat type indicator"},
+		{name: "TID", start: 62, end: 86, longName: "Threat identity data"},
+		{name: "??", start: 86, end: 88, longName: "Reserved"},
 	},
 }
 

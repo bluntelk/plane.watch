@@ -56,7 +56,9 @@ func (f *Frame) decodeCommB() error {
 	f.major, f.minor, err = inferCommBMessageType(f.message[4:11])
 	if nil != err {
 		// log the error?
-		log.Println(err)
+		if !errors.Is(err, UnknownCommBMessage) {
+			log.Println(err)
+		}
 	}
 
 	switch f.BdsMessageType() {

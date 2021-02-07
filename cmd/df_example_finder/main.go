@@ -115,8 +115,16 @@ func showTypes(filePath string) {
 			//println("Error! ", line, err.Error())
 			continue
 		}
+		switch frame.DownLinkType() {
+		case 17:
+			fmt.Printf("DF%02d\tMT%02d\tST%02d\t%s\t%s\n",frame.DownLinkType(), frame.MessageType(), frame.MessageSubType(), frame.ICAOString(), line)
+		case 20, 21:
+			fmt.Printf("DF%02d\tBDS%s\tST%02d\t%s\t%s\n",frame.DownLinkType(), frame.BdsMessageType(), frame.MessageSubType(), frame.ICAOString(), line)
+		default:
+			fmt.Printf("DF%02d\tMT%02d\tST%02d\t%s\t%s\n",frame.DownLinkType(), frame.MessageType(), frame.MessageSubType(), frame.ICAOString(), line)
 
-		fmt.Printf("DF%02d\tMT%02d\tST%02d\t%s\t%s\n",frame.DownLinkType(), frame.MessageType(), frame.MessageSubType(), frame.ICAOString(), line)
+		}
+
 	}
 
 }
