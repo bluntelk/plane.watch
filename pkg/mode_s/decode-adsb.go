@@ -48,7 +48,8 @@ func (f *Frame) decodeAdsb() {
 			f.validHeading = true
 		}
 
-	case 9, 10, 11, 12, 13, 14, 15, 16, 17, 18:
+	case 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22:
+		f.isGnssAlt = f.messageType >= 20
 		/* Airborne position Message */
 		f.messageSubType = 0
 		f.timeFlag = int(f.message[6] & (1 << 3))
@@ -58,7 +59,17 @@ func (f *Frame) decodeAdsb() {
 		f.nicSupplementB = f.message[4] & 0x01
 
 		field := ((int32(f.message[5]) << 4) | (int32(f.message[6]) >> 4)) & 0x0FFF
-		f.altitude = decodeAC12Field(field)
+		if f.isGnssAlt {
+			// decimal value
+			if f.unit == modesUnitFeet {
+				f.altitude = int32(float64(field) * 3.28084)
+			} else {
+				f.altitude = field
+			}
+
+		} else {
+			f.altitude = decodeAC12Field(field)
+		}
 		f.validAltitude = f.altitude != 0
 		f.decodeAdsbLatLon()
 
@@ -154,8 +165,6 @@ func (f *Frame) decodeAdsb() {
 			}
 			f.haeDelta = multiplier * int((f.message[10] & 0x7f) - 1)
 		}
-	case 20, 21, 22:
-	//NoOp -- Airborne Position with GNSS instead of Baro
 	case 23:
 		if f.messageSubType == 7 {
 			// TEST MESSAGE with  squawk - decode it!

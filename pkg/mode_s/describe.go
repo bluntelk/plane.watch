@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"strconv"
 	"strings"
 )
@@ -51,7 +52,7 @@ var featureDescription = map[string]featureDescriptionType{
 	"RR":   {field: "Reply Request", meaning: "commands details of reply"},
 	"SD":   {field: "Special Designator", meaning: "control codes to transponder"},
 	"SL":   {field: "Sensitivity level, ACAS", meaning: "Reports the current operating sensitivity level of TCAS"},
-	"SS":   {field: "Surveillance Status", meaning: ""},
+	"SS":   {field: "Surveillance Status", meaning: "  0: No condition,  1: Permanent alert, 2: Temporary alert, 3: SPI condition"},
 	"UF":   {field: "Uplink Format", meaning: "format descriptor"},
 	"UM":   {field: "Utility Message", meaning: "protocol message"},
 	"VS":   {field: "Vertical Status", meaning: "aircraft status, airborne (0) or on the ground (1)"},
@@ -60,7 +61,7 @@ var featureDescription = map[string]featureDescriptionType{
 	"CCC":  {field: "Capability Class Code", meaning: "Capability Class Code"},
 	"OMC":  {field: "Operational Mode Code", meaning: "Operational Mode Code"},
 	"CRC":  {field: "CRC", meaning: "CRC Checksum"},
-	"TC":   {field: "DF 17 Message Type", meaning: "Message Category"},
+	"TC":   {field: "DF 17 Message Type", meaning: "Message Type Code"},
 	"SUB":  {field: "DF 17 Message Sub Type", meaning: "Message Sub Type"},
 	"DATA": {field: "ADS-B Data", meaning: "ADS-B Data"},
 	"CHAR": {field: "Flight Number", meaning: "1 character of the AIS charset"},
@@ -100,6 +101,7 @@ var featureDescription = map[string]featureDescriptionType{
 }
 
 var featureDF17FlightName = []featureBreakdown{
+	{name: "TC", start: 32, end: 37},
 	{name: "CAT", start: 37, end: 40},
 	{name: "CHAR", start: 40, end: 46},
 	{name: "CHAR", start: 46, end: 52},
@@ -111,6 +113,7 @@ var featureDF17FlightName = []featureBreakdown{
 	{name: "CHAR", start: 82, end: 88},
 }
 var featureDF17SurfacePosition = []featureBreakdown{
+	{name: "TC", start: 32, end: 37},
 	{name: "MOV", start: 37, end: 44},
 	{name: "HB", start: 44, end: 45},
 	{name: "HD", start: 45, end: 52},
@@ -120,6 +123,7 @@ var featureDF17SurfacePosition = []featureBreakdown{
 	{name: "LON", start: 71, end: 88},
 }
 var featureDF17AirPosition = []featureBreakdown{
+	{name: "TC", start: 32, end: 37},
 	{name: "SS", start: 37, end: 39},
 	{name: "NICb", start: 39, end: 40},
 	{name: "AC", start: 40, end: 52},
@@ -130,10 +134,12 @@ var featureDF17AirPosition = []featureBreakdown{
 }
 
 var featureDF17AirVelocityUnknown = []featureBreakdown{
+	{name: "TC", start: 32, end: 37},
 	{name: "SUB", start: 37, end: 40},
 	{name: "??", start: 40, end: 88},
 }
 var featureDF17AirVelocityGroundSpeed = []featureBreakdown{
+	{name: "TC", start: 32, end: 37},
 	{name: "SUB", start: 37, end: 40},
 	{name: "IC", start: 40, end: 41},
 	{name: "IFR", start: 41, end: 42},
@@ -150,6 +156,7 @@ var featureDF17AirVelocityGroundSpeed = []featureBreakdown{
 	{name: "HAEV", start: 81, end: 88},
 }
 var featureDF17AirVelocityAirSpeed = []featureBreakdown{
+	{name: "TC", start: 32, end: 37},
 	{name: "SUB", start: 37, end: 40},
 	{name: "IC", start: 40, end: 41},
 	{name: "IFR", start: 41, end: 42},
@@ -200,12 +207,17 @@ var asdbFeatures = map[string][]featureBreakdown{
 	"17": featureDF17AirPosition,
 	"18": featureDF17AirPosition,
 	"19": featureDF17AirVelocity,
+	"20": featureDF17AirPosition,
+	"21": featureDF17AirPosition,
+	"22": featureDF17AirPosition,
 	"23": {
+		{name: "TC", start: 32, end: 37},
 		{name: "SUB", start: 37, end: 40},
 		{name: "ID", start: 40, end: 53},
 		{name: "  ", start: 53, end: 88},
 	},
 	"28": {
+		{name: "TC", start: 32, end: 37},
 		{name: "SUB", start: 37, end: 40},
 		{name: "??", start: 40, end: 88, subFields: map[string][]featureBreakdown{
 			"0": {
@@ -238,10 +250,12 @@ var asdbFeatures = map[string][]featureBreakdown{
 		},
 	},
 	"29": {
+		{name: "TC", start: 32, end: 37},
 		{name: "SUB", start: 37, end: 40},
 		{name: "??", start: 40, end: 88},
 	},
 	"31": {
+		{name: "TC", start: 32, end: 37},
 		{name: "SUB", start: 37, end: 40},
 		{name: "CCC", start: 40, end: 56, subFields: map[string][]featureBreakdown{
 			"0": { // airborne
@@ -393,8 +407,7 @@ var frameFeatures = map[byte][]featureBreakdown{
 		{name: "DF", start: 0, end: 5},
 		{name: "CA", start: 5, end: 8},
 		{name: "AA", start: 8, end: 32},
-		{name: "TC", start: 32, end: 37},
-		{name: "ME", start: 40, end: 88, subFields: asdbFeatures},
+		{name: "ME", start: 32, end: 88, subFields: asdbFeatures},
 		{name: "PI", start: 88, end: 112},
 	},
 	18: {
@@ -527,10 +540,30 @@ func (f *Frame) showCrossLinkCapability(output io.Writer) {
 
 func (f *Frame) showAltitude(output io.Writer) {
 	if f.validAltitude {
-		fprintf(output, "AC: Altitude        : %d %s (q bit: %t, m bit: %t)\n", f.altitude, f.AltitudeUnits(), f.acQ, f.acM)
+		if f.isGnssAlt {
+			fprintf(output, "AC: Altitude        : %d %s (GNSS)\n", f.altitude, f.AltitudeUnits())
+		} else {
+			fprintf(output, "AC: Altitude        : %d %s (q bit: %t, m bit: %t)\n", f.altitude, f.AltitudeUnits(), f.acQ, f.acM)
+		}
 	} else {
 		fprintln(output, "AC: Altitude        : Invalid")
 	}
+}
+
+func (f *Frame) showWakeVortex(output io.Writer) {
+	var wakeType string
+	if 1 == f.messageType {
+		wakeType = "Reserved!"
+	} else if f.messageType > 4 {
+		wakeType = "Unknown"
+	} else if 0 == f.catSubType {
+		wakeType = "No Information Provided"
+	} else {
+		wakeType = wakeVortex[f.messageType][f.catSubType]
+	}
+	wakeType = fmt.Sprintf("(TC:%d CAT:%d) - %s", f.messageType, f.catSubType, wakeType)
+
+	fprintf(output, "Wake Type           : %s", wakeType)
 }
 
 func (f *Frame) showContainmentRadius(output io.Writer) {
@@ -670,11 +703,13 @@ func (f *Frame) showAdsb(output io.Writer) {
 	case 1, 2, 3, 4:
 		f.showCategory(output)
 		f.showFlightNumber(output)
+		f.showWakeVortex(output)
 	case 5, 6, 7, 8:
 		f.showVelocity(output)
 		f.showHeading(output)
 		f.showCprLatLon(output)
-	case 9, 10, 11, 12, 13, 14, 15, 16, 17, 18:
+	case 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22:
+		// 20-22 is GNSS Altitude, 9-18 is barometric
 		f.showContainmentRadius(output)
 		f.showSurveilanceStatus(output)
 		f.showNavigationIntegrity(output)
@@ -803,14 +838,14 @@ func (f *Frame) showBitString(output io.Writer) {
 }
 
 func (f *Frame) formatBitString(features []featureBreakdown) string {
-	var header, separator, bits, rawBits, bitFmt, bitDesc, footer, suffix string
+	var header, separator, bits, rawBits, bitFmt, bitDesc, footer string
 	var padLen, realLen, shownBitCount, i int
 
 	for _, i := range f.message {
 		rawBits += fmt.Sprintf("%08s", strconv.FormatUint(uint64(i), 2))
 	}
 
-	doMakeBitString := func(f featureBreakdown, indent string) {
+	doMakeBitString := func(f featureBreakdown) {
 		padLen = len(f.name)
 		realLen = f.end - f.start
 		if realLen > padLen {
@@ -820,7 +855,6 @@ func (f *Frame) formatBitString(features []featureBreakdown) string {
 		bitFmt = fmt.Sprintf(" %%- %ds |", padLen)
 		header += fmt.Sprintf(bitFmt, f.name)
 		separator += strings.Repeat("-", padLen+2) + "+"
-		//bits += fmt.Sprintf(bitFmt, rawBits[f.start: f.end])
 		bits += " "
 		for i = f.start; i < f.end; i++ {
 			if i%8 == 0 {
@@ -831,37 +865,54 @@ func (f *Frame) formatBitString(features []featureBreakdown) string {
 		}
 		bits += strings.Repeat(" ", padLen-(f.end-f.start)+1) + "|"
 		bitDesc += fmt.Sprintf(bitFmt, strconv.Itoa(f.start))
+	}
 
-		if 1 == realLen {
+	doMakeFooterString := func(f featureBreakdown, indent string) {
+		var feature featureDescriptionType
+		var fieldBitLength = f.end - f.start
+		var suffix string
+		if 1 == fieldBitLength {
 			suffix = ""
 		} else {
 			suffix = "s"
 		}
-		var feature featureDescriptionType
+
 		if "" != f.longName {
 			feature.field = f.name
 			feature.meaning = f.longName
 		} else {
 			feature = featureDescription[f.name]
 		}
-		footer += fmt.Sprintf(" %s%-10s %d bit%s\t %s: %s\n", indent, f.name, realLen, suffix, feature.field, feature.meaning)
+		footer += fmt.Sprintf(" %s%-10s (%2d-%2d) %2d bit%s\t %s: %s\n", indent, f.name, f.start, f.end-1, fieldBitLength, suffix, feature.field, feature.meaning)
 	}
 
 	var feature featureDescriptionType
 
-	var subFieldBitCounter int
+	var fieldBitCounter, subFieldBitCounter, subSubFieldBitCounter int
 	for _, feat := range features {
 		var sk string
+
+		// determine any specified sub feature we need to recurse down into
 		switch f.downLinkFormat {
 		case 17:
-			sk = strconv.Itoa(int(f.messageSubType))
+			sk = strconv.Itoa(int(f.messageType))
 		case 20, 21:
 			sk = f.BdsMessageType()
 		}
 
+		if fieldBitCounter != feat.start {
+			log.Printf("Describe: Top Level Fields Not Adding up. (%d %s %d). Expected Start=%d, got=%d", f.downLinkFormat, sk, f.messageSubType, feat.start, fieldBitCounter)
+		}
+		fieldBitCounter = feat.end
+
 		if 0 == len(feat.subFields[sk]) {
-			doMakeBitString(feat, "")
+			// this field does not have any sub field features
+			doMakeBitString(feat)
+			doMakeFooterString(feat, "")
 		} else {
+			// this field has an array of fields that make up its important properties
+			doMakeFooterString(feat, "")
+
 			subFieldBitCounter = feat.start
 			if "" != feat.longName {
 				feature.field = feat.name
@@ -870,17 +921,26 @@ func (f *Frame) formatBitString(features []featureBreakdown) string {
 				feature = featureDescription[feat.name]
 			}
 
-			footer += fmt.Sprintf("-- Field=%s -- SubFields -- %s: %s \n", feat.name, feature.field, feature.meaning)
+			//footer += fmt.Sprintf("-- Field=%s -- SubFields -- %s: %s \n", feat.name, feature.field, feature.meaning)
 			for _, sf := range feat.subFields[sk] {
 				if subFieldBitCounter != sf.start {
-					println("Bad Field Alignment: ", subFieldBitCounter, sf.start)
+					log.Printf("Describe: Second Level Fields Not Adding up. (%d %s %d). Expected Start=%d, got=%d", f.downLinkFormat, sk, f.messageSubType, sf.start, subFieldBitCounter)
 				}
 				subFieldBitCounter = sf.end
 				if 0 == len(sf.subFields[sk]) {
-					doMakeBitString(sf, " -> ")
+					doMakeBitString(sf)
+					doMakeFooterString(sf, " -> ")
+
 				} else {
-					for _, ssf := range sf.subFields[sk] {
-						doMakeBitString(ssf, " -> ")
+					feature = featureDescription[sf.name]
+					subSubFieldBitCounter = sf.start
+					ssk := strconv.Itoa(int(f.messageSubType))
+					for _, ssf := range sf.subFields[ssk] {
+						if subSubFieldBitCounter != ssf.start {
+							log.Printf("Describe: Third Level Fields Not Adding up. (%d %s %d). Expected Start=%d, got=%d", f.downLinkFormat, sk, f.messageSubType, ssf.start, subSubFieldBitCounter)
+						}
+						doMakeBitString(ssf)
+						doMakeFooterString(ssf, "   -> ")
 					}
 				}
 			}

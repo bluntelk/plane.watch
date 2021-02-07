@@ -33,6 +33,7 @@ const (
 type Position struct {
 	validAltitude       bool
 	altitude            int32
+	isGnssAlt           bool
 	unit                int
 
 	rawLatitude         int     /* Non decoded latitude */
@@ -308,6 +309,39 @@ var (
 		},
 	}
 
+	// TC -> CA
+	wakeVortex = [5][8]string{
+		0: {},
+		1: {},
+		2: {
+			1: "Surface emergency vehicle",
+			2: "?",
+			3: "Surface service vehicle",
+			4: "Ground obstruction",
+			5: "Ground obstruction",
+			6: "Ground obstruction",
+			7: "Ground obstruction",
+		},
+		3: {
+			1: "Glider, sailplane",
+			2: "Lighter-than-air",
+			3: "Parachutist, skydiver",
+			4: "Ultralight, hang-glider, paraglider",
+			5: "Reserved",
+			6: "Unmanned aerial vehicle",
+			7: "Space or transatmospheric vehicle",
+		},
+		4: {
+			1: "Light (less than 7000 kg)",
+			2: "Medium 1 (between 7000 kg and 34000 kg)",
+			3: "Medium 2 (between 34000 kg to 136000 kg)",
+			4: "High vortex aircraft",
+			5: "Heavy (larger than 136000 kg)",
+			6: "High performance (>5 g acceleration) and high speed (>400 kt)",
+			7: "Rotocraft",
+		},
+	}
+
 	adsbCompatibilityVersion = []string{
 		0: "Conformant to DO-260/ED-102 and DO-242",
 		1: "Conformant to DO-260A and DO-242A",
@@ -354,6 +388,7 @@ func (f *Frame) MessageTypeString() string {
 	} else if f.messageType == 28 {
 		if f.messageSubType == 1 {
 			name = DF17FrameEmergencyPriority
+			f.decodeFlightNumber()
 
 		} else if f.messageSubType == 2 {
 			name = DF17FrameTcasRA
