@@ -463,9 +463,9 @@ func decodeFlightNumber(b []byte) []byte {
 	return callsign
 }
 
-func (f *Frame) decodeFlightId() {
-	if f.message[4] == 32 && len(f.message) >= 10 {
-		// Aircraft Identification
-		f.decodeFlightNumber()
-	}
-}
+//func (f *Frame) decodeFlightId() {
+//	if f.message[4] == 32 && len(f.message) >= 10 {
+//		// Aircraft Identification
+//		f.decodeFlightNumber()
+//	}
+//}

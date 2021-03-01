@@ -597,11 +597,11 @@ func (f *Frame) showFlightStatus(output io.Writer) {
 	f.showAlert(output)
 	f.showVerticalStatus(output)
 }
-
-func (f *Frame) showFlightId(output io.Writer) {
-	fprintf(output, "Flight          : %s", f.Flight())
-	fprintln(output, "")
-}
+//
+//func (f *Frame) showFlightId(output io.Writer) {
+//	fprintf(output, "Flight          : %s", f.Flight())
+//	fprintln(output, "")
+//}
 
 func (f *Frame) showICAO(output io.Writer) {
 	fprintf(output, "AA: ICAO            : %6X", f.icao)

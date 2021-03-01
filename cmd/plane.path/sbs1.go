@@ -5,8 +5,8 @@ import (
 	"github.com/urfave/cli"
 	"io/ioutil"
 	"os"
-	"plane.watch/pkg/sbs1"
-	"plane.watch/pkg/tracker"
+	"plane.watch/lib/tracker"
+	"plane.watch/lib/tracker/sbs1"
 	"time"
 )
 
@@ -31,12 +31,12 @@ func parseSbs(c *cli.Context) error {
 	}
 
 	if !verbose {
-		tracker.SetDebugOutput(ioutil.Discard)
+		tracker.SetLoggerOutput(ioutil.Discard)
 	}
 
 	inputLines, errChan := readFiles(dataFiles)
 
-	trackingChan := make(chan sbs1.Frame, 50)
+	trackingChan := make(chan *sbs1.Frame, 50)
 	go handleSbs1Tracking(trackingChan, verbose)
 	go func() {
 		for err := range errChan {
@@ -68,8 +68,8 @@ func parseSbs(c *cli.Context) error {
 	return writeResult(outFileName)
 }
 
-func handleSbs1Tracking(trackingChan chan sbs1.Frame, debug bool) {
+func handleSbs1Tracking(trackingChan chan *sbs1.Frame, debug bool) {
 	for frame := range trackingChan {
-		tracker.HandleSbs1Frame(frame, debug)
+		tracker.HandleSbs1Frame(frame)
 	}
 }

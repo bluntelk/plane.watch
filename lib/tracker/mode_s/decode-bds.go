@@ -7,14 +7,35 @@ import (
 	"strings"
 )
 
+const (
+	BdsESAirbornePosition  = "0.5"
+	BdsESSurfacePosition   = "0.6"
+	BdsESStatus            = "0.7"
+	BdsESIdCat             = "0.8"
+	BdsESAirVelocity       = "0.9"
+	BdsElsDataLinkCap      = "1.0"
+	BdsElsGicbCap          = "1.7"
+	BdsElsAircraftIdent    = "2.0"
+	BdsElsAcasRA           = "3.0"
+	BdsEhsSelVertIntent    = "4.0"
+	BdsEhsAircraftIntent   = "4.3"
+	BdsMetRoutineAirReport = "4.4"
+	BdsMetHazartReport     = "4.5"
+	BdsEhsTrackTurnReport  = "5.0"
+	BdsEhsPosRepCourse     = "5.1"
+	BdsEhsPosRepFine       = "5.2"
+	BdsEhsAirRefStateVec   = "5.3"
+	BdsEhsHeadingSpeed     = "6.0"
+)
+
 type bds struct {
 	major, minor byte
 }
 
 var (
-	UnknownCommBMessage = errors.New("unable to infer Comm-B message type")
+	UnknownCommBMessage  = errors.New("unable to infer Comm-B message type")
 	CommBIncorrectLength = errors.New("Comm-B must be exactly 7 bytes")
-	bdsFields           = map[string]string{
+	bdsFields            = map[string]string{
 		// ADSB Service
 		"0.5": "Extended Squitter Airborne Position",
 		"0.6": "Extended Squitter Surface Position",
@@ -62,11 +83,12 @@ func (f *Frame) decodeCommB() error {
 	}
 
 	switch f.BdsMessageType() {
-	case "1.0":
+	case BdsElsDataLinkCap: // 1.0
 		// decode capability
-	case "1.7":
+		// todo: get squawk
+	case BdsElsGicbCap: // 1.7
 		// decode GICB
-	case "2.0":
+	case BdsElsAircraftIdent: // 2.0
 		f.decodeFlightNumber()
 
 	}
@@ -127,7 +149,7 @@ func inferCommBMessageType(mb []byte) (byte, byte, error) {
 	var bits uint64
 	// get bits 16-22 as the LSB
 	bits = ((uint64(mb[1]) << 8) | uint64(mb[2])) >> 2
-	if mb[0] == 0b0011_0000 && mb[3]&0b0000_1100 != 0b0000_1100 && bits &0b0111_1111 < 48 {
+	if mb[0] == 0b0011_0000 && mb[3]&0b0000_1100 != 0b0000_1100 && bits&0b0111_1111 < 48 {
 		return 3, 0, nil
 	}
 

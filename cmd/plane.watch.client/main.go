@@ -7,8 +7,8 @@ import (
 	"github.com/urfave/cli"
 	"log"
 	"os"
-	"plane.watch/pkg/mode_s"
-	"plane.watch/pkg/tracker"
+	"plane.watch/lib/tracker"
+	"plane.watch/lib/tracker/mode_s"
 	"time"
 )
 
@@ -180,7 +180,7 @@ func run(c *cli.Context) {
 		if nil != err {
 			log.Println(err)
 		}
-		plane := tracker.HandleModeSFrame(frame, showDebug)
+		plane := tracker.HandleModeSFrame(frame)
 
 		if nil != plane {
 			planeJson, _ := json.Marshal(plane)
@@ -198,7 +198,7 @@ func run(c *cli.Context) {
 
 		}
 
-		tracker.CleanPlanes()
+		//tracker.CleanPlanes()
 	})
 
 	select {}

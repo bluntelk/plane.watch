@@ -5,8 +5,8 @@ import (
 	"github.com/urfave/cli"
 	"io/ioutil"
 	"os"
-	"plane.watch/pkg/mode_s"
-	"plane.watch/pkg/tracker"
+	"plane.watch/lib/tracker"
+	"plane.watch/lib/tracker/mode_s"
 	"time"
 )
 
@@ -27,8 +27,8 @@ func parseAvr(c *cli.Context) error {
 		fmt.Fprintf(os.Stderr, "Usage: %s %s [output-file.json] input [input...]\n", os.Args[0], c.Command.Name)
 	}
 
-	if !verbose {
-		tracker.SetDebugOutput(ioutil.Discard)
+	if verbose {
+		tracker.SetLoggerOutput(os.Stdout)
 	}
 
 	inputLines, errChan := readFiles(dataFiles)
@@ -38,11 +38,11 @@ func parseAvr(c *cli.Context) error {
 	errorChan := make(chan error, 1000)
 	exitChan := make(chan bool)
 
-	go handleReceived(resultChan, verbose)
+	go handleReceived(resultChan)
 	go handleErrors(errChan, verbose)
 	go handleErrors(errorChan, verbose)
 	if !verbose {
-		tracker.SetDebugOutput(ioutil.Discard)
+		tracker.SetLoggerOutput(ioutil.Discard)
 	}
 	go mode_s.DecodeStringWorker(jobChan, resultChan, errorChan)
 
@@ -67,22 +67,22 @@ func parseAvr(c *cli.Context) error {
 		close(errorChan)
 	}
 
-	fmt.Fprintf(os.Stderr,"We have %d points tracked\n", tracker.PointCounter)
+	fmt.Fprintf(os.Stderr, "We have %d points tracked\n", tracker.PointCounter)
 
 	return writeResult(outFileName)
 }
 
-func handleReceived(results chan *mode_s.Frame, verbose bool) {
+func handleReceived(results chan *mode_s.Frame) {
 	var resultCounter int
 	for {
 		select {
 		case frame := <-results:
 			resultCounter++
-			plane := tracker.HandleModeSFrame(frame, verbose)
+			plane := tracker.HandleModeSFrame(frame)
 			if nil != plane {
 				// whee plane changed - now has it moved from its last position?
 				if resultCounter%1000 == 0 {
-					fmt.Fprintf(os.Stderr,"Results: %d (buf %d)\r", resultCounter, len(results))
+					fmt.Fprintf(os.Stderr, "Results: %d (buf %d)\r", resultCounter, len(results))
 				}
 			}
 		}
@@ -92,7 +92,7 @@ func handleErrors(errors chan error, verbose bool) {
 	for {
 		select {
 		case err := <-errors:
-			if verbose && nil != err{
+			if verbose && nil != err {
 				fmt.Fprintln(os.Stderr, err)
 			}
 		}

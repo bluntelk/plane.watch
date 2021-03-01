@@ -12,61 +12,77 @@ const (
 	max17Bits = 131071
 )
 
-
 type (
-PlaneLocation struct {
-	Latitude, Longitude  float64
-	Altitude             int32
-	VerticalRate         int
-	AltitudeUnits        string
-	Heading, Velocity    float64
-	TimeStamp            time.Time
-	onGround, hasHeading bool
-	hasLatLon            bool
-	DistanceTravelled    float64
-	DurationTravelled    float64
-	TrackFinished        bool
-}
+	PlaneLocation struct {
+		Latitude, Longitude  float64
+		Altitude             int32
+		VerticalRate         int
+		AltitudeUnits        string
+		Heading, Velocity    float64
+		TimeStamp            time.Time
+		onGround, hasHeading bool
+		hasLatLon            bool
+		DistanceTravelled    float64
+		DurationTravelled    float64
+		TrackFinished        bool
+	}
 
- Flight struct {
-	Identifier string
-	Status     string
-	StatusId   byte
-}
+	Flight struct {
+		Identifier string
+		Status     string
+		StatusId   byte
+	}
 
- Plane struct {
-	lastSeen         time.Time
-	icaoIdentifier   uint32
-	Icao             string
-	SquawkIdentity   uint32
-	Flight           Flight
-	LocationHistory  []PlaneLocation
-	Location         PlaneLocation
-	cprLocation      CprLocation
-	Special          string
-	NumUpdates       int
-	frameTimes       []time.Time
-	RecentFrameCount int
-	AirframeCategory string
+	Plane struct {
+		lastSeen         time.Time
+		icaoIdentifier   uint32
+		Icao             string
+		Squawk           uint32
+		Flight           Flight
+		LocationHistory  []PlaneLocation
+		Location         PlaneLocation
+		cprLocation      CprLocation
+		Special          string
+		NumUpdates       int
+		frameTimes       []time.Time
+		RecentFrameCount int
+		AirframeCategory string
 
-	rwLock sync.RWMutex
-}
+		rwLock sync.RWMutex
+	}
 
- PlaneList map[uint32]Plane
+	PlaneList struct {
+		list sync.Map
+	}
 
- PlaneIterator func(p Plane)
+	PlaneIterator func(p *Plane) bool
 
+	DistanceTravelled struct {
+		metres   float64
+		duration float64
+	}
 )
+
 var (
-	planeList          PlaneList
-	planeAccessMutex   sync.Mutex
 	MaxLocationHistory = 10
+	PointCounter       int
 )
 
-func init() {
-	planeList = make(PlaneList, 2000)
+func NewPlane(icao uint32) *Plane {
+	p := &Plane{}
+	p.SetIcaoIdentifier(icao)
+	p.ResetLocationHistory()
+	p.ZeroCpr()
+	return p
 }
 
+func GetPlane(icao uint32) *Plane {
+	return DefaultTracker.GetPlane(icao)
+}
+
+func Each(pi PlaneIterator) {
+	DefaultTracker.EachPlane(pi)
+}
 
 func (p *Plane) LastSeen() time.Time {
 	p.rwLock.RLock()
@@ -86,70 +102,23 @@ func (p *Plane) IcaoIdentifier() uint32 {
 	return p.icaoIdentifier
 }
 
-func (p *Plane) SetIcaoIdentifier(icaoIdentifier   uint32) {
+func (p *Plane) SetIcaoIdentifier(icaoIdentifier uint32) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	p.icaoIdentifier = icaoIdentifier
+	p.Icao = fmt.Sprintf("%06X", icaoIdentifier)
 }
 
-
-func GetPlane(ICAO uint32) Plane {
-	planeAccessMutex.Lock()
-	defer planeAccessMutex.Unlock()
-
-	if plane, ok := planeList[ICAO]; ok {
-		return plane
-	}
-	var p Plane
-	p.SetIcaoIdentifier(ICAO)
-	p.Icao = fmt.Sprintf("%06X", ICAO)
+func (p *Plane) ResetLocationHistory() {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
 	p.LocationHistory = make([]PlaneLocation, 0)
-	p.ZeroCpr()
-	planeList[ICAO] = p
-
-	return p
 }
 
-func SetPlane(p Plane, ts time.Time) {
-	planeAccessMutex.Lock()
-	p.SetLastSeen(ts)
-	p.NumUpdates++
-	delete(planeList, p.IcaoIdentifier())
-	planeList[p.IcaoIdentifier()] = p
-	planeAccessMutex.Unlock()
-}
-
-func Each(pi PlaneIterator) {
-	planeAccessMutex.Lock()
-	defer planeAccessMutex.Unlock()
-
-	for _, p := range planeList {
-		pi(p)
-	}
-}
-
-// todo: fix this. it deletes everything
-func CleanPlanes() {
-	//remove planes that have not been seen for a while
-	planeAccessMutex.Lock()
-	//
-	//// go through the list and remove planes
-	//var cutOff, planeCutOff time.Time
-	//cutOff = time.Now().Add(5 * time.Minute)
-	//for i, plane := range planeList {
-	//	planeCutOff = plane.lastSeen.Add(5 * time.Minute)
-	//	if planeCutOff.Before(cutOff) {
-	//		delete(planeList, i)
-	//	}
-	//}
-
-	planeAccessMutex.Unlock()
-}
-
-func NukePlanes() {
-	planeAccessMutex.Lock()
-	planeList = make(PlaneList, 2000)
-	planeAccessMutex.Unlock()
+func (p *Plane) SetSpecial(status string) {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	p.Special = status
 }
 
 func (p *Plane) String() string {
@@ -201,7 +170,115 @@ func (p *Plane) MarkFrameTime(ts time.Time) {
 	p.RecentFrameCount = len(p.frameTimes)
 }
 
-var PointCounter int
+func (p *Plane) SetLocationUpdateTime(t time.Time) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	p.Location.TimeStamp = t
+}
+func (p *Plane) SetAltitude(altitude int32, altitudeUnits string) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	// set the current altitude
+	p.Location.Altitude = altitude
+	p.Location.AltitudeUnits = altitudeUnits
+}
+func (p *Plane) Altitude() int32 {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	// set the current altitude
+	return p.Location.Altitude
+}
+func (p *Plane) AltitudeUnits() string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	// set the current altitude
+	return p.Location.AltitudeUnits
+}
+func (p *Plane) SetGroundStatus(onGround bool) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	p.Location.onGround = onGround
+}
+func (p *Plane) GroundStatus() bool {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.Location.onGround
+}
+func (p *Plane) SetFlightStatus(statusId byte, statusString string) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	p.Flight.StatusId = statusId
+	p.Flight.Status = statusString
+}
+func (p *Plane) FlightStatus() string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.Flight.Status
+}
+func (p *Plane) SetSquawkIdentity(ident uint32) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	p.Squawk = ident
+}
+func (p *Plane) SquawkIdentity() uint32 {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.Squawk
+}
+func (p *Plane) SetFlightIdentifier(flightIdentifier string) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	p.Flight.Identifier = flightIdentifier
+}
+func (p *Plane) SetAirFrameCategory(category string) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	p.AirframeCategory = category
+}
+func (p *Plane) SetHeading(heading float64) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	// set the current altitude
+	p.Location.Heading = heading
+	p.Location.hasHeading = true
+}
+func (p *Plane) Heading() float64 {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	// set the current altitude
+	return p.Location.Heading
+}
+func (p *Plane) HasHeading() bool {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	// set the current altitude
+	return p.Location.hasHeading
+}
+func (p *Plane) SetVelocity(velocity float64) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	// set the current altitude
+	p.Location.Velocity = velocity
+}
+func (p *Plane) Velocity() float64 {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	// set the current altitude
+	return p.Location.Velocity
+}
+func (p *Plane) DistanceTravelled() DistanceTravelled {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return DistanceTravelled{
+		metres:   p.Location.DistanceTravelled,
+		duration: p.Location.DurationTravelled,
+	}
+}
+func (p *Plane) SetVerticalRate(rate int) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	p.Location.VerticalRate = rate
+}
 
 func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) {
 	if lat < -95.0 || lat > 95 || lon < -180 || lon > 180 {
@@ -260,6 +337,8 @@ func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) {
 }
 
 func (p *Plane) ZeroCpr() {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
 	p.cprLocation.evenLat = 0
 	p.cprLocation.evenLon = 0
 	p.cprLocation.oddLat = 0
@@ -305,12 +384,6 @@ func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) error {
 	return nil
 }
 
-func (p *Plane) SetAltitude(altitude int32, altitudeUnits string) {
-	// set the current altitude
-	p.Location.Altitude = altitude
-	p.Location.AltitudeUnits = altitudeUnits
-}
-
 func (p *Plane) DecodeCpr(ts time.Time) error {
 
 	// attempt to decode the CPR LAT/LON
@@ -332,8 +405,6 @@ func (p *Plane) DecodeCpr(ts time.Time) error {
 	//p.ZeroCpr()
 	return nil
 }
-
-
 
 // Distance function returns the distance (in meters) between two points of
 //     a given longitude and latitude relatively accurately (using a spherical
@@ -359,4 +430,15 @@ func distance(lat1, lon1, lat2, lon2 float64) float64 {
 	h := hsin(la2-la1) + math.Cos(la1)*math.Cos(la2)*hsin(lo2-lo1)
 
 	return 2 * r * math.Asin(math.Sqrt(h))
+}
+
+func (dt *DistanceTravelled) Valid() bool {
+	return dt.metres > 0 && dt.duration > 0
+}
+
+func (dt *DistanceTravelled) Metres() float64 {
+	return dt.metres
+}
+func (dt *DistanceTravelled) Duration() float64 {
+	return dt.duration
 }

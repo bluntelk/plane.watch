@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"plane.watch/pkg/mode_s"
-	"plane.watch/pkg/tracker"
+	"plane.watch/lib/tracker"
+	"plane.watch/lib/tracker/mode_s"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -22,7 +22,7 @@ func main() {
 	app := cli.NewApp()
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name: "port",
+			Name:  "port",
 			Value: "8080",
 			Usage: "Port to run the website on",
 		},
@@ -38,10 +38,11 @@ func main() {
 func runHttpServer(c *cli.Context) {
 	if len(c.Args()) == 0 || "" == c.Args()[0] {
 		fmt.Println("First argument needs to be the htdocs folder")
-		return;
+		return
 	}
 	var htdocsPath string
 	htdocsPath = path.Clean(c.Args()[0])
+
 
 	http.Handle("/css/", http.FileServer(http.Dir(htdocsPath)))
 	http.Handle("/js/", http.FileServer(http.Dir(htdocsPath)))
@@ -55,7 +56,7 @@ func runHttpServer(c *cli.Context) {
 		}()
 		switch r.URL.Path {
 		case "/decode":
-			tracker.NukePlanes()
+			pt := tracker.NewTracker()
 			var submittedPackets string
 			_ = r.ParseForm()
 			submittedPackets = r.FormValue("packet")
@@ -80,14 +81,14 @@ func runHttpServer(c *cli.Context) {
 					_, _ = fmt.Fprintln(w, "Not an AVR Frame", err)
 					return
 				}
-				tracker.HandleModeSFrame(frame, false)
+				pt.HandleModeSFrame(frame)
 				icaoList[frame.ICAOAddr()] = frame.ICAOAddr()
 				frame.Describe(w)
 			}
 
 			for _, icao := range icaoList {
 				_, _ = fmt.Fprintln(w, "")
-				plane := tracker.GetPlane(icao)
+				plane := pt.GetPlane(icao)
 				encoded, _ := json.MarshalIndent(plane, "", "  ")
 				_, _ = fmt.Fprintf(w, "%s", string(encoded))
 			}

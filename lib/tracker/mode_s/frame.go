@@ -5,10 +5,9 @@ package mode_s
 */
 
 import (
+	"fmt"
 	"regexp"
 	"time"
-	"strings"
-	"fmt"
 )
 
 const (
@@ -486,13 +485,13 @@ func (f *Frame) VerticalRateValid() bool {
 	return f.validVerticalRate
 }
 
-func (f *Frame) Flight() string {
-	flight := string(f.flightId)
-	if "" == flight {
-		flight = "??????"
-	}
-	return strings.Trim(flight, " ")
-}
+//func (f *Frame) Flight() string {
+//	flight := string(f.flightId)
+//	if "" == flight {
+//		flight = "??????"
+//	}
+//	return strings.Trim(flight, " ")
+//}
 
 func (f *Frame) SquawkIdentity() uint32 {
 	return f.identity

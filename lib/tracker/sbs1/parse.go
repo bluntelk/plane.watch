@@ -1,6 +1,7 @@
 package sbs1
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -29,6 +30,7 @@ const (
 
 type Frame struct {
 	Icao         string
+	IcaoInt      uint32
 	Received     time.Time
 	CallSign     string
 	Altitude     int
@@ -44,17 +46,25 @@ type Frame struct {
 	HasPosition bool
 }
 
-func Parse(sbsString string) (Frame, error) {
+func (f *Frame) TimeStamp() time.Time {
+	return f.Received
+}
+
+func Parse(sbsString string) (*Frame, error) {
 	// decode the string
 	var plane Frame
 	var err error
 
 	bits := strings.Split(sbsString, ",")
 	if len(bits) != 22 {
-		return plane, fmt.Errorf("Failed to Parse Input - not enough parameters: %s", sbsString)
+		return nil, fmt.Errorf("Failed to Parse Input - not enough parameters: %s", sbsString)
 	}
 
 	plane.Icao = bits[sbsIcaoField]
+	plane.IcaoInt, err = icaoStringToInt(bits[sbsIcaoField])
+	if nil != err {
+		return nil, err
+	}
 	sTime := bits[sbsRecvDate] + " " + bits[sbsRecvTime]
 	//2016/06/03 00:00:38.350
 	plane.Received, err = time.Parse("2006/01/02 15:04:05.999999999", sTime)
@@ -131,5 +141,13 @@ func Parse(sbsString string) (Frame, error) {
 		}
 	}
 
-	return plane, nil
+	return &plane, nil
+}
+
+func icaoStringToInt(icao string) (uint32, error) {
+	btoi, err := hex.DecodeString(icao)
+	if nil != err {
+		return 0, fmt.Errorf("Failed to decode ICAO HEX (%s) into UINT32. %s", icao, err)
+	}
+	return uint32(btoi[0])<<16 | uint32(btoi[1])<<8 | uint32(btoi[2]), nil
 }

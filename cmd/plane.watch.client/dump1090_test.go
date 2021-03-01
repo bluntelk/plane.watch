@@ -2,9 +2,9 @@ package main
 
 import (
 	"testing"
-	"plane.watch/pkg/mode_s"
+	"plane.watch/lib/mode_s"
 	"time"
-	"plane.watch/pkg/tracker"
+	"plane.watch/lib/tracker"
 	"fmt"
 	"os"
 )
@@ -68,7 +68,7 @@ func TestTracking2(t *testing.T) {
 
 func performTrackingTest(frames []string, t *testing.T) {
 	f, _ := os.Open(os.DevNull)
-	tracker.SetDebugOutput(f)
+	tracker.SetLoggerOutput(f)
 	for _, msg := range frames {
 		frame, err := mode_s.DecodeString(msg, time.Now())
 		if nil != err {

@@ -9,7 +9,7 @@ import (
 	"github.com/kpawlik/geojson"
 	"github.com/urfave/cli"
 	"os"
-	"plane.watch/pkg/tracker"
+	"plane.watch/lib/tracker"
 	"strings"
 	"time"
 )
@@ -59,7 +59,9 @@ func main() {
 
 	tracker.MaxLocationHistory = -1
 
-	app.Run(os.Args)
+	if err := app.Run(os.Args); nil != err {
+		fmt.Println(err)
+	}
 }
 
 func readFiles(inFileNames []string) (chan string, chan error) {
@@ -94,7 +96,7 @@ func readFiles(inFileNames []string) (chan string, chan error) {
 			for scanner.Scan() {
 				outChan <- scanner.Text()
 			}
-			inFile.Close()
+			_ = inFile.Close()
 		}
 		// and wait for our outChan to be empty
 		for len(outChan) > 0 {
@@ -111,7 +113,7 @@ func writeResult(outFileName string) error {
 	var coordCounter, planeCounter int
 	var trackCounter int
 
-	addFeature := func(coordinates geojson.Coordinates, p tracker.Plane) {
+	addFeature := func(coordinates geojson.Coordinates, p *tracker.Plane) {
 		trackCounter++
 		props := make(map[string]interface{})
 		props["icao"] = p.Icao
@@ -121,10 +123,10 @@ func writeResult(outFileName string) error {
 		}
 	}
 
-	tracker.Each(func(p tracker.Plane) {
+	tracker.Each(func(p *tracker.Plane) bool {
 		var coords geojson.Coordinates
 		if 0 == len(p.LocationHistory) {
-			return
+			return true
 		}
 		planeCounter++
 		numLocations := len(p.LocationHistory)
@@ -143,8 +145,9 @@ func writeResult(outFileName string) error {
 			}
 		}
 		addFeature(coords, p)
+		return true
 	})
-	fmt.Fprintf(os.Stderr,"We have %d coords tracked over %d tracks from %d planes\n", coordCounter, trackCounter, planeCounter)
+	_, _ = fmt.Fprintf(os.Stderr, "We have %d coords tracked over %d tracks from %d planes\n", coordCounter, trackCounter, planeCounter)
 
 	jsonContent, err := json.Marshal(fc)
 	//jsonContent, err := json.MarshalIndent(fc, "", "  ")
@@ -154,8 +157,8 @@ func writeResult(outFileName string) error {
 	if outFileName != "" {
 		f, err := os.Create(outFileName)
 		if nil == err {
-			f.Write(jsonContent)
-			f.Close()
+			_, _ = f.Write(jsonContent)
+			_ = f.Close()
 			fmt.Println("Wrote content to file: " + outFileName)
 			return nil
 		}
