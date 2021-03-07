@@ -133,7 +133,6 @@ type Frame struct {
 	icao           uint32
 	crc, checkSum  uint32
 	identity       uint32
-	flightId       []byte
 	special        string
 	alert          bool
 						// if we have trouble decoding our frame, the message ends up here

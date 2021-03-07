@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/urfave/cli"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -26,6 +27,10 @@ func main() {
 			Value: "8080",
 			Usage: "Port to run the website on",
 		},
+		cli.BoolFlag{
+			Name:  "verbose",
+			Usage: "output debug info on the CLI",
+		},
 	}
 
 	app.Action = runHttpServer
@@ -36,20 +41,30 @@ func main() {
 }
 
 func runHttpServer(c *cli.Context) {
-	if len(c.Args()) == 0 || "" == c.Args()[0] {
-		fmt.Println("First argument needs to be the htdocs folder")
-		return
-	}
 	var htdocsPath string
-	htdocsPath = path.Clean(c.Args()[0])
+	var err error
+	var files fs.FS
+	if len(c.Args()) == 0 {
+		println("Using our embedded filesystem")
+		files, err = fs.Sub(embeddedHtdocs, "htdocs")
+		if nil != err {
+			panic(err)
+		}
+	} else {
+		println("Using the files in dir:", htdocsPath)
+		htdocsPath = path.Clean(c.Args()[0])
+		files = os.DirFS(htdocsPath)
+	}
+	if c.Bool("verbose") {
+		tracker.SetLoggerOutput(os.Stdout)
+	}
 
+	http.Handle("/", http.FileServer(http.FS(files)))
 
-	http.Handle("/css/", http.FileServer(http.Dir(htdocsPath)))
-	http.Handle("/js/", http.FileServer(http.Dir(htdocsPath)))
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/decode", func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
-				_, _ = fmt.Fprintln(w, "Failed big time...")
+				_, _ = fmt.Fprintln(w, "<pre>Failed big time...")
 				_, _ = fmt.Fprintln(w, r)
 				_, _ = w.Write(debug.Stack())
 			}
@@ -93,8 +108,6 @@ func runHttpServer(c *cli.Context) {
 				_, _ = fmt.Fprintf(w, "%s", string(encoded))
 			}
 
-		case "/":
-			http.ServeFile(w, r, path.Join(htdocsPath, "/index.html"))
 		default:
 			http.NotFound(w, r)
 			_, _ = fmt.Fprintln(w, "<br/>\n"+r.RequestURI)
@@ -105,5 +118,4 @@ func runHttpServer(c *cli.Context) {
 	port := ":" + c.String("port")
 	log.Printf("Listening on %s...\n", port)
 	log.Fatal(http.ListenAndServe(port, nil))
-
 }

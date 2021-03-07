@@ -318,6 +318,9 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 			}
 		case mode_s.BdsElsAircraftIdent: // 2.0
 			plane.SetFlightIdentifier(frame.FlightNumber())
+		default:
+			// let's see if we can decode more BDS info
+			// TODO: Decode Other BDS frames
 		}
 	}
 	if hasChanged {

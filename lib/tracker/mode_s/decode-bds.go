@@ -85,7 +85,6 @@ func (f *Frame) decodeCommB() error {
 	switch f.BdsMessageType() {
 	case BdsElsDataLinkCap: // 1.0
 		// decode capability
-		// todo: get squawk
 	case BdsElsGicbCap: // 1.7
 		// decode GICB
 	case BdsElsAircraftIdent: // 2.0

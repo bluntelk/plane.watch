@@ -178,12 +178,12 @@ func (f *Frame) Parse() error {
 		}
 	case 20: //DF_20
 		f.decodeFlightStatus()
-		err = f.decode13bitAltitudeCode()
-		f.decodeCommB()
+		_ = f.decode13bitAltitudeCode()
+		err = f.decodeCommB()
 	case 21: //DF_21
 		f.decodeFlightStatus()
 		f.decodeSquawkIdentity(2, 3) // gillham encoded squawk
-		f.decodeCommB()
+		err = f.decodeCommB()
 	}
 
 	return err
@@ -292,6 +292,7 @@ func (f *Frame) decodeCrossLinkCapability() {
 func (f *Frame) decodeFlightStatus() {
 	// first 5 bits are the downlink format
 	// bits 5,6,7 are the flight status
+	// https://mode-s.org/decode/content/mode-s/3-surveillance.html
 	f.fs = f.message[0] & 0x7
 	if f.fs == 0 || f.fs == 2 {
 		f.validVerticalStatus = true
