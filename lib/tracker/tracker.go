@@ -263,11 +263,11 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 			}
 		case mode_s.DF17FrameAirPositionGnss: // "Airborne Position (GNSS Height)"
 			{
-				debugMessage("\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
+				debugMessage("\033[2m Ignoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
 			}
 		case mode_s.DF17FrameTestMessage: //, "Test Message":
-			debugMessage("\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
+			debugMessage("\033[2m Ignoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 			break
 		case mode_s.DF17FrameTestMessageSquawk: //, "Test Message":
 			{
@@ -279,7 +279,7 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 			}
 		case mode_s.DF17FrameSurfaceSystemStatus: //, "Surface System Status":
 			{
-				debugMessage("\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
+				debugMessage("\033[2m Ignoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
 			}
 		case mode_s.DF17FrameEmergencyPriority: //, "Extended Squitter Aircraft Status (Emergency)":
@@ -292,17 +292,17 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 			}
 		case mode_s.DF17FrameTcasRA: //, "Extended Squitter Aircraft Status (1090ES TCAS RA)":
 			{
-				debugMessage("\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
+				debugMessage("\033[2m Ignoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
 			}
 		case mode_s.DF17FrameTargetStateStatus: //, "Target State and Status Message":
 			{
-				debugMessage("\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
+				debugMessage("\033[2m Ignoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
 			}
 		case mode_s.DF17FrameAircraftOperational: //, "Aircraft Operational Status Message":
 			{
-				debugMessage("\033[2mIgnoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
+				debugMessage("\033[2m Ignoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
 			}
 		}

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/urfave/cli"
 	"io/ioutil"
 	"os"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/mode_s"
+	"sync"
 	"time"
 )
 
@@ -18,18 +20,19 @@ func parseAvr(c *cli.Context) error {
 	var dataFiles []string
 	if stdOut {
 		dataFiles = c.Args()
-	} else {
+	} else if c.NArg() > 1 {
 		outFileName = c.Args().First()
 		dataFiles = c.Args()[1:]
 	}
 
 	if 0 == len(dataFiles) {
-		fmt.Fprintf(os.Stderr, "Usage: %s %s [output-file.json] input [input...]\n", os.Args[0], c.Command.Name)
+		return errors.New("please specify datafiles to use")
 	}
 
 	if verbose {
 		tracker.SetLoggerOutput(os.Stdout)
 	}
+
 
 	inputLines, errChan := readFiles(dataFiles)
 
@@ -72,11 +75,19 @@ func parseAvr(c *cli.Context) error {
 	return writeResult(outFileName)
 }
 
+var lastSeenMap sync.Map
 func handleReceived(results chan *mode_s.Frame) {
 	var resultCounter int
 	for {
 		select {
 		case frame := <-results:
+			lastSeen, _ := lastSeenMap.LoadOrStore(frame.ICAOAddr(), time.Now().Add(-time.Hour))
+			if frame.VelocityValid() {
+
+			} else {
+				lastSeen = time.Time(lastSeen).Add(time.Second)
+			}
+
 			resultCounter++
 			plane := tracker.HandleModeSFrame(frame)
 			if nil != plane {

@@ -15,11 +15,11 @@ import (
 )
 
 func main() {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Failed to run: %s", r)
-		}
-	}()
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//		fmt.Printf("Failed to run: %s", r)
+	//	}
+	//}()
 
 	app := cli.NewApp()
 
