@@ -36,18 +36,18 @@ func (t *Tracker) SetLoggerOutput(out io.Writer) {
 
 func (t *Tracker) debugMessage(sfmt string, a ...interface{}) {
 	if t.logLevel >= logLevelDebug {
-		_, _ = fmt.Fprintf(t.logs, "DEBUG: "+sfmt, a...)
+		_, _ = fmt.Fprintf(t.logs, "DEBUG: "+sfmt+"\n", a...)
 	}
 }
 
 func (t *Tracker) infoMessage(sfmt string, a ...interface{}) {
 	if t.logLevel >= logLevelInfo {
-		_, _ = fmt.Fprintf(t.logs, "INFO : "+sfmt, a...)
+		_, _ = fmt.Fprintf(t.logs, "INFO : "+sfmt+"\n", a...)
 	}
 }
 
 func (t *Tracker) errorMessage(sfmt string, a ...interface{}) {
-	_, _ = fmt.Fprintf(t.logs, "ERROR: "+sfmt, a...)
+	_, _ = fmt.Fprintf(t.logs, "ERROR: "+sfmt+"\n", a...)
 }
 
 func SetLoggerOutput(out io.Writer) { DefaultTracker.SetLoggerOutput(out) }
@@ -75,7 +75,7 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 	if nil == frame {
 		return nil
 	}
-	icao := frame.ICAOAddr()
+	icao := frame.Icao()
 	if 0 == icao {
 		return nil
 	}
@@ -342,6 +342,7 @@ func (t *Tracker) HandleSbs1Frame(frame *sbs1.Frame) *Plane {
 	if frame.HasPosition {
 		plane.AddLatLong(frame.Lat, frame.Lon, frame.Received)
 		hasChanged = true
+		t.debugMessage("Plane %s is at %0.4f, %0.4f", frame.IcaoStr(), frame.Lat, frame.Lon)
 	}
 	if hasChanged {
 		return plane

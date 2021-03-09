@@ -7,6 +7,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type featureDescriptionType struct {
@@ -457,7 +458,8 @@ func (f *Frame) Describe(output io.Writer) {
 	fprintf(output, "Frame               : %s\n", f.raw)
 	fprintf(output, "DF: Downlink Format : (%d) %s\n", f.downLinkFormat, f.DownLinkFormat())
 	if f.mode == "MLAT" {
-		fprintf(output, "MLAT: Beast Uptime  : %s (12mhz clock)\n", f.beastAvrUptime.String())
+		fprintf(output, "MLAT: Beast Ticks  : %d (@12mhz clock)\n", f.beastTicks)
+		fprintf(output, "MLAT: Beast Uptime  : %s\n", time.Duration(f.beastTicksNs).String())
 	}
 	// decode the specific DF type
 	switch f.downLinkFormat {
@@ -597,6 +599,7 @@ func (f *Frame) showFlightStatus(output io.Writer) {
 	f.showAlert(output)
 	f.showVerticalStatus(output)
 }
+
 //
 //func (f *Frame) showFlightId(output io.Writer) {
 //	fprintf(output, "Flight          : %s", f.Flight())

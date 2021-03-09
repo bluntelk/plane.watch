@@ -29,7 +29,10 @@ const (
 )
 
 type Frame struct {
-	Icao         string
+	// original is our unadulterated string
+	MsgType      string
+	original     string
+	icaoStr      string
 	IcaoInt      uint32
 	Received     time.Time
 	CallSign     string
@@ -46,37 +49,44 @@ type Frame struct {
 	HasPosition bool
 }
 
+func NewFrame(sbsString string) *Frame {
+	return &Frame{
+		original: sbsString,
+	}
+}
+
 func (f *Frame) TimeStamp() time.Time {
 	return f.Received
 }
 
-func Parse(sbsString string) (*Frame, error) {
+func (f *Frame) Parse() error {
 	// decode the string
-	var plane Frame
 	var err error
 
-	bits := strings.Split(sbsString, ",")
+	bits := strings.Split(f.original, ",")
 	if len(bits) != 22 {
-		return nil, fmt.Errorf("Failed to Parse Input - not enough parameters: %s", sbsString)
+		return fmt.Errorf("Failed to Parse Input - not enough parameters: %s", f.original)
 	}
 
-	plane.Icao = bits[sbsIcaoField]
-	plane.IcaoInt, err = icaoStringToInt(bits[sbsIcaoField])
+	f.icaoStr = bits[sbsIcaoField]
+	f.IcaoInt, err = icaoStringToInt(bits[sbsIcaoField])
 	if nil != err {
-		return nil, err
+		return err
 	}
 	sTime := bits[sbsRecvDate] + " " + bits[sbsRecvTime]
 	//2016/06/03 00:00:38.350
-	plane.Received, err = time.Parse("2006/01/02 15:04:05.999999999", sTime)
+	f.Received, err = time.Parse("2006/01/02 15:04:05.999999999", sTime)
 	if nil != err {
-		plane.Received = time.Now()
+		f.Received = time.Now()
 	}
+
+	f.MsgType = bits[sbsMsgTypeField]
 
 	switch bits[sbsMsgTypeField] { // message type
 	case "SEL": // SELECTION_CHANGE
-		plane.CallSign = bits[sbsCallsignField]
+		f.CallSign = bits[sbsCallsignField]
 	case "ID": // NEW_ID
-		plane.CallSign = bits[sbsCallsignField]
+		f.CallSign = bits[sbsCallsignField]
 	case "AIR": // NEW_AIRCRAFT - just indicates when a new aircraft pops up
 	case "STA": // STATUS_AIRCRAFT
 	// call sign field (10) contains one of:
@@ -89,59 +99,59 @@ func Parse(sbsString string) (*Frame, error) {
 	case "MSG": // TRANSMISSION
 		switch bits[sbsMsgSubCatField] {
 		case "1": // ES Identification and Category
-			plane.CallSign = bits[sbsCallsignField]
+			f.CallSign = bits[sbsCallsignField]
 
 		case "2": // ES Surface Position Message
-			plane.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
-			plane.GroundSpeed, _ = strconv.Atoi(bits[sbsGroundSpeedField])
-			plane.Track, _ = strconv.ParseFloat(bits[sbsTrackField], 32)
-			plane.Lat, _ = strconv.ParseFloat(bits[sbsLatField], 32)
-			plane.Lon, _ = strconv.ParseFloat(bits[sbsLonField], 32)
-			plane.HasPosition = true
-			plane.OnGround = "-1" == bits[sbsOnGroundField]
+			f.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
+			f.GroundSpeed, _ = strconv.Atoi(bits[sbsGroundSpeedField])
+			f.Track, _ = strconv.ParseFloat(bits[sbsTrackField], 32)
+			f.Lat, _ = strconv.ParseFloat(bits[sbsLatField], 32)
+			f.Lon, _ = strconv.ParseFloat(bits[sbsLonField], 32)
+			f.HasPosition = true
+			f.OnGround = "-1" == bits[sbsOnGroundField]
 
 		case "3": // ES Airborne Position Message
-			plane.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
-			plane.Lat, _ = strconv.ParseFloat(bits[sbsLatField], 32)
-			plane.Lon, _ = strconv.ParseFloat(bits[sbsLonField], 32)
-			plane.HasPosition = true
-			plane.Alert = bits[sbsAlertSquawkField]
-			plane.Emergency = bits[sbsEmergencyField]
-			plane.OnGround = "-1" == bits[sbsOnGroundField]
+			f.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
+			f.Lat, _ = strconv.ParseFloat(bits[sbsLatField], 32)
+			f.Lon, _ = strconv.ParseFloat(bits[sbsLonField], 32)
+			f.HasPosition = true
+			f.Alert = bits[sbsAlertSquawkField]
+			f.Emergency = bits[sbsEmergencyField]
+			f.OnGround = "-1" == bits[sbsOnGroundField]
 		//SPI Flag Ignored
 
 		case "4": // ES Airborne Velocity Message
-			plane.GroundSpeed, _ = strconv.Atoi(bits[sbsGroundSpeedField])
-			plane.Track, _ = strconv.ParseFloat(bits[sbsTrackField], 32)
-			plane.VerticalRate, _ = strconv.Atoi(bits[sbsVerticalRateField])
-			plane.OnGround = "-1" == bits[sbsOnGroundField]
+			f.GroundSpeed, _ = strconv.Atoi(bits[sbsGroundSpeedField])
+			f.Track, _ = strconv.ParseFloat(bits[sbsTrackField], 32)
+			f.VerticalRate, _ = strconv.Atoi(bits[sbsVerticalRateField])
+			f.OnGround = "-1" == bits[sbsOnGroundField]
 
 		case "5": // Surveillance Alt Message
-			plane.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
-			plane.Alert = bits[sbsAlertSquawkField]
-			plane.OnGround = "-1" == bits[sbsOnGroundField]
-			plane.CallSign = bits[sbsCallsignField]
+			f.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
+			f.Alert = bits[sbsAlertSquawkField]
+			f.OnGround = "-1" == bits[sbsOnGroundField]
+			f.CallSign = bits[sbsCallsignField]
 		//SPI Flag Ignored
 
 		case "6": // Surveillance ID Message
-			plane.CallSign = bits[sbsCallsignField]
-			plane.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
-			plane.Squawk = bits[sbsSquawkField]
-			plane.Alert = bits[sbsAlertSquawkField]
-			plane.Emergency = bits[sbsEmergencyField]
-			plane.OnGround = "-1" == bits[sbsOnGroundField]
+			f.CallSign = bits[sbsCallsignField]
+			f.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
+			f.Squawk = bits[sbsSquawkField]
+			f.Alert = bits[sbsAlertSquawkField]
+			f.Emergency = bits[sbsEmergencyField]
+			f.OnGround = "-1" == bits[sbsOnGroundField]
 		//SPI Flag Ignored
 
 		case "7": //Air To Air Message
-			plane.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
-			plane.OnGround = "-1" == bits[sbsOnGroundField]
+			f.Altitude, _ = strconv.Atoi(bits[sbsAltitudeField])
+			f.OnGround = "-1" == bits[sbsOnGroundField]
 
 		case "8": // All Call Reply
-			plane.OnGround = "-1" == bits[sbsOnGroundField]
+			f.OnGround = "-1" == bits[sbsOnGroundField]
 		}
 	}
 
-	return &plane, nil
+	return nil
 }
 
 func icaoStringToInt(icao string) (uint32, error) {
@@ -150,4 +160,19 @@ func icaoStringToInt(icao string) (uint32, error) {
 		return 0, fmt.Errorf("Failed to decode ICAO HEX (%s) into UINT32. %s", icao, err)
 	}
 	return uint32(btoi[0])<<16 | uint32(btoi[1])<<8 | uint32(btoi[2]), nil
+}
+
+func (f *Frame) Icao() uint32 {
+	return f.IcaoInt
+}
+func (f *Frame) IcaoStr() string {
+	return f.icaoStr
+}
+
+func (f *Frame) Decode() (bool, error) {
+	return true, f.Parse()
+}
+
+func (f *Frame) Raw() string {
+	return f.original
 }

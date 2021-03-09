@@ -30,74 +30,74 @@ const (
 )
 
 type Position struct {
-	validAltitude       bool
-	altitude            int32
-	isGnssAlt           bool
-	unit                int
+	validAltitude bool
+	altitude      int32
+	isGnssAlt     bool
+	unit          int
 
-	rawLatitude         int     /* Non decoded latitude */
-	rawLongitude        int     /* Non decoded longitude */
+	rawLatitude  int /* Non decoded latitude */
+	rawLongitude int /* Non decoded longitude */
 
-	eastWestDirection   int     /* 0 = East, 1 = West. */
-	eastWestVelocity    int     /* E/W velocity. */
-	northSouthDirection int     /* 0 = North, 1 = South. */
-	northSouthVelocity  int     /* N/S velocity. */
+	eastWestDirection   int /* 0 = East, 1 = West. */
+	eastWestVelocity    int /* E/W velocity. */
+	northSouthDirection int /* 0 = North, 1 = South. */
+	northSouthVelocity  int /* N/S velocity. */
 	validVelocity       bool
 	velocity            float64 /* Computed from EW and NS velocity. */
 	superSonic          bool
 
-	verticalRateSource  int     /* Vertical rate source. */
-	verticalRate        int     /* Vertical rate. */
-	validVerticalRate   bool
+	verticalRateSource int /* Vertical rate source. */
+	verticalRate       int /* Vertical rate. */
+	validVerticalRate  bool
 
-	onGround            bool    /* VS Bit */
+	onGround            bool /* VS Bit */
 	validVerticalStatus bool
 
-	heading             float64
-	validHeading        bool
+	heading      float64
+	validHeading bool
 
-	haeDirection        byte    //up or down increments of 25
-	haeDelta            int
-	validHae            bool
+	haeDirection byte //up or down increments of 25
+	haeDelta     int
+	validHae     bool
 }
 
 type df17 struct {
-	messageType             byte   // DF17 Extended Squitter Message Type
-	messageSubType          byte   // DF17 Extended Squitter Message Sub Type
+	messageType    byte // DF17 Extended Squitter Message Type
+	messageSubType byte // DF17 Extended Squitter Message Sub Type
 
-	cprFlagOddEven          int    /* 1 = Odd, 0 = Even CPR message. */
-	timeFlag                int    /* UTC synchronized? */
-	flight                  []byte /* 8 chars flight number. */
+	cprFlagOddEven int    /* 1 = Odd, 0 = Even CPR message. */
+	timeFlag       int    /* UTC synchronized? */
+	flight         []byte /* 8 chars flight number. */
 
 	validCompatibilityClass bool
 	compatibilityClass      int
 	cccHasOperationalTcas   *bool
 	cccHas1090EsIn          bool
-	cccHasAirRefVel         *bool  // supports Air Referenced Velocity
+	cccHasAirRefVel         *bool // supports Air Referenced Velocity
 	cccHasLowTxPower        *bool
-	cccHasTargetStateRpt    *bool  // supports Target State Report
-	cccHasTargetChangeRpt   *bool  // supports Target Change Report
+	cccHasTargetStateRpt    *bool // supports Target State Report
+	cccHasTargetChangeRpt   *bool // supports Target Change Report
 	cccHasUATReceiver       bool
 	validNacV               bool
 
 	operationalModeCode int
 	adsbVersion         byte
-	nacP                byte   // Navigation accuracy category - position
-	geoVertAccuracy     byte   // geometric vertical accuracy
+	nacP                byte // Navigation accuracy category - position
+	geoVertAccuracy     byte // geometric vertical accuracy
 	sil                 byte
 	airframeWidthLen    byte
-	nicCrossCheck       byte   // whether or not the alt or heading is cross checked
-	northReference      byte   // 0=true north, 1 = magnetic north
+	nicCrossCheck       byte // whether or not the alt or heading is cross checked
+	northReference      byte // 0=true north, 1 = magnetic north
 
-	surveillanceStatus      byte
-	nicSupplementA          byte
-	nicSupplementB          byte
-	nicSupplementC          byte
-	containmentRadius       int
+	surveillanceStatus byte
+	nicSupplementA     byte
+	nicSupplementB     byte
+	nicSupplementC     byte
+	containmentRadius  int
 
-	intentChange            byte
-	ifrCapability           byte
-	nacV                    byte
+	intentChange  byte
+	ifrCapability byte
+	nacV          byte
 }
 
 type rawFields struct {
@@ -112,8 +112,8 @@ type rawFields struct {
 	acQ, acM bool
 
 	// adsb decoding
-	catType, catSubType                byte
-	catValid                           bool
+	catType, catSubType byte
+	catValid            bool
 }
 
 type Frame struct {
@@ -121,11 +121,14 @@ type Frame struct {
 	bds
 	df17
 	Position
-	mode           string
+	mode string
 	// the timestamp we are processing this message at
 	timeStamp      time.Time
 	beastTimeStamp string
-	beastAvrBoot   *time.Time
+	// beastTicks is the number of ticks since the beast was turned on
+	beastTicks uint64
+	// beastTicksNs is the number of nanoseconds since the beast was turned on
+	beastTicksNs   uint64
 	beastAvrUptime time.Duration
 	raw, full      string
 	message        []byte
@@ -135,8 +138,8 @@ type Frame struct {
 	identity       uint32
 	special        string
 	alert          bool
-						// if we have trouble decoding our frame, the message ends up here
-	err            error
+	// if we have trouble decoding our frame, the message ends up here
+	err error
 }
 
 var (
@@ -155,14 +158,14 @@ var (
 		24: "Comm. D Extended Length Message (ELM)",
 	}
 
-// DownLink Format Sub Type Capability CA
+	// DownLink Format Sub Type Capability CA
 	capabilityTable = map[byte]string{
-		0: "Level 1 no communication capability (Survillance Only)", // 0,4,5,11
-		1: "Level 2 Comm-A and Comm-B capability", // DF 0,4,5,11,20,21
-		2: "Level 3 Comm-A, Comm-B and uplink ELM capability", // (DF0,4,5,11,20,21)
+		0: "Level 1 no communication capability (Survillance Only)",    // 0,4,5,11
+		1: "Level 2 Comm-A and Comm-B capability",                      // DF 0,4,5,11,20,21
+		2: "Level 3 Comm-A, Comm-B and uplink ELM capability",          // (DF0,4,5,11,20,21)
 		3: "Level 4 Comm-A, Comm-B uplink and downlink ELM capability", // (DF0,4,5,11,20,21,24)
-		4: "Level 2,3 or 4. can set code 7. is on ground", // DF0,4,5,11,20,21,24,code7
-		5: "Level 2,3 or 4. can set code 7. is airborne", // DF0,4,5,11,20,21,24,
+		4: "Level 2,3 or 4. can set code 7. is on ground",              // DF0,4,5,11,20,21,24,code7
+		5: "Level 2,3 or 4. can set code 7. is airborne",               // DF0,4,5,11,20,21,24,
 		6: "Level 2,3 or 4. can set code 7.",
 		7: "Level 7 DR≠0 or FS=3, 4 or 5",
 	}
@@ -179,27 +182,27 @@ var (
 	}
 
 	emergencyStateTable = map[int]string{
-		0:  "No emergency",
-		1:  "General emergency (squawk 7700)",
-		2:  "Lifeguard/Medical",
-		3:  "Minimum fuel",
-		4:  "No communications (squawk 7600)",
-		5:  "Unlawful interference (squawk 7500)",
-		6:  "Downed Aircraft",
-		7:  "Reserved",
+		0: "No emergency",
+		1: "General emergency (squawk 7700)",
+		2: "Lifeguard/Medical",
+		3: "Minimum fuel",
+		4: "No communications (squawk 7600)",
+		5: "Unlawful interference (squawk 7500)",
+		6: "Downed Aircraft",
+		7: "Reserved",
 	}
 
 	replyInformationField = map[byte]string{
-		0: "No on-board TCAS.",
-		1: "Not assigned.",
-		2: "On-board TCAS with resolution capability inhibited.",
-		3: "On-board TCAS with vertical-only resolution capability.",
-		4: "On-board TCAS with vertical and horizontal resolution capability.",
-		5: "Not assigned.",
-		6: "Not assigned.",
-		7: "Not assigned.",
-		8: "No maximum airspeed data available.",
-		9: "Airspeed is ≤75kts.",
+		0:  "No on-board TCAS.",
+		1:  "Not assigned.",
+		2:  "On-board TCAS with resolution capability inhibited.",
+		3:  "On-board TCAS with vertical-only resolution capability.",
+		4:  "On-board TCAS with vertical and horizontal resolution capability.",
+		5:  "Not assigned.",
+		6:  "Not assigned.",
+		7:  "Not assigned.",
+		8:  "No maximum airspeed data available.",
+		9:  "Airspeed is ≤75kts.",
 		10: "Airspeed is >75kts and ≤150kts.",
 		11: "Airspeed is >150kts and ≤300kts.",
 		12: "Airspeed is >300kts and ≤600kts.",
@@ -222,16 +225,16 @@ var (
 	aisCharset = "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456789??????"
 
 	downlinkRequestField = []string{
-		0: "No downlink request.",
-		1: "Request to send Comm-B message (B-Bit set).",
-		2: "TCAS information available.",
-		3: "TCAS information available and request to send Comm-B message.",
-		4: "Comm-B broadcast #1 available.",
-		5: "Comm-B broadcast #2 available.",
-		6: "TCAS information and Comm-B broadcast #1 available.",
-		7: "TCAS information and Comm-B broadcast #2 available.",
-		8: "Not assigned.",
-		9: "Not assigned.",
+		0:  "No downlink request.",
+		1:  "Request to send Comm-B message (B-Bit set).",
+		2:  "TCAS information available.",
+		3:  "TCAS information available and request to send Comm-B message.",
+		4:  "Comm-B broadcast #1 available.",
+		5:  "Comm-B broadcast #2 available.",
+		6:  "TCAS information and Comm-B broadcast #1 available.",
+		7:  "TCAS information and Comm-B broadcast #2 available.",
+		8:  "Not assigned.",
+		9:  "Not assigned.",
 		10: "Not assigned.",
 		11: "Not assigned.",
 		12: "Not assigned.",
@@ -253,7 +256,6 @@ var (
 		29: "Request to send 43 segments signified by 15+n.",
 		30: "Request to send 44 segments signified by 15+n.",
 		31: "Request to send 45 segments signified by 15+n.",
-
 	}
 
 	utilityMessageField = []string{
@@ -265,45 +267,45 @@ var (
 	}
 
 	aircraftCategory = [][]string{
-		0:{
-			0:"No ADS-B Emitter Category Information",
-			1:"Light (< 15500 lbs)",
-			2:"Small (15500 to 75000 lbs)",
-			3:"Large (75000 to 300000 lbs)",
-			4:"High Vortex Large (aircraft such as B-757)",
-			5:"Heavy (> 300000 lbs)",
-			6:"High Performance (> 5g acceleration and 400 kts)",
-			7:"Rotorcraft",
+		0: {
+			0: "No ADS-B Emitter Category Information",
+			1: "Light (< 15500 lbs)",
+			2: "Small (15500 to 75000 lbs)",
+			3: "Large (75000 to 300000 lbs)",
+			4: "High Vortex Large (aircraft such as B-757)",
+			5: "Heavy (> 300000 lbs)",
+			6: "High Performance (> 5g acceleration and 400 kts)",
+			7: "Rotorcraft",
 		},
-		1:{
-			0:"No ADS-B Emitter Category Information",
-			1:"Glider / sailplane",
-			2:"Lighter-than-air",
-			3:"Parachutist / Skydiver",
-			4:"Ultralight / hang-glider / paraglider",
-			5:"Reserved",
-			6:"Unmanned Aerial Vehicle",
-			7:"Space / Trans-atmospheric vehicle",
+		1: {
+			0: "No ADS-B Emitter Category Information",
+			1: "Glider / sailplane",
+			2: "Lighter-than-air",
+			3: "Parachutist / Skydiver",
+			4: "Ultralight / hang-glider / paraglider",
+			5: "Reserved",
+			6: "Unmanned Aerial Vehicle",
+			7: "Space / Trans-atmospheric vehicle",
 		},
-		2:{
-			0:"No ADS-B Emitter Category Information",
-			1:"Surface Vehicle – Emergency Vehicle",
-			2:"Surface Vehicle – Service Vehicle",
-			3:"Point Obstacle (includes tethered balloons)",
-			4:"Cluster Obstacle",
-			5:"Line Obstacle",
-			6:"Reserved",
-			7:"Reserved",
+		2: {
+			0: "No ADS-B Emitter Category Information",
+			1: "Surface Vehicle – Emergency Vehicle",
+			2: "Surface Vehicle – Service Vehicle",
+			3: "Point Obstacle (includes tethered balloons)",
+			4: "Cluster Obstacle",
+			5: "Line Obstacle",
+			6: "Reserved",
+			7: "Reserved",
 		},
-		3:{
-			0:"Reserved",
-			1:"Reserved",
-			2:"Reserved",
-			3:"Reserved",
-			4:"Reserved",
-			5:"Reserved",
-			6:"Reserved",
-			7:"Reserved",
+		3: {
+			0: "Reserved",
+			1: "Reserved",
+			2: "Reserved",
+			3: "Reserved",
+			4: "Reserved",
+			5: "Reserved",
+			6: "Reserved",
+			7: "Reserved",
 		},
 	}
 
@@ -409,11 +411,11 @@ func (f *Frame) DownLinkType() byte {
 	return f.downLinkFormat
 }
 
-func (f *Frame) ICAOAddr() uint32 {
+func (f *Frame) Icao() uint32 {
 	return f.icao
 }
 
-func (f *Frame) ICAOString() string {
+func (f *Frame) IcaoStr() string {
 	return fmt.Sprintf("%06X", f.icao)
 }
 
@@ -541,7 +543,7 @@ func (f *Frame) isNoOp() bool {
 	// the first character can be * or @ (or left out)
 	// if the entire string is then 0's, it's a noop
 	re := regexp.MustCompile("^[*@]?0+$")
-	return re.MatchString(f.raw)
+	return re.MatchString(f.full)
 }
 
 /**
@@ -610,12 +612,13 @@ func (f *Frame) NavigationIntegrityCategory(nicSupplA bool) (byte, error) {
 		err = fmt.Errorf("unknown navigation integrity category")
 	case 9, 20:
 		nic = 11
-	case 10: case 21:
+	case 10:
+	case 21:
 		nic = 10
 	case 11:
 		if nicSupplA {
 			nic = 9
-		}else {
+		} else {
 			nic = 8
 		}
 	case 12:
@@ -644,8 +647,8 @@ func (f *Frame) NavigationIntegrityCategory(nicSupplA bool) (byte, error) {
 /**
  * Gets the air frames size in metres
  */
-func (f *Frame)getAirplaneLengthWidth() (float32, float32, error) {
-	if ! (f.messageType == 31 && f.messageSubType == 1) {
+func (f *Frame) getAirplaneLengthWidth() (float32, float32, error) {
+	if !(f.messageType == 31 && f.messageSubType == 1) {
 		return 0, 0, fmt.Errorf("can only get aircraft size from ADSB message 31 sub type 1")
 	}
 	var length, width float32

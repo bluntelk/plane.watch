@@ -1,75 +1,23 @@
 package main
 
 import (
-	"fmt"
 	"github.com/urfave/cli"
-	"io/ioutil"
-	"os"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/sbs1"
-	"time"
 )
 
 func parseSbs(c *cli.Context) error {
-	stdOut := c.GlobalBool("stdout")
-	verbose := c.GlobalBool("v")
-	if c.NArg() == 0 {
-		return fmt.Errorf("you need to specify some files")
+	newFrameFunc := func(line string) tracker.Frame {
+		return sbs1.NewFrame(line)
+	}
+	p, err := produceOutput(c, newFrameFunc)
+	if nil != err {
+		return err
 	}
 
-	var outFileName string
-	var dataFiles []string
-	if stdOut {
-		dataFiles = c.Args()
-	} else {
-		outFileName = c.Args().First()
-		dataFiles = c.Args()[1:]
-	}
+	ih := tracker.NewInputHandler(tracker.WithVerboseOutput())
+	ih.AddProducer(p)
+	ih.Wait()
 
-	if 0 == len(dataFiles) {
-		return fmt.Errorf("you need to specify some files")
-	}
-
-	if !verbose {
-		tracker.SetLoggerOutput(ioutil.Discard)
-	}
-
-	inputLines, errChan := readFiles(dataFiles)
-
-	trackingChan := make(chan *sbs1.Frame, 50)
-	go handleSbs1Tracking(trackingChan, verbose)
-	go func() {
-		for err := range errChan {
-			fmt.Fprintln(os.Stderr, err)
-		}
-	}()
-
-	var lineCounter uint
-	for line := range inputLines {
-		lineCounter++
-		if 0 == lineCounter%10000 {
-			fmt.Fprintf(os.Stderr, "Processing line: %d\r", lineCounter)
-		}
-		frame, err := sbs1.Parse(line)
-		if nil != err {
-			if verbose {
-				fmt.Fprintln(os.Stderr, "Failed to parse SBS1 Frame.", err)
-			}
-			continue
-		}
-		trackingChan <- frame
-
-	}
-	for len(trackingChan) > 0 {
-		time.Sleep(100 * time.Millisecond)
-	}
-	close(trackingChan)
-
-	return writeResult(outFileName)
-}
-
-func handleSbs1Tracking(trackingChan chan *sbs1.Frame, debug bool) {
-	for frame := range trackingChan {
-		tracker.HandleSbs1Frame(frame)
-	}
+	return writeResult(ih.Tracker, p.outFile)
 }

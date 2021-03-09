@@ -97,7 +97,7 @@ func runHttpServer(c *cli.Context) {
 					return
 				}
 				pt.HandleModeSFrame(frame)
-				icaoList[frame.ICAOAddr()] = frame.ICAOAddr()
+				icaoList[frame.Icao()] = frame.Icao()
 				frame.Describe(w)
 			}
 

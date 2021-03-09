@@ -303,7 +303,7 @@ func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) {
 
 			distanceTravelled = distance(lat, lon, p.Location.Latitude, p.Location.Longitude)
 
-			//log.Printf("%s travelled %0.2fm in %0.2f seconds (%s -> %s)", p.Icao, distanceTravelled, durationTravelled, referenceTime.Format(time.RFC3339Nano), ts.Format(time.RFC3339Nano))
+			//log.Printf("%s travelled %0.2fm in %0.2f seconds (%s -> %s)", p.icaoStr, distanceTravelled, durationTravelled, referenceTime.Format(time.RFC3339Nano), ts.Format(time.RFC3339Nano))
 
 			if distanceTravelled > acceptableMaxDistance {
 				log.Printf("The distance (%0.2fm) between {%0.4f,%0.4f} and {%0.4f,%0.4f} is too great for %s to travel in %0.2f seconds. New Track", distanceTravelled, lat, lon, p.Location.Latitude, p.Location.Longitude, p.Icao, durationTravelled)

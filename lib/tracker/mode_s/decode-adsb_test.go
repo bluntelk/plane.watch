@@ -17,7 +17,7 @@ func TestDecodeDF17BaroAlt1(t *testing.T) {
 		t.Errorf("DF17 Baro Alt: Failed to decode Altitude field correctly 5250 != %d", a)
 	}
 
-	sicao := fmt.Sprintf("%x", frame.ICAOAddr())
+	sicao := fmt.Sprintf("%x", frame.Icao())
 	if "7c4a08" != sicao {
 		t.Errorf("Did not correctly decode the ICAO address: %s != 7c4a08", sicao)
 	}
@@ -35,7 +35,7 @@ func TestDecodeDF17BaroAlt2(t *testing.T) {
 		t.Errorf("DF17 Baro Alt: Failed to decode Altitude field correctly 16025 != %d", a)
 	}
 
-	sicao := fmt.Sprintf("%x", frame.ICAOAddr())
+	sicao := fmt.Sprintf("%x", frame.Icao())
 	if "8960c6" != sicao {
 		t.Errorf("Did not correctly decode the ICAO address: 8960c6 != %s", sicao)
 	}
@@ -53,7 +53,7 @@ func TestDecodeDF17BaroAlt3(t *testing.T) {
 		t.Errorf("DF17 Baro Alt: Failed to decode Altitude field correctly 16025 != %d", a)
 	}
 
-	sicao := fmt.Sprintf("%x", frame.ICAOAddr())
+	sicao := fmt.Sprintf("%x", frame.Icao())
 	if "7c6c9a" != sicao {
 		t.Errorf("Did not correctly decode the ICAO address: 7c6c9a != %s", sicao)
 	}
@@ -74,8 +74,8 @@ func TestDecodeDF17MT19ST1(t *testing.T) {
 		t.Errorf("Capability should be 5, got %d", frame.ca)
 	}
 
-	if "7C451C" != frame.ICAOString() {
-		t.Errorf("Failed to decode ICAO. expected 7C451C, got %s", frame.ICAOString())
+	if "7C451C" != frame.IcaoStr() {
+		t.Errorf("Failed to decode ICAO. expected 7C451C, got %s", frame.IcaoStr())
 	}
 
 	if 19 != frame.messageType || 1 != frame.messageSubType {

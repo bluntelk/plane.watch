@@ -197,7 +197,7 @@ type tIcaoMessage struct {
 //		if nil != err {
 //			t.Error("Fail", err)
 //		}
-//		decodedIcao := fmt.Sprintf("%06x", frame.ICAOAddr())
+//		decodedIcao := fmt.Sprintf("%06x", frame.Icao())
 //		if sut.expectedIcao != decodedIcao {
 //			t.Errorf("%s: Bad ICAO Decode: expected %s != %s actual", sut.df, sut.expectedIcao, decodedIcao)
 //		}

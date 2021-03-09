@@ -27,100 +27,72 @@ type (
 		Frame string
 		Time  time.Time
 	}
-	AvrDecoder struct {
-		beastAvrBootTime time.Time
-	}
 )
 
-var beastAvrBootTime time.Time
-
-func init() {
-	beastAvrBootTime = time.Now()
-}
-
-func NewAvrDecoder() *AvrDecoder {
-	return &AvrDecoder{beastAvrBootTime: time.Now()}
-}
-
-func (d *AvrDecoder) DecodeAvrString(rawFrame string, t time.Time) (*Frame, error) {
-	frame, err := prepareFrame(rawFrame, t)
-	if nil != err {
-		return nil, err
-	}
-	if frame.isNoOp() {
-		return nil, nil
-	}
-	frame.beastAvrBoot = &d.beastAvrBootTime
-	err = frame.Parse()
-	return frame, err
-}
-
-func DecodeStringWorker(jobs <-chan ReceivedFrame, results chan<- *Frame, errors chan<- error) {
-	for s := range jobs {
-		frame, err := DecodeString(s.Frame, s.Time)
-		if nil != err {
-			errors <- err
-		} else {
-			results <- frame
-		}
-	}
-}
-
 func DecodeString(rawFrame string, t time.Time) (*Frame, error) {
-	frame, err := prepareFrame(rawFrame, t)
-	if nil != err {
+	frame := NewFrame(rawFrame, t)
+	if ok, err := frame.Decode(); !ok || nil != err {
 		return nil, err
 	}
 	if frame.isNoOp() {
 		return nil, nil
 	}
-	frame.beastAvrBoot = &beastAvrBootTime
-	err = frame.Parse()
+	err := frame.Parse()
 	return frame, err
 }
 
-func prepareFrame(rawFrame string, t time.Time) (*Frame, error) {
-	var frame Frame
 
-	encodedFrame := strings.TrimFunc(rawFrame, func(r rune) bool {
+func NewFrame(rawFrame string, t time.Time) *Frame {
+	f := Frame{
+		full:      rawFrame,
+		timeStamp: t,
+	}
+	return &f
+}
+
+func (f *Frame) Decode() (bool, error) {
+	encodedFrame := strings.TrimFunc(f.full, func(r rune) bool {
 		return unicode.IsSpace(r) || ';' == r
 	})
 
 	// let's ensure that we have some correct data...
 	if "" == encodedFrame {
-		return nil, errors.New("cannot decode empty string")
+		return false, errors.New("cannot decode empty string")
 	}
 
 	if len(encodedFrame) < 14 {
-		return nil, fmt.Errorf("frame (%s) too short to be a Mode S frame", rawFrame)
+		return false, fmt.Errorf("frame (%s) too short to be a Mode S frame", f.full)
 	}
 
 	// determine what type of frame we are dealing with
 	if encodedFrame[0] == '@' {
 		// Beast Timestamp+AVR format
-		frame.mode = "MLAT"
+		f.mode = "MLAT"
 	} else {
-		frame.mode = "NORMAL"
+		f.mode = "NORMAL"
 	}
 
-	frame.timeStamp = t
 	// ensure we have a timestamp
 	frameStart := 0
-	if "MLAT" == frame.mode {
+	if "MLAT" == f.mode {
 		frameStart = 13
 		// try and use the provided timestamp
-		frame.beastTimeStamp = encodedFrame[1:12]
+		f.beastTimeStamp = encodedFrame[1:12]
 	} else if "*" == encodedFrame[0:1] {
 		frameStart = 1
 	}
-	frame.raw = encodedFrame[frameStart:]
-	frame.full = encodedFrame
-
-	return &frame, nil
+	f.raw = encodedFrame[frameStart:]
+	return !f.isNoOp(), f.Parse()
 }
+
 
 func (f *Frame) Parse() error {
 	var err error
+
+	if f.isNoOp() {
+		return nil
+	}
+
 	f.parseBeastTimeStamp()
 
 	err = f.parseRawToMessage()
@@ -185,7 +157,6 @@ func (f *Frame) Parse() error {
 		f.decodeSquawkIdentity(2, 3) // gillham encoded squawk
 		err = f.decodeCommB()
 	}
-
 	return err
 }
 
@@ -200,6 +171,12 @@ func (f *Frame) decodeDownLinkFormat() {
 
 }
 
+func (f *Frame) parseRadarcapeTimeStamp() {
+	// The same 48bites are used in GPS format (from radarcape)
+	//   18 bit second of day, 30bit nanosecond
+	// TODO: Decode Radarcape Ticks
+}
+
 func (f *Frame) parseBeastTimeStamp() {
 	if "" == f.beastTimeStamp || "00000000000" == f.beastTimeStamp {
 		return
@@ -210,34 +187,21 @@ func (f *Frame) parseBeastTimeStamp() {
 	// max: 2,000,000 seconds
 	// Wrinkle: The same 48bites are used in GPS format (from radarcape)
 	//   18 bit second of day, 30bit nanosecond
-	ticksSinceBoot, err := strconv.ParseInt(f.beastTimeStamp, 16, 64)
+	var err error
+	f.beastTicks, err = strconv.ParseUint(f.beastTimeStamp, 16, 64)
 	if err != nil {
 		log.Printf("Failed to decode beast avr timestamp: %s", err)
 		return
 	}
-	if nil == f.beastAvrBoot {
-		panic(errors.New("Should have set f.beastAvrBoot"))
-	}
-
-	// handle rollover
-	oldestBootTime := time.Now().Add(-2000000 * time.Second)
-	if oldestBootTime.After(*f.beastAvrBoot) {
-		*f.beastAvrBoot = oldestBootTime
-	}
-
-	guess := f.TimeStamp().Add(time.Duration(ticksSinceBoot*500) * time.Nanosecond)
-	if guess.Before(*f.beastAvrBoot) {
-		*f.beastAvrBoot = guess
-	}
-
-	f.beastAvrUptime = time.Duration(ticksSinceBoot * 500)
-	//log.Printf("%0.2f seconds, or %s", duration.Seconds(), duration.String())
-
-	f.timeStamp = beastAvrBootTime.Add(time.Duration(ticksSinceBoot * 500))
+	f.beastTicksNs = f.beastTicks * 500
 }
 
 func (f *Frame) TimeStamp() time.Time {
 	return f.timeStamp
+}
+
+func (f *Frame) SetTimeStamp(t time.Time) {
+	f.timeStamp = t
 }
 
 // call after frame.raw is set. does the preparing
