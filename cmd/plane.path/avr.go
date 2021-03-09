@@ -27,6 +27,8 @@ func parseAvr(c *cli.Context) error {
 }
 
 var lastSeenMap sync.Map
+// timeFiddler ensures we have enough time between messages for a plane to have travelled the distance it says it did
+// this is because we do not have the timestamp for when it was collected when processing AVR frames
 func timeFiddler(f tracker.Frame) tracker.Frame {
 	switch f.(type) {
 	case *mode_s.Frame:
