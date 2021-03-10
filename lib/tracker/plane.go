@@ -280,7 +280,7 @@ func (p *Plane) SetVerticalRate(rate int) {
 	p.Location.VerticalRate = rate
 }
 
-func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) {
+func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) (warn error) {
 	if lat < -95.0 || lat > 95 || lon < -180 || lon > 180 {
 		log.Printf("Invalid Coordinate {%0.6f, %0.6f}", lat, lon)
 		return
@@ -306,7 +306,7 @@ func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) {
 			//log.Printf("%s travelled %0.2fm in %0.2f seconds (%s -> %s)", p.icaoStr, distanceTravelled, durationTravelled, referenceTime.Format(time.RFC3339Nano), ts.Format(time.RFC3339Nano))
 
 			if distanceTravelled > acceptableMaxDistance {
-				log.Printf("The distance (%0.2fm) between {%0.4f,%0.4f} and {%0.4f,%0.4f} is too great for %s to travel in %0.2f seconds. New Track", distanceTravelled, lat, lon, p.Location.Latitude, p.Location.Longitude, p.Icao, durationTravelled)
+				warn = fmt.Errorf("The distance (%0.2fm) between {%0.4f,%0.4f} and {%0.4f,%0.4f} is too great for %s to travel in %0.2f seconds. New Track", distanceTravelled, lat, lon, p.Location.Latitude, p.Location.Longitude, p.Icao, durationTravelled)
 				p.Location.TrackFinished = true
 			}
 		}
@@ -334,6 +334,7 @@ func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) {
 	newLocation.Velocity = p.Location.Velocity
 
 	p.Location = newLocation
+	return
 }
 
 func (p *Plane) ZeroCpr() {
@@ -400,10 +401,7 @@ func (p *Plane) DecodeCpr(ts time.Time) error {
 		return err
 	}
 	p.Location.hasLatLon = true
-	p.AddLatLong(loc.Latitude, loc.Longitude, ts)
-
-	//p.ZeroCpr()
-	return nil
+	return p.AddLatLong(loc.Latitude, loc.Longitude, ts)
 }
 
 // Distance function returns the distance (in meters) between two points of

@@ -15,9 +15,9 @@ func parseSbs(c *cli.Context) error {
 		return err
 	}
 
-	ih := tracker.NewInputHandler(tracker.WithVerboseOutput())
+	ih := tracker.NewTracker(tracker.WithVerboseOutput())
 	ih.AddProducer(p)
 	ih.Wait()
 
-	return writeResult(ih.Tracker, p.outFile)
+	return writeResult(ih, p.outFile)
 }

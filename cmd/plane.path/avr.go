@@ -18,12 +18,12 @@ func parseAvr(c *cli.Context) error {
 		return err
 	}
 
-	ih := tracker.NewInputHandler(tracker.WithVerboseOutput())
+	ih := tracker.NewTracker(tracker.WithVerboseOutput())
 	ih.AddProducer(p)
 	ih.AddMiddleware(timeFiddler)
 	ih.Wait()
 
-	return writeResult(ih.Tracker, p.outFile)
+	return writeResult(ih, p.outFile)
 }
 
 var lastSeenMap sync.Map
@@ -34,7 +34,17 @@ func timeFiddler(f tracker.Frame) tracker.Frame {
 	case *mode_s.Frame:
 		lastSeen, _ := lastSeenMap.LoadOrStore(f.Icao(), time.Now().Add(-24 *time.Hour))
 		t := lastSeen.(time.Time)
-		t = t.Add(10*time.Second)
+		frame := f.(*mode_s.Frame)
+		if 17 == frame.DownLinkType() {
+			switch frame.MessageTypeString() {
+			case mode_s.DF17FrameSurfacePos, mode_s.DF17FrameAirPositionGnss, mode_s.DF17FrameAirPositionBarometric:
+				if frame.IsEven() {
+					t = t.Add(10*time.Second)
+				}
+			}
+		} else {
+			t = t.Add(100* time.Millisecond)
+		}
 		fp := f.(*mode_s.Frame)
 		fp.SetTimeStamp(t)
 		lastSeenMap.Store(f.Icao(), t)

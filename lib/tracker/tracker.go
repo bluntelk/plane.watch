@@ -9,25 +9,50 @@ import (
 )
 
 const (
-	logLevelQuiet  = 0
-	logLevelNormal = 1
-	logLevelInfo   = 2
-	logLevelDebug  = 3
+	LogLevelQuiet = 0
+	LogLevelError = 1
+	LogLevelInfo  = 2
+	LogLevelDebug = 3
 )
 
 type Tracker struct {
 	logs      io.Writer
 	planeList sync.Map
+
 	logLevel  int
+
+	// Input Handling
+	producers   []Producer
+	middlewares []Middleware
+
+	producerWaiter sync.WaitGroup
+
+	decodeWorkerCount   uint
+	decodingQueue       chan Frame
+	decodingQueueWaiter sync.WaitGroup
 }
 
 var DefaultTracker = NewTracker()
 
-func NewTracker() *Tracker {
-	return &Tracker{
+// NewTracker creates a new tracker with which we can populate with plane tracking data
+func NewTracker(opts ...Option) *Tracker {
+	t := &Tracker{
 		logs:     io.Discard,
-		logLevel: logLevelQuiet,
+		logLevel: LogLevelQuiet,
+		producers:     []Producer{},
+		middlewares:   []Middleware{},
+		decodingQueue: make(chan Frame, 1000), // a nice deep buffer
 	}
+
+	for _, opt := range opts {
+		opt(t)
+	}
+
+	for i := 0; i < 5; i++ {
+		go t.decodeQueue()
+	}
+
+	return t
 }
 
 func (t *Tracker) SetLoggerOutput(out io.Writer) {
@@ -35,13 +60,13 @@ func (t *Tracker) SetLoggerOutput(out io.Writer) {
 }
 
 func (t *Tracker) debugMessage(sfmt string, a ...interface{}) {
-	if t.logLevel >= logLevelDebug {
+	if t.logLevel >= LogLevelDebug {
 		_, _ = fmt.Fprintf(t.logs, "DEBUG: "+sfmt+"\n", a...)
 	}
 }
 
 func (t *Tracker) infoMessage(sfmt string, a ...interface{}) {
-	if t.logLevel >= logLevelInfo {
+	if t.logLevel >= LogLevelInfo {
 		_, _ = fmt.Fprintf(t.logs, "INFO : "+sfmt+"\n", a...)
 	}
 }
@@ -88,7 +113,7 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 
 	debugMessage := func(sfmt string, a ...interface{}) {
 		planeFormat = fmt.Sprintf("DF%02d - \033[0;97mPlane (\033[38;5;118m%s %-8s\033[0;97m)", frame.DownLinkType(), plane.Icao, plane.Flight.Identifier)
-		fmt.Printf(planeFormat+sfmt+"\n", a...)
+		t.debugMessage(planeFormat+sfmt, a...)
 	}
 
 	// determine what to do with our given frame
@@ -200,7 +225,9 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 				} else {
 					_ = plane.SetCprOddLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
 				}
-				_ = plane.DecodeCpr(frame.TimeStamp())
+				if err := plane.DecodeCpr(frame.TimeStamp()); nil != err {
+					debugMessage("%s", err)
+				}
 				plane.SetLocationUpdateTime(frame.TimeStamp())
 
 				heading := "unknown heading"
@@ -226,7 +253,9 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 
 				altitude, _ := frame.Altitude()
 				plane.SetAltitude(altitude, frame.AltitudeUnits())
-				_ = plane.DecodeCpr(frame.TimeStamp())
+				if err := plane.DecodeCpr(frame.TimeStamp()); nil != err {
+					debugMessage("%s", err)
+				}
 
 				dt := plane.DistanceTravelled()
 				if dt.Valid() {
@@ -324,7 +353,6 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 		}
 	}
 	if hasChanged {
-		//log.Println(plane.String())
 		return plane
 	} else {
 		return nil
@@ -340,7 +368,9 @@ func (t *Tracker) HandleSbs1Frame(frame *sbs1.Frame) *Plane {
 	plane := t.GetPlane(frame.IcaoInt)
 	plane.SetLastSeen(frame.TimeStamp())
 	if frame.HasPosition {
-		plane.AddLatLong(frame.Lat, frame.Lon, frame.Received)
+		if err := plane.AddLatLong(frame.Lat, frame.Lon, frame.Received); nil != err {
+			t.debugMessage("%s", err)
+		}
 		hasChanged = true
 		t.debugMessage("Plane %s is at %0.4f, %0.4f", frame.IcaoStr(), frame.Lat, frame.Lon)
 	}

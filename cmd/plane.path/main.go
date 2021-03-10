@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/kpawlik/geojson"
 	"github.com/urfave/cli"
-	"log"
 	"os"
 	"plane.watch/lib/tracker"
 	"strings"
@@ -22,6 +21,7 @@ type (
 
 		input   chan string
 		errChan chan error
+		logChan chan tracker.LogItem
 		out     chan tracker.Frame
 
 		newFrame frameFunc
@@ -31,12 +31,6 @@ type (
 )
 
 func main() {
-	//defer func() {
-	//	if r := recover(); r != nil {
-	//		fmt.Printf("Failed to run: %s", r)
-	//	}
-	//}()
-
 	app := cli.NewApp()
 
 	app.Version = "v0.0.2"
@@ -80,6 +74,10 @@ func main() {
 	}
 }
 
+func (p producer) Logs() chan tracker.LogItem {
+	return p.logChan
+}
+
 func produceOutput(c *cli.Context, newFrame frameFunc) (*producer, error) {
 	stdOut := c.GlobalBool("stdout")
 
@@ -87,7 +85,11 @@ func produceOutput(c *cli.Context, newFrame frameFunc) (*producer, error) {
 		outFile:   "",
 		dataFiles: []string{},
 		verbose:   c.GlobalBool("v"),
-		newFrame: newFrame,
+		newFrame:  newFrame,
+		logChan:   make(chan tracker.LogItem, 50),
+		input:     make(chan string, 50),
+		errChan:   make(chan error, 50),
+		out:       make(chan tracker.Frame, 50),
 	}
 
 	if c.NArg() == 0 {
@@ -99,17 +101,13 @@ func produceOutput(c *cli.Context, newFrame frameFunc) (*producer, error) {
 		p.dataFiles = c.Args()
 	} else {
 		p.outFile = c.Args().First()
-		p.debugOutput("Writing json output to", p.outFile)
+		p.debugOutput("Writing json output to ", p.outFile)
 		p.dataFiles = c.Args()[1:]
 	}
 	if 0 == len(p.dataFiles) {
 		return nil, fmt.Errorf("you need to specify some files")
 	}
-	p.debugOutput("using", len(p.dataFiles), "data files")
-
-	p.input = make(chan string, 50)
-	p.errChan = make(chan error, 50)
-	p.out = make(chan tracker.Frame, 50)
+	p.debugOutput("using ", len(p.dataFiles), " data files")
 
 	go p.handleErrors()
 
@@ -117,8 +115,10 @@ func produceOutput(c *cli.Context, newFrame frameFunc) (*producer, error) {
 }
 
 func (p producer) debugOutput(v ...interface{}) {
-	if p.verbose {
-		log.Println(v...)
+	p.logChan <- tracker.LogItem{
+		Level:   tracker.LogLevelDebug,
+		Section: "Reader",
+		Message: fmt.Sprint(v...),
 	}
 }
 
@@ -135,8 +135,10 @@ func (p *producer) Listen() chan tracker.Frame {
 				_, _ = fmt.Fprintf(os.Stderr, "Processing line: %d\r", lineCounter)
 			}
 		}
-		p.debugOutput("Done reading lines. Processed", lineCounter, "lines")
+		p.debugOutput("Done reading lines. Processed ", lineCounter, " lines")
 		close(p.out)
+		close(p.errChan)
+		close(p.logChan)
 	}()
 
 	return p.out
@@ -144,27 +146,28 @@ func (p *producer) Listen() chan tracker.Frame {
 
 func (p producer) Stop() {
 	close(p.input)
+	close(p.errChan)
+	close(p.logChan)
 }
 
 func (p producer) handleErrors() {
 	for err := range p.errChan {
 		if nil != err {
-			p.debugOutput("ERROR", err)
+			p.logChan <- tracker.LogItem{
+				Level:   tracker.LogLevelError,
+				Section: "Reader",
+				Message: fmt.Sprint(err),
+			}
 		}
 	}
 }
 
 func (p *producer) readFiles() {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println("something went wrong")
-		}
-	}()
 	var err error
 	var inFile *os.File
 	var gzipFile *gzip.Reader
 	for _, inFileName := range p.dataFiles {
-		p.debugOutput("Loading lines from", inFileName)
+		p.debugOutput("Loading lines from ", inFileName)
 		inFile, err = os.Open(inFileName)
 		if err != nil {
 			p.errChan <- fmt.Errorf("failed to open file {%s}: %s", inFileName, err)
@@ -173,8 +176,7 @@ func (p *producer) readFiles() {
 
 		isGzip := strings.ToLower(inFileName[len(inFileName)-2:]) == "gz"
 		isBzip2 := strings.ToLower(inFileName[len(inFileName)-3:]) == "bz2"
-		p.debugOutput("Is Gzip?", isGzip, "Is Bzip2?", isBzip2)
-
+		p.debugOutput("Is Gzip?", isGzip, " Is Bzip2?", isBzip2)
 
 		var scanner *bufio.Scanner
 		if isGzip {

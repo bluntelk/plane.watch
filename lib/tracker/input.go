@@ -2,15 +2,23 @@ package tracker
 
 import (
 	"errors"
+	"io/ioutil"
 	"os"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
-	"sync"
 	"time"
 )
 
 type (
-	InputHandlerOption func(*InputHandler)
+	// Option allows us to configure our new Tracker as we need it
+	Option func(*Tracker)
+
+	//LogItem allows us to send out logs in a structured manner
+	LogItem struct {
+		Level   int
+		Section string
+		Message string
+	}
 
 	// Frame is our general object for a tracking update, AVR, SBS1, Modes Beast Binary
 	Frame interface {
@@ -23,109 +31,101 @@ type (
 	// processes further
 	Producer interface {
 		Listen() chan Frame
+		Logs() chan LogItem
 		Stop()
 	}
 
 	// a Middleware has a chance to modify a frame before we send it to the plane Tracker
 	Middleware func(Frame) Frame
-
-	InputHandler struct {
-		producers   []Producer
-		middlewares []Middleware
-
-		producerWaiter sync.WaitGroup
-
-		decodeWorkerCount   uint
-		decodingQueue       chan Frame
-		decodingQueueWaiter sync.WaitGroup
-		Tracker             *Tracker
-	}
 )
 
-func (ih *InputHandler) setVerbosity(logLevel int) {
-	ih.Tracker.logLevel = logLevel
-	ih.Tracker.SetLoggerOutput(os.Stderr)
-}
-
-func NewInputHandler(opts ...InputHandlerOption) *InputHandler {
-	ph := &InputHandler{
-		producers:     []Producer{},
-		middlewares:   []Middleware{},
-		decodingQueue: make(chan Frame, 1000), // a nice deep buffer
-		Tracker:       NewTracker(),
-	}
-
-	for _, opt := range opts {
-		opt(ph)
-	}
-
-	for i := 0; i < 5; i++ {
-		go ph.decodeQueue()
-	}
-
-	return ph
-}
-
-func WithVerboseOutput() InputHandlerOption {
-	return func(ih *InputHandler) {
-		ih.setVerbosity(logLevelDebug)
+func (t *Tracker) setVerbosity(logLevel int) {
+	t.logLevel = logLevel
+	if logLevel == LogLevelQuiet {
+		t.SetLoggerOutput(ioutil.Discard)
+	} else {
+		t.SetLoggerOutput(os.Stderr)
 	}
 }
-func WithInfoOutput() InputHandlerOption {
-	return func(ih *InputHandler) {
-		ih.setVerbosity(logLevelInfo)
+
+func WithVerboseOutput() Option {
+	return func(ih *Tracker) {
+		ih.setVerbosity(LogLevelDebug)
 	}
 }
-func WithQuietOutput() InputHandlerOption {
-	return func(ih *InputHandler) {
-		ih.setVerbosity(logLevelQuiet)
+func WithInfoOutput() Option {
+	return func(ih *Tracker) {
+		ih.setVerbosity(LogLevelInfo)
 	}
 }
-func WithDecodeWorkerCount(numDecodeWorkers uint) InputHandlerOption {
-	return func(ih *InputHandler) {
+func WithQuietOutput() Option {
+	return func(ih *Tracker) {
+		ih.setVerbosity(LogLevelQuiet)
+	}
+}
+func WithDecodeWorkerCount(numDecodeWorkers uint) Option {
+	return func(ih *Tracker) {
 		ih.decodeWorkerCount = numDecodeWorkers
 	}
 }
 
-func (ih *InputHandler) Finish() {
-	close(ih.decodingQueue)
+func (t *Tracker) Finish() {
+	close(t.decodingQueue)
 }
 
-func (ih *InputHandler) AddProducer(p Producer) {
-	ih.producers = append(ih.producers, p)
-	ih.producerWaiter.Add(1)
+func (t *Tracker) AddProducer(p Producer) {
+	t.debugMessage("Adding a producer")
+	t.producers = append(t.producers, p)
+	t.producerWaiter.Add(2)
 	go func() {
 		for f := range p.Listen() {
-			ih.decodingQueue <- f
+			t.decodingQueue <- f
 		}
-		ih.producerWaiter.Done()
+		t.producerWaiter.Done()
 	}()
+	go func() {
+		for log := range p.Logs() {
+			switch log.Level {
+			case LogLevelQuiet:
+				continue
+			case LogLevelError:
+				t.errorMessage("%s: %s", log.Section, log.Message)
+			case LogLevelInfo:
+				t.infoMessage("%s: %s", log.Section, log.Message)
+			case LogLevelDebug:
+				t.debugMessage("%s: %s", log.Section, log.Message)
+			}
+		}
+		t.producerWaiter.Done()
+	}()
+	t.debugMessage("Just added a producer")
 }
 
-func (ih *InputHandler) AddMiddleware(m Middleware) {
-	ih.middlewares = append(ih.middlewares, m)
+func (t *Tracker) AddMiddleware(m Middleware) {
+	t.middlewares = append(t.middlewares, m)
 }
 
 // Wait waits for all producers to stop producing input and then return
-func (ih *InputHandler) Wait() {
-	ih.producerWaiter.Wait()
-	close(ih.decodingQueue)
-	ih.decodingQueueWaiter.Wait()
+func (t *Tracker) Wait() {
+	t.debugMessage("and we are up and running...")
+	t.producerWaiter.Wait()
+	close(t.decodingQueue)
+	t.decodingQueueWaiter.Wait()
 }
 
-func (ih *InputHandler) handleError(err error) {
+func (t *Tracker) handleError(err error) {
 	if nil != err {
-		ih.Tracker.errorMessage("%s", err)
+		t.errorMessage("%s", err)
 	}
 }
 
-func (ih *InputHandler) decodeQueue() {
-	ih.decodingQueueWaiter.Add(1)
-	for f := range ih.decodingQueue {
+func (t *Tracker) decodeQueue() {
+	t.decodingQueueWaiter.Add(1)
+	for f := range t.decodingQueue {
 		ok, err := f.Decode()
 		if nil != err {
 			// the decode operation failed to produce valid output, and we tell someone about it
-			ih.handleError(err)
+			t.handleError(err)
 			continue
 		}
 		if !ok {
@@ -134,18 +134,18 @@ func (ih *InputHandler) decodeQueue() {
 			continue
 		}
 
-		for _, m := range ih.middlewares {
+		for _, m := range t.middlewares {
 			f = m(f)
 		}
 
 		switch f.(type) {
 		case *mode_s.Frame:
-			ih.Tracker.HandleModeSFrame(f.(*mode_s.Frame))
+			t.HandleModeSFrame(f.(*mode_s.Frame))
 		case *sbs1.Frame:
-			ih.Tracker.HandleSbs1Frame(f.(*sbs1.Frame))
+			t.HandleSbs1Frame(f.(*sbs1.Frame))
 		default:
-			ih.handleError(errors.New("unknown frame type, cannot track"))
+			t.handleError(errors.New("unknown frame type, cannot track"))
 		}
 	}
-	ih.decodingQueueWaiter.Done()
+	t.decodingQueueWaiter.Done()
 }
