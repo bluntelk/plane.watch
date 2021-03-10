@@ -7,6 +7,7 @@ import (
 	"github.com/urfave/cli"
 	"log"
 	"os"
+	"plane.watch/lib/producer"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/mode_s"
 	"time"
@@ -158,6 +159,19 @@ func test(c *cli.Context) {
 
 // run is our method for running things
 func run(c *cli.Context) {
+	trk := tracker.NewTracker(tracker.WithVerboseOutput())
+	trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
+	trk.Wait()
+
+	// TODO: turn the below into a sink
+	// trk.AddSink(sink.Redis(host,port))
+	// trk.AddSink(sink.RabbitMq(host, port, queue)
+
+	// TODO: Add an API for programatically handling differing inputs
+	// /api/producer[CRUD]
+	// /api/sink[CRUD]
+
+	return
 	d1090 := NewDump1090Reader(dump1090Host, dump1090Port)
 	var err error
 	if err = d1090.Connect(); err != nil {

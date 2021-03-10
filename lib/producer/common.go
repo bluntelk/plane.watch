@@ -5,56 +5,63 @@ import (
 	"plane.watch/lib/tracker"
 )
 
-type Producer struct {
+const (
+	cmdExit = 1
+)
+
+type producer struct {
 	label string
-	out  chan tracker.Frame
-	errs chan tracker.LogItem
+	out   chan tracker.Frame
+	logs  chan tracker.LogItem
+
+	cmdChan chan int
 }
 
-func NewProducer(label string) *Producer {
-	return &Producer{
-		label: label,
-		out:  make(chan tracker.Frame),
-		errs: make(chan tracker.LogItem),
+func NewProducer(label string) *producer {
+	return &producer{
+		label:   label,
+		out:     make(chan tracker.Frame),
+		logs:    make(chan tracker.LogItem),
+		cmdChan: make(chan int),
 	}
 }
 
-func (p *Producer) Listen() chan tracker.Frame {
+func (p *producer) Listen() chan tracker.Frame {
 	return p.out
 }
 
-func (p *Producer) addFrame(f tracker.Frame) {
+func (p *producer) addFrame(f tracker.Frame) {
 	p.out <- f
 }
 
-func (p *Producer) addDebug(sfmt string, v ...interface{}) {
-	p.errs <- tracker.LogItem{
+func (p *producer) addDebug(sfmt string, v ...interface{}) {
+	p.logs <- tracker.LogItem{
 		Level:   tracker.LogLevelDebug,
 		Section: p.label,
-		Message: fmt.Sprintf("Debug: "+ sfmt, v...),
+		Message: fmt.Sprintf("Debug: "+sfmt, v...),
 	}
 }
 
-func (p *Producer) addInfo(sfmt string, v ...interface{}) {
-	p.errs <- tracker.LogItem{
+func (p *producer) addInfo(sfmt string, v ...interface{}) {
+	p.logs <- tracker.LogItem{
 		Level:   tracker.LogLevelInfo,
 		Section: p.label,
-		Message: fmt.Sprintf("Info : "+ sfmt, v...),
+		Message: fmt.Sprintf("Info : "+sfmt, v...),
 	}
 }
 
-func (p *Producer) addError(err error) {
-	p.errs <- tracker.LogItem{
+func (p *producer) addError(err error) {
+	p.logs <- tracker.LogItem{
 		Level:   tracker.LogLevelError,
 		Section: p.label,
 		Message: fmt.Sprintf("Error: %s", err),
 	}
 }
 
-func (p *Producer) Logs() chan tracker.LogItem {
-	return p.errs
+func (p *producer) Logs() chan tracker.LogItem {
+	return p.logs
 }
 
-func (p *Producer) Stop() {
-
+func (p *producer) Stop() {
+	p.cmdChan <- cmdExit
 }
