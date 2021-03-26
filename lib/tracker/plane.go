@@ -68,20 +68,12 @@ var (
 	PointCounter       int
 )
 
-func NewPlane(icao uint32) *Plane {
+func newPlane(icao uint32) *Plane {
 	p := &Plane{}
 	p.SetIcaoIdentifier(icao)
 	p.ResetLocationHistory()
 	p.ZeroCpr()
 	return p
-}
-
-func GetPlane(icao uint32) *Plane {
-	return DefaultTracker.GetPlane(icao)
-}
-
-func Each(pi PlaneIterator) {
-	DefaultTracker.EachPlane(pi)
 }
 
 func (p *Plane) LastSeen() time.Time {
@@ -387,7 +379,10 @@ func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) error {
 
 func (p *Plane) DecodeCpr(ts time.Time) error {
 
-	// attempt to decode the CPR LAT/LON
+	if !(p.cprLocation.oddFrame && p.cprLocation.evenFrame) {
+		return nil
+	}
+		// attempt to decode the CPR LAT/LON
 	var loc PlaneLocation
 	var err error
 
@@ -401,7 +396,9 @@ func (p *Plane) DecodeCpr(ts time.Time) error {
 		return err
 	}
 	p.Location.hasLatLon = true
-	return p.AddLatLong(loc.Latitude, loc.Longitude, ts)
+	err = p.AddLatLong(loc.Latitude, loc.Longitude, ts)
+	p.ZeroCpr()
+	return err
 }
 
 // Distance function returns the distance (in meters) between two points of

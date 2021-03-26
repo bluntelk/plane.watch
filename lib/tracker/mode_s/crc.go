@@ -56,7 +56,7 @@ func (f *Frame) checkCrc() error {
 		if f.decodeModeSChecksum() {
 			return nil
 		}
-		return fmt.Errorf("invalid checksum for DF %d", f.downLinkFormat)
+		return fmt.Errorf("invalid checksum for DF %d (%s)", f.downLinkFormat, f.raw)
 	default:
 		return fmt.Errorf("do not know how to CRC Downlink Format %d", f.downLinkFormat)
 	}

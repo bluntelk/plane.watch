@@ -20,7 +20,6 @@ func NewAvrListener(host, port string) tracker.Producer {
 
 func NewAvrFetcher(host, port string) tracker.Producer {
 	p := NewProducer("AVR Fetcher for: " + net.JoinHostPort(host, port))
-	// todo: gracefully close/stop
 	var conn net.Conn
 	working := true
 	go func() {
@@ -31,14 +30,18 @@ func NewAvrFetcher(host, port string) tracker.Producer {
 				p.addError(err)
 				continue
 			}
+			p.addDebug("Connected!")
 			scan := bufio.NewScanner(conn)
 			for scan.Scan() {
-				p.addFrame(mode_s.NewFrame(scan.Text(), time.Now()))
+				line := scan.Text()
+				p.addFrame(mode_s.NewFrame(line, time.Now()))
+				p.addDebug("AVR Frame: %s", line)
 			}
 			if err = scan.Err(); nil != err {
 				p.addError(err)
 			}
 		}
+		p.Cleanup()
 	}()
 
 	go func() {

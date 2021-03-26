@@ -1,12 +1,11 @@
 package main
 
 import (
-	"testing"
-	"plane.watch/lib/mode_s"
-	"time"
-	"plane.watch/lib/tracker"
 	"fmt"
-	"os"
+	"plane.watch/lib/tracker"
+	"plane.watch/lib/tracker/mode_s"
+	"testing"
+	"time"
 )
 
 func TestTracking(t *testing.T) {
@@ -16,7 +15,8 @@ func TestTracking(t *testing.T) {
 	}
 	performTrackingTest(frames, t)
 
-	plane := tracker.GetPlane(4219421)
+	trk := tracker.NewTracker()
+	plane := trk.GetPlane(4219421)
 	if plane.Location.Altitude != 38000 {
 		t.Error("Plane should be at 38000 feet")
 	}
@@ -67,14 +67,13 @@ func TestTracking2(t *testing.T) {
 }
 
 func performTrackingTest(frames []string, t *testing.T) {
-	f, _ := os.Open(os.DevNull)
-	tracker.SetLoggerOutput(f)
+	trk := tracker.NewTracker()
 	for _, msg := range frames {
 		frame, err := mode_s.DecodeString(msg, time.Now())
 		if nil != err {
 			t.Errorf("%s", err)
 		}
-		tracker.HandleModeSFrame(frame, false)
+		trk.HandleModeSFrame(frame)
 	}
 }
 
@@ -107,19 +106,19 @@ func TestCprDecode(t *testing.T) {
 		//{raw: "*8d7c4516580f06fc6d8f25d8669d;", icoa:"7c4516", isEven: false, alt:1800, lat:"-0.000000", lon:"+0.000000"},
 		//{raw: "*8d7c4516580df2a168340b32212a;", icoa:"7c4516", isEven: true, alt:1775, lat:"-32.054260", lon:"+115.931854"},
 	}
-
+	trk := tracker.NewTracker()
 	for i, d := range testData {
 		time.Sleep(1)
 		frame, err := mode_s.DecodeString(d.raw, time.Now())
 		if nil != err {
 			t.Error(err)
 		}
-		plane := tracker.HandleModeSFrame(frame, false)
+		plane := trk.HandleModeSFrame(frame)
 
 		if nil == plane {
 			t.Errorf("Plane data should have been updated")
+			continue
 		}
-
 		if plane.Location.Altitude != d.alt {
 			t.Errorf("Plane Altitude is wrong for packet %d: should be %d, was %d", i, d.alt, plane.Location.Altitude)
 		}

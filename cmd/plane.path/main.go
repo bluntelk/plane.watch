@@ -11,6 +11,7 @@ import (
 	"os"
 	"plane.watch/lib/tracker"
 	"strings"
+	"time"
 )
 
 type (
@@ -21,13 +22,13 @@ type (
 
 		input   chan string
 		errChan chan error
-		logChan chan tracker.LogItem
-		out     chan tracker.Frame
+		logChan chan tracker.LogEvent
+		out     chan tracker.Event
 
 		newFrame frameFunc
 	}
 
-	frameFunc func(string) tracker.Frame
+	frameFunc func(string) *tracker.FrameEvent
 )
 
 func main() {
@@ -68,14 +69,22 @@ func main() {
 	}
 
 	tracker.MaxLocationHistory = -1
+	//
+	//f, err := os.Create("cpuprofile")
+	//if err != nil {
+	//	fmt.Fprintf(os.Stderr, "could not create CPU profile: %v\n", err)
+	//	os.Exit(1)
+	//}
+	//if err := pprof.StartCPUProfile(f); err != nil {
+	//	fmt.Fprintf(os.Stderr, "could not start CPU profile: %v\n", err)
+	//	os.Exit(1)
+	//}
+	//defer pprof.StopCPUProfile()
+	//
 
 	if err := app.Run(os.Args); nil != err {
 		fmt.Println(err)
 	}
-}
-
-func (p producer) Logs() chan tracker.LogItem {
-	return p.logChan
 }
 
 func produceOutput(c *cli.Context, newFrame frameFunc) (*producer, error) {
@@ -86,10 +95,10 @@ func produceOutput(c *cli.Context, newFrame frameFunc) (*producer, error) {
 		dataFiles: []string{},
 		verbose:   c.GlobalBool("v"),
 		newFrame:  newFrame,
-		logChan:   make(chan tracker.LogItem, 50),
+		logChan:   make(chan tracker.LogEvent, 50),
 		input:     make(chan string, 50),
 		errChan:   make(chan error, 50),
-		out:       make(chan tracker.Frame, 50),
+		out:       make(chan tracker.Event, 50),
 	}
 
 	if c.NArg() == 0 {
@@ -115,14 +124,15 @@ func produceOutput(c *cli.Context, newFrame frameFunc) (*producer, error) {
 }
 
 func (p producer) debugOutput(v ...interface{}) {
-	p.logChan <- tracker.LogItem{
+	p.logChan <- tracker.LogEvent{
+		When:    time.Now(),
 		Level:   tracker.LogLevelDebug,
 		Section: "Reader",
 		Message: fmt.Sprint(v...),
 	}
 }
 
-func (p *producer) Listen() chan tracker.Frame {
+func (p *producer) Listen() chan tracker.Event {
 	go p.readFiles()
 
 	go func() {
@@ -138,7 +148,6 @@ func (p *producer) Listen() chan tracker.Frame {
 		p.debugOutput("Done reading lines. Processed ", lineCounter, " lines")
 		close(p.out)
 		close(p.errChan)
-		close(p.logChan)
 	}()
 
 	return p.out
@@ -147,17 +156,12 @@ func (p *producer) Listen() chan tracker.Frame {
 func (p producer) Stop() {
 	close(p.input)
 	close(p.errChan)
-	close(p.logChan)
 }
 
 func (p producer) handleErrors() {
 	for err := range p.errChan {
 		if nil != err {
-			p.logChan <- tracker.LogItem{
-				Level:   tracker.LogLevelError,
-				Section: "Reader",
-				Message: fmt.Sprint(err),
-			}
+			p.out <- tracker.NewLogEvent(tracker.LogLevelError, "Reader", fmt.Sprint(err))
 		}
 	}
 }

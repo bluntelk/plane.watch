@@ -2,8 +2,6 @@ package tracker
 
 import (
 	"errors"
-	"io/ioutil"
-	"os"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
 	"time"
@@ -13,13 +11,6 @@ type (
 	// Option allows us to configure our new Tracker as we need it
 	Option func(*Tracker)
 
-	//LogItem allows us to send out logs in a structured manner
-	LogItem struct {
-		Level   int
-		Section string
-		Message string
-	}
-
 	// Frame is our general object for a tracking update, AVR, SBS1, Modes Beast Binary
 	Frame interface {
 		Icao() uint32
@@ -27,12 +18,16 @@ type (
 		Decode() (bool, error)
 		TimeStamp() time.Time
 	}
-	// A Producer can listen or generate Frames, it provides the output via a channel that the handler then
-	// processes further
+	// A Producer can listen for or generate Frames, it provides the output via a channel that the handler can then
+	// processes further.
+	// A Producer can send *LogEvent and  *FrameEvent events
 	Producer interface {
-		Listen() chan Frame
-		Logs() chan LogItem
+		Listen() chan Event
 		Stop()
+	}
+
+	Sink interface {
+		OnEvent(Event)
 	}
 
 	// a Middleware has a chance to modify a frame before we send it to the plane Tracker
@@ -41,11 +36,6 @@ type (
 
 func (t *Tracker) setVerbosity(logLevel int) {
 	t.logLevel = logLevel
-	if logLevel == LogLevelQuiet {
-		t.SetLoggerOutput(ioutil.Discard)
-	} else {
-		t.SetLoggerOutput(os.Stderr)
-	}
 }
 
 func WithVerboseOutput() Option {
@@ -69,31 +59,42 @@ func WithDecodeWorkerCount(numDecodeWorkers uint) Option {
 	}
 }
 
+// Finish begins the ending of the tracking by closing our decoding queue
 func (t *Tracker) Finish() {
+	for _, p := range t.producers {
+		p.Stop()
+	}
 	close(t.decodingQueue)
 }
 
+// AddProducer wires up a Producer to start feeding data into the tracker
 func (t *Tracker) AddProducer(p Producer) {
 	t.debugMessage("Adding a producer")
 	t.producers = append(t.producers, p)
-	t.producerWaiter.Add(2)
+	t.producerWaiter.Add(1)
 	go func() {
-		for f := range p.Listen() {
-			t.decodingQueue <- f
-		}
-		t.producerWaiter.Done()
-	}()
-	go func() {
-		for log := range p.Logs() {
-			switch log.Level {
-			case LogLevelQuiet:
-				continue
-			case LogLevelError:
-				t.errorMessage("%s: %s", log.Section, log.Message)
-			case LogLevelInfo:
-				t.infoMessage("%s: %s", log.Section, log.Message)
-			case LogLevelDebug:
-				t.debugMessage("%s: %s", log.Section, log.Message)
+		for e := range p.Listen() {
+			switch e.(type) {
+			case *FrameEvent:
+				t.decodingQueue <- e.(*FrameEvent).frame
+				// send this event on!
+				t.AddEvent(e)
+			case *LogEvent:
+				logEvent := e.(*LogEvent)
+				switch logEvent.Level {
+				case LogLevelQuiet:
+					continue
+				case LogLevelError:
+					t.errorMessage("%s: %s", logEvent.Section, logEvent.Message)
+				case LogLevelInfo:
+					if t.logLevel >= LogLevelInfo {
+						t.infoMessage("%s: %s", logEvent.Section, logEvent.Message)
+					}
+				case LogLevelDebug:
+					if t.logLevel >= LogLevelDebug {
+						t.debugMessage("%s: %s", logEvent.Section, logEvent.Message)
+					}
+				}
 			}
 		}
 		t.producerWaiter.Done()
@@ -101,15 +102,20 @@ func (t *Tracker) AddProducer(p Producer) {
 	t.debugMessage("Just added a producer")
 }
 
+// AddMiddleware wires up a Middleware which each message will go through before being added to the tracker
 func (t *Tracker) AddMiddleware(m Middleware) {
 	t.middlewares = append(t.middlewares, m)
 }
 
-// Wait waits for all producers to stop producing input and then return
+// AddSink wires up a Sink in the tracker. Whenever an event happens it gets sent to each Sink
+func (t *Tracker) AddSink(s Sink) {
+	t.sinks = append(t.sinks, s)
+}
+
+// Wait waits for all producers to stop producing input and then returns
 func (t *Tracker) Wait() {
 	t.debugMessage("and we are up and running...")
 	t.producerWaiter.Wait()
-	close(t.decodingQueue)
 	t.decodingQueueWaiter.Wait()
 }
 
@@ -148,4 +154,8 @@ func (t *Tracker) decodeQueue() {
 		}
 	}
 	t.decodingQueueWaiter.Done()
+}
+
+func NewFrameEvent(f Frame) *FrameEvent {
+	return &FrameEvent{frame: f}
 }

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"plane.watch/lib/sink"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/mode_s"
 	"runtime/debug"
@@ -55,9 +56,6 @@ func runHttpServer(c *cli.Context) {
 		htdocsPath = path.Clean(c.Args()[0])
 		files = os.DirFS(htdocsPath)
 	}
-	if c.Bool("verbose") {
-		tracker.SetLoggerOutput(os.Stdout)
-	}
 
 	http.Handle("/", http.FileServer(http.FS(files)))
 
@@ -72,6 +70,9 @@ func runHttpServer(c *cli.Context) {
 		switch r.URL.Path {
 		case "/decode":
 			pt := tracker.NewTracker()
+			if c.Bool("verbose") {
+				pt.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
+			}
 			var submittedPackets string
 			_ = r.ParseForm()
 			submittedPackets = r.FormValue("packet")
@@ -108,6 +109,7 @@ func runHttpServer(c *cli.Context) {
 				_, _ = fmt.Fprintf(w, "%s", string(encoded))
 			}
 
+			pt = nil
 		default:
 			http.NotFound(w, r)
 			_, _ = fmt.Fprintln(w, "<br/>\n"+r.RequestURI)

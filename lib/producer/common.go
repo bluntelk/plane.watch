@@ -11,8 +11,7 @@ const (
 
 type producer struct {
 	label string
-	out   chan tracker.Frame
-	logs  chan tracker.LogItem
+	out   chan tracker.Event
 
 	cmdChan chan int
 }
@@ -20,48 +19,35 @@ type producer struct {
 func NewProducer(label string) *producer {
 	return &producer{
 		label:   label,
-		out:     make(chan tracker.Frame),
-		logs:    make(chan tracker.LogItem),
+		out:     make(chan tracker.Event, 100),
 		cmdChan: make(chan int),
 	}
 }
 
-func (p *producer) Listen() chan tracker.Frame {
+func (p *producer) Listen() chan tracker.Event {
 	return p.out
 }
 
 func (p *producer) addFrame(f tracker.Frame) {
-	p.out <- f
+	p.out <- tracker.NewFrameEvent(f)
 }
 
 func (p *producer) addDebug(sfmt string, v ...interface{}) {
-	p.logs <- tracker.LogItem{
-		Level:   tracker.LogLevelDebug,
-		Section: p.label,
-		Message: fmt.Sprintf("Debug: "+sfmt, v...),
-	}
+	p.out <- tracker.NewLogEvent(tracker.LogLevelDebug, p.label, fmt.Sprintf(sfmt, v...))
 }
 
 func (p *producer) addInfo(sfmt string, v ...interface{}) {
-	p.logs <- tracker.LogItem{
-		Level:   tracker.LogLevelInfo,
-		Section: p.label,
-		Message: fmt.Sprintf("Info : "+sfmt, v...),
-	}
+	p.out <- tracker.NewLogEvent(tracker.LogLevelInfo, p.label, fmt.Sprintf(sfmt, v...))
 }
 
 func (p *producer) addError(err error) {
-	p.logs <- tracker.LogItem{
-		Level:   tracker.LogLevelError,
-		Section: p.label,
-		Message: fmt.Sprintf("Error: %s", err),
-	}
-}
-
-func (p *producer) Logs() chan tracker.LogItem {
-	return p.logs
+	p.out <- tracker.NewLogEvent(tracker.LogLevelError, p.label, fmt.Sprint(err))
 }
 
 func (p *producer) Stop() {
 	p.cmdChan <- cmdExit
+}
+
+func (p *producer) Cleanup() {
+	close(p.out)
 }

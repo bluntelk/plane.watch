@@ -58,7 +58,7 @@ func TestGetPlane(t *testing.T) {
 	err = plane.SetCprOddLocation(88385, 125818, time.Now())
 	if nil != err {
 		// there was an error
-		t.Errorf("Unexpected error when decoding CPR: %s", err)
+		t.Errorf("Unexpected error When decoding CPR: %s", err)
 	}
 
 	if 88385 != plane.cprLocation.oddLat {
@@ -73,7 +73,7 @@ func TestGetPlane(t *testing.T) {
 	err = plane.SetCprEvenLocation(92095, 39846, time.Now())
 	if nil != err {
 		// there was an error
-		t.Errorf("Unexpected error when decoding CPR: %s", err)
+		t.Errorf("Unexpected error When decoding CPR: %s", err)
 	}
 
 	if 92095 != plane.cprLocation.evenLat {
@@ -105,7 +105,7 @@ func TestGetPlane(t *testing.T) {
 
 	if nil != err {
 		// there was an error
-		t.Errorf("Unexpected error when decoding CPR: %s", err)
+		t.Errorf("Unexpected error When decoding CPR: %s", err)
 	}
 
 	if "123.889128586342" != fmt.Sprintf("%0.12f", location.Longitude) {
@@ -142,11 +142,11 @@ func TestDecodeFailsOnNoOddLoc(t *testing.T) {
 	location, err := plane.cprLocation.decodeGlobalAir()
 
 	if nil == err {
-		t.Errorf("Failed to Fail! we should not be able to decode when there is no odd CPR location")
+		t.Errorf("Failed to Fail! we should not be able to decode When there is no odd CPR location")
 	}
 
 	if location.Latitude != 0 {
-		t.Errorf("Failed to Fail! we should not be able to decode when there is no odd CPR location")
+		t.Errorf("Failed to Fail! we should not be able to decode When there is no odd CPR location")
 	}
 }
 func TestDecodeFailsOnNoEvenLoc(t *testing.T) {
@@ -156,11 +156,11 @@ func TestDecodeFailsOnNoEvenLoc(t *testing.T) {
 	location, err := plane.cprLocation.decodeGlobalAir()
 
 	if nil == err {
-		t.Errorf("Failed to Fail! we should not be able to decode when there is no even CPR location")
+		t.Errorf("Failed to Fail! we should not be able to decode When there is no even CPR location")
 	}
 
 	if location.Latitude != 0 {
-		t.Errorf("Failed to Fail! we should not be able to decode when there is no even CPR location")
+		t.Errorf("Failed to Fail! we should not be able to decode When there is no even CPR location")
 	}
 }
 

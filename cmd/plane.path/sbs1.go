@@ -7,8 +7,8 @@ import (
 )
 
 func parseSbs(c *cli.Context) error {
-	newFrameFunc := func(line string) tracker.Frame {
-		return sbs1.NewFrame(line)
+	newFrameFunc := func(line string) *tracker.FrameEvent {
+		return tracker.NewFrameEvent(sbs1.NewFrame(line))
 	}
 	p, err := produceOutput(c, newFrameFunc)
 	if nil != err {

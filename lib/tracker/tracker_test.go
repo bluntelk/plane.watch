@@ -16,34 +16,35 @@ func TestNLFunc(t *testing.T) {
 
 func TestCprDecode(t *testing.T) {
 	type testDataType struct {
-		even_lat, even_lon                 float64
-		odd_lat, odd_lon                   float64
+		evenLat, evenLon float64
+		oddLat, oddLon   float64
 
 
-		even_rlat_check1, even_rlon_check1 string
+		evenRlatCheck1, evenRlonCheck1 string
 
-		even_rlat, even_rlon               string
-		odd_rlat, odd_rlon                 string
+		evenRlat, evenRlon string
+		oddRlat, oddRlon   string
 	}
 	testData := []testDataType{
 		//odd *8d7c4516581f76e48d95e8ab20ca; even *8d7c4516581f6288f83ade534ae1;
-		{even_lat:83068, even_lon:15070, odd_lat:94790, odd_lon:103912, odd_rlat:"-32.197483", odd_rlon:"+116.028629", even_rlat:"-32.197449", even_rlon:"+116.027820"},
+		{evenLat: 83068, evenLon:15070, oddLat:94790, oddLon:103912, oddRlat:"-32.197483", oddRlon:"+116.028629", evenRlat:"-32.197449", evenRlon:"+116.027820"},
 
 		// odd *8d7c4516580f06fc6d8f25d8669d; even *8d7c4516580df2a168340b32212a;
-		{even_lat:86196, even_lon:13323, odd_lat:97846, odd_lon:102181, odd_rlat:"-32.055219", odd_rlon:"+115.931602", even_rlat:"-32.054260", even_rlon:"+115.931854"},
+		{evenLat: 86196, evenLon:13323, oddLat:97846, oddLon:102181, oddRlat:"-32.055219", oddRlon:"+115.931602", evenRlat:"-32.054260", evenRlon:"+115.931854"},
 
 		// test data from cprtest.c from mutability dump1090
-		{even_lat:80536, even_lon:9432, odd_lat:61720, odd_lon:9192, even_rlat:"+51.686646", even_rlon:"+0.700156", odd_rlat:"+51.686763", odd_rlon:"+0.701294"},
+		{evenLat: 80536, evenLon:9432, oddLat:61720, oddLon:9192, evenRlat:"+51.686646", evenRlon:"+0.700156", oddRlat:"+51.686763", oddRlon:"+0.701294"},
 	}
-	airDlat0 := "+6.000000";
-	airDlat1 := "+6.101695";
+	airDlat0 := "+6.000000"
+	airDlat1 := "+6.101695"
+	trk := NewTracker()
 
 	for i, d := range testData {
-		plane := GetPlane(11234)
+		plane := trk.GetPlane(11234)
 
-		plane.SetCprOddLocation(d.odd_lat, d.odd_lon, time.Now())
+		plane.SetCprOddLocation(d.oddLat, d.oddLon, time.Now())
 		time.Sleep(2)
-		plane.SetCprEvenLocation(d.even_lat, d.even_lon, time.Now())
+		plane.SetCprEvenLocation(d.evenLat, d.evenLon, time.Now())
 		loc, err := plane.cprLocation.decodeGlobalAir()
 		if err != nil {
 			t.Error(err)
@@ -52,11 +53,11 @@ func TestCprDecode(t *testing.T) {
 		lat := fmt.Sprintf("%+0.6f", loc.Latitude);
 		lon := fmt.Sprintf("%+0.6f", loc.Longitude);
 
-		if lat != d.odd_rlat {
-			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.odd_rlat, lat)
+		if lat != d.oddRlat {
+			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.oddRlat, lat)
 		}
-		if lon != d.odd_rlon {
-			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.odd_rlon, lon)
+		if lon != d.oddRlon {
+			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.oddRlon, lon)
 		}
 
 		if airDlat0 != fmt.Sprintf("%+0.6f", plane.cprLocation.airDLat0) {
@@ -66,9 +67,9 @@ func TestCprDecode(t *testing.T) {
 			t.Error("AirDlat1 is wrong")
 		}
 
-		plane.SetCprEvenLocation(d.even_lat, d.even_lon, time.Now())
+		plane.SetCprEvenLocation(d.evenLat, d.evenLon, time.Now())
 		time.Sleep(2)
-		plane.SetCprOddLocation(d.odd_lat, d.odd_lon, time.Now())
+		plane.SetCprOddLocation(d.oddLat, d.oddLon, time.Now())
 		loc, err = plane.cprLocation.decodeGlobalAir()
 		if err != nil {
 			t.Error(err)
@@ -77,11 +78,11 @@ func TestCprDecode(t *testing.T) {
 		lat = fmt.Sprintf("%+0.6f", loc.Latitude);
 		lon = fmt.Sprintf("%+0.6f", loc.Longitude);
 
-		if lat != d.even_rlat {
-			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.even_rlat, lat)
+		if lat != d.evenRlat {
+			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.evenRlat, lat)
 		}
-		if lon != d.even_rlon {
-			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.even_rlon, lon)
+		if lon != d.evenRlon {
+			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.evenRlon, lon)
 		}
 
 		if airDlat0 != fmt.Sprintf("%+0.6f", plane.cprLocation.airDLat0) {

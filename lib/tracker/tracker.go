@@ -15,38 +15,45 @@ const (
 	LogLevelDebug = 3
 )
 
-type Tracker struct {
-	logs      io.Writer
-	planeList sync.Map
+type (
+	Tracker struct {
+		logs      io.Writer
+		planeList sync.Map
 
-	logLevel  int
+		logLevel int
 
-	// Input Handling
-	producers   []Producer
-	middlewares []Middleware
+		// Input Handling
+		producers   []Producer
+		middlewares []Middleware
+		sinks       []Sink
 
-	producerWaiter sync.WaitGroup
+		producerWaiter sync.WaitGroup
 
-	decodeWorkerCount   uint
-	decodingQueue       chan Frame
-	decodingQueueWaiter sync.WaitGroup
-}
+		decodeWorkerCount   uint
+		decodingQueue       chan Frame
+		decodingQueueWaiter sync.WaitGroup
 
-var DefaultTracker = NewTracker()
+		events       chan Event
+		eventsWaiter sync.WaitGroup
+	}
+)
 
 // NewTracker creates a new tracker with which we can populate with plane tracking data
 func NewTracker(opts ...Option) *Tracker {
 	t := &Tracker{
-		logs:     io.Discard,
-		logLevel: LogLevelQuiet,
+		logs:          io.Discard,
+		logLevel:      LogLevelQuiet,
 		producers:     []Producer{},
 		middlewares:   []Middleware{},
 		decodingQueue: make(chan Frame, 1000), // a nice deep buffer
+		events:        make(chan Event, 1000),
 	}
 
 	for _, opt := range opts {
 		opt(t)
 	}
+
+	go t.processEvents()
 
 	for i := 0; i < 5; i++ {
 		go t.decodeQueue()
@@ -55,37 +62,30 @@ func NewTracker(opts ...Option) *Tracker {
 	return t
 }
 
-func (t *Tracker) SetLoggerOutput(out io.Writer) {
-	t.logs = out
-}
-
 func (t *Tracker) debugMessage(sfmt string, a ...interface{}) {
 	if t.logLevel >= LogLevelDebug {
-		_, _ = fmt.Fprintf(t.logs, "DEBUG: "+sfmt+"\n", a...)
+		t.AddEvent(NewLogEvent(LogLevelDebug, "Tracker", fmt.Sprintf("DEBUG: "+sfmt, a...)))
 	}
 }
 
 func (t *Tracker) infoMessage(sfmt string, a ...interface{}) {
 	if t.logLevel >= LogLevelInfo {
-		_, _ = fmt.Fprintf(t.logs, "INFO : "+sfmt+"\n", a...)
+		t.AddEvent(NewLogEvent(LogLevelInfo, "Tracker", fmt.Sprintf("INFO : "+sfmt, a...)))
 	}
 }
 
 func (t *Tracker) errorMessage(sfmt string, a ...interface{}) {
-	_, _ = fmt.Fprintf(t.logs, "ERROR: "+sfmt+"\n", a...)
+	t.AddEvent(NewLogEvent(LogLevelError, "Tracker", fmt.Sprintf("ERROR : "+sfmt, a...)))
 }
-
-func SetLoggerOutput(out io.Writer) { DefaultTracker.SetLoggerOutput(out) }
-
-func HandleModeSFrame(frame *mode_s.Frame) *Plane { return DefaultTracker.HandleModeSFrame(frame) }
 
 func (t *Tracker) GetPlane(icao uint32) *Plane {
 	plane, ok := t.planeList.Load(icao)
 	if ok {
 		return plane.(*Plane)
 	}
+	t.infoMessage("Plane %06X has made an appearance", icao)
 
-	p := NewPlane(icao)
+	p := newPlane(icao)
 	t.planeList.Store(icao, p)
 	return p
 }
@@ -231,7 +231,9 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 				plane.SetLocationUpdateTime(frame.TimeStamp())
 
 				heading := "unknown heading"
-				if plane.HasHeading() {heading = fmt.Sprintf("heading %0.2f", plane.Heading())}
+				if plane.HasHeading() {
+					heading = fmt.Sprintf("heading %0.2f", plane.Heading())
+				}
 				debugMessage(" is on the ground and has %s and is travelling at %0.2f knots\033[0m", heading, plane.Velocity())
 				hasChanged = true
 				break
@@ -285,7 +287,9 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 				plane.SetLocationUpdateTime(frame.TimeStamp())
 
 				heading := "unknown heading"
-				if plane.HasHeading() {heading = fmt.Sprintf("heading %0.2f", plane.Heading())}
+				if plane.HasHeading() {
+					heading = fmt.Sprintf("heading %0.2f", plane.Heading())
+				}
 				debugMessage(" has %s and is travelling at %0.2f knots\033[0m", heading, plane.Velocity())
 				hasChanged = true
 				break
@@ -357,10 +361,6 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 	} else {
 		return nil
 	}
-}
-
-func HandleSbs1Frame(frame *sbs1.Frame) *Plane {
-	return DefaultTracker.HandleSbs1Frame(frame)
 }
 
 func (t *Tracker) HandleSbs1Frame(frame *sbs1.Frame) *Plane {

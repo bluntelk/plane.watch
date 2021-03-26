@@ -536,14 +536,14 @@ func (f *Frame) FlightNumber() string {
 	return string(f.flight)
 }
 
+// the first character can be * or @ (or left out)
+// if the entire string is then 0's, it's a noop
+var noopRw = regexp.MustCompile("^[*@]?0+$")
 func (f *Frame) isNoOp() bool {
 	if "" == f.raw {
 		return true
 	}
-	// the first character can be * or @ (or left out)
-	// if the entire string is then 0's, it's a noop
-	re := regexp.MustCompile("^[*@]?0+$")
-	return re.MatchString(f.full)
+	return noopRw.MatchString(f.full)
 }
 
 /**

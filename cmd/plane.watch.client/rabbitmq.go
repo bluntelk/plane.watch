@@ -160,7 +160,7 @@ func (r *RabbitMQ) connect(uri string, done chan bool) {
 		return
 	}
 
-	log.Printf("Connection established, getting Channel")
+	log.Printf("Config established, getting Channel")
 	r.channel, err = r.conn.Channel()
 	if err != nil {
 		log.Printf("Channel: %s", err)

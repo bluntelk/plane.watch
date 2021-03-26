@@ -1,16 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/streadway/amqp"
 	"github.com/urfave/cli"
-	"log"
 	"os"
 	"plane.watch/lib/producer"
+	"plane.watch/lib/sink"
 	"plane.watch/lib/tracker"
-	"plane.watch/lib/tracker/mode_s"
-	"time"
 )
 
 var (
@@ -22,7 +18,6 @@ var (
 )
 
 func main() {
-
 	app := cli.NewApp()
 
 	app.Version = "1.0.0"
@@ -89,11 +84,6 @@ func main() {
 
 	app.Commands = []cli.Command{
 		{
-			Name:   "test",
-			Usage:  "Tests the configuration",
-			Action: test,
-		},
-		{
 			Name:   "run",
 			Usage:  "Gather ADSB data and sends it to plane.watch",
 			Action: run,
@@ -105,117 +95,35 @@ func main() {
 	}
 }
 
-func getRabbitConnection(timeout int64) (*RabbitMQ, error) {
-	if "" == pwUser {
-		log.Fatalln("No User Specified For Plane.Watch Rabbit Connection")
-	}
-	if "" == pwPass {
-		log.Fatalln("No Password Specified For Plane.Watch Rabbit Connection")
-	}
-
-	var rabbitConfig RabbitMQConfig
-	rabbitConfig.Host = pwHost
-	rabbitConfig.Port = pwPort
-	rabbitConfig.User = pwUser
-	rabbitConfig.Password = pwPass
-	rabbitConfig.Vhost = pwVhost
-
-	log.Printf("Connecting to plane.watch RabbitMQ @ %s", rabbitConfig)
-	rabbit := NewRabbitMQ(rabbitConfig)
-	connected := make(chan bool)
-	go rabbit.Connect(connected)
-	select {
-	case <-connected:
-		return rabbit, nil
-	case <-time.After(time.Duration(timeout) * time.Second):
-		return nil, fmt.Errorf("failed to connect to rabbit in a timely manner")
-	}
-}
-
-func failOnError(err error, msg string) {
-	if err != nil {
-		log.Fatalf("%s: %s", msg, err)
-		//panic(fmt.Sprintf("%s: %s", msg, err))
-	}
-}
-
-// test makes sure that our setup is working
-func test(c *cli.Context) {
-	log.Printf("Testing connection to dump1090 @ %s:%s", dump1090Host, dump1090Port)
-	d1090 := NewDump1090Reader(dump1090Host, dump1090Port)
-	var err error
-	if err = d1090.Connect(); err != nil {
-		log.Fatalf("Unable to connect to Dump 1090 %s", err)
-	} else {
-		d1090.Stop()
-	}
-
-	rabbit, err := getRabbitConnection(10)
-	failOnError(err, "Unable to connect to rabbit")
-	defer rabbit.Disconnect()
-
-	log.Printf("Success. You are ready to go")
-}
 
 // run is our method for running things
-func run(c *cli.Context) {
+func run(c *cli.Context) error {
+	app, err := newAppDisplay()
+	if nil != err {
+		return err
+	}
 	trk := tracker.NewTracker(tracker.WithVerboseOutput())
 	trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
-	trk.Wait()
+	trk.AddSink(app)
 
-	// TODO: turn the below into a sink
-	// trk.AddSink(sink.Redis(host,port))
-	// trk.AddSink(sink.RabbitMq(host, port, queue)
-
-	// TODO: Add an API for programatically handling differing inputs
-	// /api/producer[CRUD]
-	// /api/sink[CRUD]
-
-	return
-	d1090 := NewDump1090Reader(dump1090Host, dump1090Port)
-	var err error
-	if err = d1090.Connect(); err != nil {
-		log.Fatalf("Unable to connect to Dump 1090 %s", err)
-		return
+	if "" != c.String("redis-host") {
+		trk.AddSink(
+			sink.NewRedisSink(
+				sink.WithHost(c.String("redis-host"), c.String("redis-port")),
+			),
+		)
+	}
+	if "" != c.String("rabbit-host") {
+		trk.AddSink(
+			sink.NewRabbitMqSink(
+				sink.WithHost(c.String("rabbit-host"), c.String("rabbit-port")),
+				sink.WithQueue(c.String("rabbit-queue")),
+			),
+		)
 	}
 
-	rabbit, err := getRabbitConnection(60)
-	failOnError(err, "Unable to connect to rabbit")
-	defer rabbit.Disconnect()
-	err = rabbit.ExchangeDeclare("planes", "topic")
-	failOnError(err, "Failed to declare a topic exchange")
-
-	d1090.SetHandler(func(msg string) {
-		var publishError error
-		if showDebug {
-			log.Println("Decoding: ", msg)
-		}
-		frame, err := mode_s.DecodeString(msg, time.Now())
-		if nil != err {
-			log.Println(err)
-		}
-		plane := tracker.HandleModeSFrame(frame)
-
-		if nil != plane {
-			planeJson, _ := json.Marshal(plane)
-			msg := amqp.Publishing{
-				ContentType: "application/json",
-				Body:        planeJson,
-			}
-			if showDebug {
-				log.Println("Sending message to plane.watch for plane:", plane.Icao)
-			}
-			publishError = rabbit.Publish("planes", plane.Icao, msg)
-			if nil != publishError {
-				log.Println("Failed to publish message to plane.watch for plane", plane.Icao)
-			}
-
-		}
-
-		//tracker.CleanPlanes()
-	})
-
-	select {}
-
-	d1090.Stop()
+	err = app.Run()
+	trk.Finish()
+	trk.Wait()
+	return err
 }
