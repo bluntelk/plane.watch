@@ -470,7 +470,7 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 		p.locationHistory = p.locationHistory[1:]
 	}
 	p.location.latitude = lat
-	p.location.latitude = lon
+	p.location.longitude = lon
 	p.location.hasLatLon = true
 	p.locationHistory = append(p.locationHistory, p.location.Copy())
 	return
