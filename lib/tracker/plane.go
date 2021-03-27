@@ -12,11 +12,14 @@ const (
 )
 
 type (
+	headingInfo []heading
 	heading struct {
 		from, to float64
 		label    string
 	}
-	planeLocation struct {
+	// PlaneLocation stores where we think a plane is currently at. It is am amalgamation of all the tracking info
+	// we receive.
+	PlaneLocation struct {
 		rwlock sync.RWMutex
 
 		latitude, longitude  float64
@@ -46,8 +49,8 @@ type (
 		icao             string
 		squawk           uint32
 		flight           flight
-		locationHistory  []*planeLocation
-		location         *planeLocation
+		locationHistory  []*PlaneLocation
+		location         *PlaneLocation
 		cprLocation      CprLocation
 		special          string
 		frameTimes       []time.Time
@@ -60,17 +63,15 @@ type (
 
 	PlaneIterator func(p *Plane) bool
 
-	distanceTravelled struct {
+	DistanceTravelled struct {
 		metres   float64
 		duration float64
 	}
 
-	headingInfo []heading
 )
 
 var (
 	MaxLocationHistory = 10
-	PointCounter       int
 	headingLookup      = headingInfo{
 		{from: 348.75, to: 360, label: "N"},
 		{from: 0, to: 11.25, label: "N"},
@@ -94,7 +95,7 @@ var (
 
 func newPlane(icao uint32) *Plane {
 	p := &Plane{
-		location: &planeLocation{},
+		location: &PlaneLocation{},
 	}
 	p.setIcaoIdentifier(icao)
 	p.resetLocationHistory()
@@ -164,7 +165,7 @@ func (p *Plane) setIcaoIdentifier(icaoIdentifier uint32) {
 func (p *Plane) resetLocationHistory() {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
-	p.locationHistory = make([]*planeLocation, 0)
+	p.locationHistory = make([]*PlaneLocation, 0)
 }
 
 // setSpecial allows us to set any special status this plane is transmitting
@@ -370,12 +371,21 @@ func (p *Plane) Velocity() float64 {
 	// set the current altitude
 	return p.location.velocity
 }
-
-// distanceTravelled Tells us how far we have tracked this plane
-func (p *Plane) DistanceTravelled() distanceTravelled {
+func (p *Plane) VelocityStr() string {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
-	return distanceTravelled{
+	// set the current altitude
+	if p.location.velocity == 0 {
+		return "?"
+	}
+	return fmt.Sprintf("%0.2f knots", p.location.velocity)
+}
+
+// DistanceTravelled Tells us how far we have tracked this plane
+func (p *Plane) DistanceTravelled() DistanceTravelled {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return DistanceTravelled{
 		metres:   p.location.distanceTravelled,
 		duration: p.location.durationTravelled,
 	}
@@ -447,7 +457,7 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 
 			travelledDistance = distance(lat, lon, p.location.latitude, p.location.longitude)
 
-			//log.Printf("%s travelled %0.2fm in %0.2f seconds (%s -> %s)", p.icaoStr, distanceTravelled, durationTravelled, referenceTime.Format(time.RFC3339Nano), ts.Format(time.RFC3339Nano))
+			//log.Printf("%s travelled %0.2fm in %0.2f seconds (%s -> %s)", p.icaoStr, DistanceTravelled, durationTravelled, referenceTime.Format(time.RFC3339Nano), ts.Format(time.RFC3339Nano))
 
 			if travelledDistance > acceptableMaxDistance {
 				warn = fmt.Errorf("the distance (%0.2fm) between {%0.4f,%0.4f} and {%0.4f,%0.4f} is too great for %s to travel in %0.2f seconds. New Track", travelledDistance, lat, lon, p.location.latitude, p.location.longitude, p.icao, durationTravelled)
@@ -456,11 +466,12 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 		}
 
 	}
-	PointCounter++
 
 	if MaxLocationHistory > 0 && numHistoryItems >= MaxLocationHistory {
 		p.locationHistory = p.locationHistory[1:]
 	}
+	p.location.latitude = lat
+	p.location.latitude = lon
 	p.locationHistory = append(p.locationHistory, p.location.Copy())
 	return
 }
@@ -524,7 +535,7 @@ func (p *Plane) decodeCpr(ts time.Time) error {
 		return nil
 	}
 	// attempt to decode the CPR LAT/LON
-	var loc planeLocation
+	var loc PlaneLocation
 	var err error
 
 	if p.location.onGround {
@@ -543,7 +554,7 @@ func (p *Plane) decodeCpr(ts time.Time) error {
 }
 
 // LocationHistory returns the track history of the Plane
-func (p *Plane) LocationHistory() []*planeLocation {
+func (p *Plane) LocationHistory() []*PlaneLocation {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
 	return p.locationHistory
@@ -575,17 +586,22 @@ func distance(lat1, lon1, lat2, lon2 float64) float64 {
 	return 2 * r * math.Asin(math.Sqrt(h))
 }
 
-func (dt *distanceTravelled) Valid() bool {
+// Valid let's us know if we have some data
+func (dt *DistanceTravelled) Valid() bool {
 	return dt.metres > 0 && dt.duration > 0
 }
 
-func (dt *distanceTravelled) Metres() float64 {
+// Metres returns how far we have gone
+func (dt *DistanceTravelled) Metres() float64 {
 	return dt.metres
 }
-func (dt *distanceTravelled) Duration() float64 {
+
+// Duration is how long we have been going
+func (dt *DistanceTravelled) Duration() float64 {
 	return dt.duration
 }
 
+// getCompassLabel turns a 0-360 degree compass reading into a nice human readable label N/S/E/W etc
 func (hi headingInfo) getCompassLabel(heading float64) string {
 	for _, h := range hi {
 		if heading >= h.from && heading <= h.to {
@@ -595,10 +611,11 @@ func (hi headingInfo) getCompassLabel(heading float64) string {
 	return "?"
 }
 
-func (pl *planeLocation) Copy() *planeLocation {
+// Copy let's us duplicate a plane location
+func (pl *PlaneLocation) Copy() *PlaneLocation {
 	pl.rwlock.RLock()
 	defer pl.rwlock.RUnlock()
-	return &planeLocation{
+	return &PlaneLocation{
 		latitude:        pl.latitude,
 		longitude:       pl.longitude,
 		altitude:        pl.altitude,
@@ -616,13 +633,16 @@ func (pl *planeLocation) Copy() *planeLocation {
 		TrackFinished:     pl.TrackFinished,
 	}
 }
-func (pl *planeLocation) Lat() float64 {
+
+// Lat returns the Locations current LAT
+func (pl *PlaneLocation) Lat() float64 {
 	pl.rwlock.RLock()
 	defer pl.rwlock.RUnlock()
 	return pl.latitude
 }
 
-func (pl *planeLocation) Lon() float64 {
+// Lon returns the Locations current LON
+func (pl *PlaneLocation) Lon() float64 {
 	pl.rwlock.RLock()
 	defer pl.rwlock.RUnlock()
 	return pl.longitude

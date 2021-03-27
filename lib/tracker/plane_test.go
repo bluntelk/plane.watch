@@ -210,7 +210,7 @@ func TestCprDecodeSurfacePosition(t *testing.T) {
 		{46.00, -180.00, 0, 0, 0, 0, 0, 90.0, -180.000000, 0, 90.0, -180.0},    // north pole
 	}
 	var plane *Plane
-	var loc planeLocation
+	var loc PlaneLocation
 	var err error
 	var expectedLat, expectedLon, actualLat, actualLon string
 

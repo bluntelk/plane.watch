@@ -117,8 +117,8 @@ func (cpr *CprLocation) checkFrameTiming() error {
 	return nil
 }
 
-func (cpr *CprLocation) computeLatLon() (planeLocation, error) {
-	var loc planeLocation
+func (cpr *CprLocation) computeLatLon() (PlaneLocation, error) {
+	var loc PlaneLocation
 	if cpr.time1.Before(cpr.time0) {
 		//log.Println("Odd Decode")
 		// this assumes we are using the odd packet to decode
@@ -149,14 +149,14 @@ func (cpr *CprLocation) computeLatLon() (planeLocation, error) {
 	//log.Printf("post normalise rlat = %0.6f, rlon = %0.6f\n", loc.latitude, loc.longitude);
 
 	if loc.latitude < -90 || loc.latitude > 90 {
-		return planeLocation{}, fmt.Errorf("Failed to decode CPR Lat %0.13f is out of range", loc.latitude)
+		return PlaneLocation{}, fmt.Errorf("Failed to decode CPR Lat %0.13f is out of range", loc.latitude)
 	}
 
 	return loc, nil
 }
 
-func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (planeLocation, error) {
-	var loc planeLocation
+func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (PlaneLocation, error) {
+	var loc PlaneLocation
 	var err error
 	cpr.globalSurfaceRange = 90.0
 
@@ -224,22 +224,22 @@ func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (planeLocation, er
 
 	// Check to see that the latitude is in range: -90 .. +90
 	if cpr.rlat0 < -90 || cpr.rlat0 > 90 || cpr.rlat1 < -90 || cpr.rlat1 > 90 {
-		return planeLocation{}, fmt.Errorf("Failed to decode CPR. Lat out of bounds")
+		return PlaneLocation{}, fmt.Errorf("Failed to decode CPR. Lat out of bounds")
 	}
 
 	if err = cpr.computeLongitudeZone(); nil != err {
-		return planeLocation{}, err
+		return PlaneLocation{}, err
 	}
 
 	if err = cpr.checkFrameTiming(); nil != err {
-		return planeLocation{}, err
+		return PlaneLocation{}, err
 	}
 
 	return cpr.computeLatLon()
 }
 
-func (cpr *CprLocation) decodeGlobalAir() (planeLocation, error) {
-	var loc planeLocation
+func (cpr *CprLocation) decodeGlobalAir() (PlaneLocation, error) {
+	var loc PlaneLocation
 	var err error
 
 	// basic check - make sure we have both frames
@@ -316,7 +316,7 @@ func cprModFunction(a, b int32) float64 {
 	return res
 }
 
-func (pl *planeLocation) SetDirection(heading float64, speed int32) {
+func (pl *PlaneLocation) SetDirection(heading float64, speed int32) {
 	pl.heading = heading
 	pl.velocity = float64(speed)
 }
