@@ -2,5 +2,8 @@ export GOBIN=$(shell pwd)/bin
 
 .PHONY: all
 
-all:
+race:
 	go install -race ./...
+
+all:
+	go install ./...

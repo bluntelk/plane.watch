@@ -16,6 +16,8 @@ type (
 		top    *tview.Table
 		bottom *tview.TextView
 
+		appLock sync.Mutex
+
 		planes sync.Map
 	}
 	pacerEvent struct {
@@ -35,6 +37,12 @@ func newPacer() *pacerEvent {
 	return &pacerEvent{}
 }
 
+func (d *display) App()  *tview.Application {
+	d.appLock.Lock()
+	defer d.appLock.Unlock()
+	return d.app
+}
+
 func (d *display) Run() error {
 	go func() {
 		c := time.NewTicker(time.Second)
@@ -46,7 +54,7 @@ func (d *display) Run() error {
 			}
 		}
 	}()
-	if err := d.app.Run(); nil != err {
+	if err := d.App().Run(); nil != err {
 		return err
 	}
 	return nil
@@ -178,32 +186,36 @@ func (d *display) updateAgeColumn() {
 }
 
 func (d *display) OnEvent(e tracker.Event) {
-	d.app.QueueUpdate(func() {
-		_, _, _, height := d.bottom.GetRect()
-		d.bottom.SetWordWrap(false).SetMaxLines(height)
-	})
 	switch e.(type) {
 	case *tracker.LogEvent:
-		w := tview.ANSIWriter(d.bottom)
-		_, _ = fmt.Fprintln(w, e)
-		d.bottom.ScrollToEnd()
+		d.App().QueueUpdate(func() {
+			_, _, _, height := d.bottom.GetRect()
+			d.bottom.SetWordWrap(false).SetMaxLines(height)
 
+			w := tview.ANSIWriter(d.bottom)
+			_, _ = fmt.Fprintln(w, e)
+			d.bottom.ScrollToEnd()
+		})
 	case *tracker.PlaneLocationEvent:
-		ple := e.(*tracker.PlaneLocationEvent)
-		if ple.Removed() {
-			d.top.RemoveRow(d.getPlaneRow(ple.Plane().IcaoIdentifier()))
-			d.planes.Delete(ple.Plane().IcaoIdentifier())
-		} else {
-			d.planes.Store(ple.Plane().IcaoIdentifier(), ple.Plane())
-			d.drawRow(ple.Plane().IcaoIdentifier(), d.getPlaneRow(ple.Plane().IcaoIdentifier()))
-		}
+		d.App().QueueUpdate(func() {
+			ple := e.(*tracker.PlaneLocationEvent)
+			if ple.Removed() {
+				d.top.RemoveRow(d.getPlaneRow(ple.Plane().IcaoIdentifier()))
+				d.planes.Delete(ple.Plane().IcaoIdentifier())
+			} else {
+				d.planes.Store(ple.Plane().IcaoIdentifier(), ple.Plane())
+				d.drawRow(ple.Plane().IcaoIdentifier(), d.getPlaneRow(ple.Plane().IcaoIdentifier()))
+			}
+		})
 		//d.drawTable()
 
 	case *tracker.FrameEvent:
 		// show the received frame
 	case *pacerEvent:
 		// cleanup our planes list
-		d.updateAgeColumn()
+		d.App().QueueUpdate(func() {
+			d.updateAgeColumn()
+		})
 		//d.drawTable()
 	}
 }

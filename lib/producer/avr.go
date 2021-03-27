@@ -2,9 +2,11 @@ package producer
 
 import (
 	"bufio"
+	"math/rand"
 	"net"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/mode_s"
+	"sync"
 	"time"
 )
 
@@ -21,16 +23,34 @@ func NewAvrListener(host, port string) tracker.Producer {
 func NewAvrFetcher(host, port string) tracker.Producer {
 	p := NewProducer("AVR Fetcher for: " + net.JoinHostPort(host, port))
 	var conn net.Conn
+	var wLock sync.RWMutex
 	working := true
+
+	isWorking := func () bool {
+		wLock.RLock()
+		defer wLock.RUnlock()
+		return working
+	}
+
 	go func() {
+		var backOff = time.Second
 		var err error
-		for working {
+		for isWorking() {
+			p.addDebug("We are working!")
+			wLock.Lock()
 			conn, err = net.Dial("tcp", net.JoinHostPort(host, port))
+			wLock.Unlock()
 			if nil != err {
 				p.addError(err)
+				time.Sleep(backOff)
+				backOff = backOff * 2 + ((time.Duration(rand.Intn(20)) * time.Millisecond * 100) - time.Second)
+				if backOff > time.Minute {
+					backOff = time.Minute
+				}
 				continue
 			}
 			p.addDebug("Connected!")
+			backOff = time.Second
 			scan := bufio.NewScanner(conn)
 			for scan.Scan() {
 				line := scan.Text()
@@ -41,6 +61,7 @@ func NewAvrFetcher(host, port string) tracker.Producer {
 				p.addError(err)
 			}
 		}
+		p.addDebug("Done with Producer", p)
 		p.Cleanup()
 	}()
 
@@ -48,8 +69,13 @@ func NewAvrFetcher(host, port string) tracker.Producer {
 		for cmd := range p.cmdChan {
 			switch cmd {
 			case cmdExit:
+				p.addDebug("Got Cmd Exit")
+				wLock.Lock()
 				working = false
-				_ = conn.Close()
+				if nil != conn {
+					_ = conn.Close()
+				}
+				wLock.Unlock()
 				return
 			}
 		}

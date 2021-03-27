@@ -115,9 +115,20 @@ func run(c *cli.Context) error {
 	if nil != err {
 		return err
 	}
-	trk := tracker.NewTracker(tracker.WithVerboseOutput())
-	trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
+
+	opts := make([]tracker.Option, 0)
+	if c.GlobalBool("debug") {
+		opts = append(opts, tracker.WithVerboseOutput())
+	} else {
+		opts = append(opts, tracker.WithInfoOutput())
+	}
+	trk := tracker.NewTracker(opts...)
 	trk.AddSink(app)
+	f, err := os.Create("app.log")
+	if nil != err {
+		return err
+	}
+	trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(f)))
 
 	if "" != c.String("redis-host") {
 		trk.AddSink(
@@ -135,8 +146,8 @@ func run(c *cli.Context) error {
 		)
 	}
 
+	trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
 	err = app.Run()
-	trk.Finish()
-	trk.Wait()
+	trk.Stop()
 	return err
 }

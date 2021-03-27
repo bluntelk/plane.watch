@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"errors"
-	"fmt"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
 	"time"
@@ -37,7 +36,6 @@ type (
 )
 
 func (t *Tracker) setVerbosity(logLevel int) {
-	fmt.Printf("Setting Verbosity To %d\n", logLevel)
 	t.logLevel = logLevel
 }
 
@@ -83,7 +81,6 @@ func (t *Tracker) AddProducer(p Producer) {
 
 	go func() {
 		for e := range p.Listen() {
-			t.debugMessage("Producer (%s) Made Message: %s", p, e)
 			switch e.(type) {
 			case *FrameEvent:
 				t.decodingQueue <- e.(*FrameEvent).frame
@@ -121,11 +118,18 @@ func (t *Tracker) AddSink(s Sink) {
 	t.sinks = append(t.sinks, s)
 }
 
-// Wait waits for all producers to stop producing input and then returns
-func (t *Tracker) Wait() {
-	t.debugMessage("and we are up and running...")
+// Stop attempts to stop all the things, mid flight. Use this if you have something else waiting for things to finish
+// use this if you are listening to remote sources
+func (t *Tracker) Stop() {
+	t.Finish()
 	t.producerWaiter.Wait()
-	t.debugMessage("All producers have exited, cleaning up and closing down")
+	t.decodingQueueWaiter.Wait()
+}
+
+// Wait waits for all producers to stop producing input and then returns
+// use this method if you are processing a file
+func (t *Tracker) Wait() {
+	t.producerWaiter.Wait()
 	t.Finish()
 	t.decodingQueueWaiter.Wait()
 }
