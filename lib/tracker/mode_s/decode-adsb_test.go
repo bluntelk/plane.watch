@@ -117,3 +117,132 @@ func TestBeastAvrTimestampDecode112BitModeS(t *testing.T) {
 		t.Errorf("Failed to identify frame as Beast AVR")
 	}
 }
+
+func Test_calcSurfaceSpeed(t *testing.T) {
+	type args struct {
+		value uint64
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  float64
+		want1 bool
+	}{
+		{name: "not avail", args: args{value: 0}, want: 0.0, want1: false},
+
+		{name: "stopped", args: args{value: 1}, want: 0.0, want1: true},
+
+		{name: "slowest", args: args{value: 2}, want: 0.125, want1: true},
+		{name: "slowest", args: args{value: 3}, want: 0.25, want1: true},
+		{name: "slowest", args: args{value: 4}, want: 0.375, want1: true},
+		{name: "slowest", args: args{value: 5}, want: 0.5, want1: true},
+		{name: "slowest", args: args{value: 6}, want: 0.625, want1: true},
+		{name: "slowest", args: args{value: 7}, want: 0.75, want1: true},
+		{name: "slowest", args: args{value: 8}, want: 0.875, want1: true},
+
+		{name: "slow", args: args{value: 9}, want: 1, want1: true},
+		{name: "slow", args: args{value: 10}, want: 1.25, want1: true},
+		{name: "slow", args: args{value: 11}, want: 1.5, want1: true},
+		{name: "slow", args: args{value: 12}, want: 1.75, want1: true},
+
+		{name: "crawling", args: args{value: 13}, want: 2, want1: true},
+		{name: "crawling", args: args{value: 14}, want: 2.5, want1: true},
+		{name: "crawling", args: args{value: 15}, want: 3, want1: true},
+		{name: "crawling", args: args{value: 16}, want: 3.5, want1: true},
+		{name: "crawling", args: args{value: 17}, want: 4, want1: true},
+		{name: "crawling", args: args{value: 18}, want: 4.5, want1: true},
+		{name: "crawling", args: args{value: 19}, want: 5, want1: true},
+		{name: "crawling", args: args{value: 20}, want: 5.5, want1: true},
+		{name: "crawling", args: args{value: 21}, want: 6, want1: true},
+		{name: "crawling", args: args{value: 22}, want: 6.5, want1: true},
+		{name: "crawling", args: args{value: 23}, want: 7, want1: true},
+		{name: "crawling", args: args{value: 24}, want: 7.5, want1: true},
+		{name: "crawling", args: args{value: 25}, want: 8, want1: true},
+		{name: "crawling", args: args{value: 26}, want: 8.5, want1: true},
+		{name: "crawling", args: args{value: 27}, want: 9, want1: true},
+		{name: "crawling", args: args{value: 28}, want: 9.5, want1: true},
+		{name: "crawling", args: args{value: 29}, want: 10, want1: true},
+		{name: "crawling", args: args{value: 30}, want: 10.5, want1: true},
+		{name: "crawling", args: args{value: 31}, want: 11, want1: true},
+		{name: "crawling", args: args{value: 32}, want: 11.5, want1: true},
+		{name: "crawling", args: args{value: 33}, want: 12, want1: true},
+		{name: "crawling", args: args{value: 34}, want: 12.5, want1: true},
+		{name: "crawling", args: args{value: 35}, want: 13, want1: true},
+		{name: "crawling", args: args{value: 36}, want: 13.5, want1: true},
+		{name: "crawling", args: args{value: 37}, want: 14, want1: true},
+		{name: "crawling", args: args{value: 38}, want: 14.5, want1: true},
+
+		{name: "going", args: args{value: 39}, want: 15, want1: true},
+		{name: "going", args: args{value: 40}, want: 16, want1: true},
+		{name: "going", args: args{value: 41}, want: 17, want1: true},
+		{name: "going", args: args{value: 42}, want: 18, want1: true},
+		{name: "going", args: args{value: 43}, want: 19, want1: true},
+		{name: "going", args: args{value: 44}, want: 20, want1: true},
+		{name: "going", args: args{value: 45}, want: 21, want1: true},
+		{name: "going", args: args{value: 46}, want: 22, want1: true},
+		{name: "going", args: args{value: 47}, want: 23, want1: true},
+		{name: "going", args: args{value: 48}, want: 24, want1: true},
+		{name: "going", args: args{value: 49}, want: 25, want1: true},
+		{name: "going", args: args{value: 50}, want: 26, want1: true},
+		{name: "going", args: args{value: 51}, want: 27, want1: true},
+		{name: "going", args: args{value: 52}, want: 28, want1: true},
+		{name: "going", args: args{value: 53}, want: 29, want1: true},
+		{name: "going", args: args{value: 54}, want: 30, want1: true},
+		{name: "going", args: args{value: 55}, want: 31, want1: true},
+		{name: "going", args: args{value: 56}, want: 32, want1: true},
+		{name: "going", args: args{value: 57}, want: 33, want1: true},
+		// .. skip a few
+		{name: "going", args: args{value: 91}, want: 67, want1: true},
+		{name: "going", args: args{value: 92}, want: 68, want1: true},
+		{name: "going", args: args{value: 93}, want: 69, want1: true},
+
+		{name: "moving", args: args{value: 94}, want: 70, want1: true},
+		{name: "moving", args: args{value: 95}, want: 72, want1: true},
+		{name: "moving", args: args{value: 96}, want: 74, want1: true},
+		{name: "moving", args: args{value: 97}, want: 76, want1: true},
+		{name: "moving", args: args{value: 98}, want: 78, want1: true},
+		{name: "moving", args: args{value: 99}, want: 80, want1: true},
+		{name: "moving", args: args{value: 100}, want: 82, want1: true},
+		{name: "moving", args: args{value: 101}, want: 84, want1: true},
+		{name: "moving", args: args{value: 102}, want: 86, want1: true},
+		{name: "moving", args: args{value: 103}, want: 88, want1: true},
+		{name: "moving", args: args{value: 104}, want: 90, want1: true},
+		{name: "moving", args: args{value: 105}, want: 92, want1: true},
+		{name: "moving", args: args{value: 106}, want: 94, want1: true},
+		{name: "moving", args: args{value: 107}, want: 96, want1: true},
+		{name: "moving", args: args{value: 108}, want: 98, want1: true},
+
+		{name: "outtahere", args: args{value: 109}, want: 100, want1: true},
+		{name: "outtahere", args: args{value: 110}, want: 105, want1: true},
+		{name: "outtahere", args: args{value: 111}, want: 110, want1: true},
+		{name: "outtahere", args: args{value: 112}, want: 115, want1: true},
+		{name: "outtahere", args: args{value: 113}, want: 120, want1: true},
+		{name: "outtahere", args: args{value: 114}, want: 125, want1: true},
+		{name: "outtahere", args: args{value: 115}, want: 130, want1: true},
+		{name: "outtahere", args: args{value: 116}, want: 135, want1: true},
+		{name: "outtahere", args: args{value: 117}, want: 140, want1: true},
+		{name: "outtahere", args: args{value: 118}, want: 145, want1: true},
+		{name: "outtahere", args: args{value: 119}, want: 150, want1: true},
+		{name: "outtahere", args: args{value: 120}, want: 155, want1: true},
+		{name: "outtahere", args: args{value: 121}, want: 160, want1: true},
+		{name: "outtahere", args: args{value: 122}, want: 165, want1: true},
+		{name: "outtahere", args: args{value: 123}, want: 170, want1: true},
+
+		{name: "gone", args: args{value: 124}, want: 175, want1: true},
+
+		{name: "reserved", args: args{value: 125}, want: 0, want1: false},
+		{name: "reserved", args: args{value: 126}, want: 0, want1: false},
+		{name: "reserved", args: args{value: 127}, want: 0, want1: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := calcSurfaceSpeed(tt.args.value)
+			if got != tt.want {
+				t.Errorf("calcSurfaceSpeed() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("calcSurfaceSpeed() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}

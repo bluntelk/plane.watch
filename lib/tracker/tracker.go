@@ -247,11 +247,7 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 				}
 				plane.setLocationUpdateTime(frame.TimeStamp())
 
-				heading := "unknown heading"
-				if plane.HasHeading() {
-					heading = fmt.Sprintf("heading %0.2f", plane.Heading())
-				}
-				debugMessage(" is on the ground and has %s and is travelling at %0.2f knots\033[0m", heading, plane.Velocity())
+				debugMessage(" is on the ground and has heading %s and is travelling at %0.2f knots\033[0m", plane.HeadingStr(), plane.Velocity())
 				hasChanged = true
 				break
 			}

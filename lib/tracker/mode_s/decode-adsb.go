@@ -41,7 +41,7 @@ func (f *Frame) decodeAdsb() {
 		f.messageSubType = 0
 
 		f.decodeAdsbLatLon()
-		f.decodeMovementField()
+		f.decodeSurfaceMovementField()
 
 		if f.message[5] & 0x08 != 0 {
 			f.heading = float64(((((f.message[5] << 4) | (f.message[6] >> 4)) & 0x007F) * 45) >> 4)
@@ -252,27 +252,44 @@ func (f *Frame) decodeAdsb() {
 //
 // Decode the 7 bit ground movement field PWL exponential style scale
 //
-func (f *Frame) decodeMovementField() {
-	var gSpeed uint64
+func (f *Frame) decodeSurfaceMovementField() {
 	movement := uint64(((f.message[4] << 4) | (f.message[5] >> 4)) & 0x007F)
-	if (movement > 0) && (movement < 125) {
 
-		if movement > 123 {
-			gSpeed = 199 // > 175kt
-		} else if movement > 108 {
-			gSpeed = ((movement - 108) * 5) + 100
-		} else if movement > 93 {
-			gSpeed = ((movement - 93) * 2) + 70
-		} else if movement > 38 {
-			gSpeed = (movement - 38) + 15
-		} else if movement > 12 {
-			gSpeed = ((movement - 11) >> 1) + 2
-		} else if movement > 8 {
-			gSpeed = ((movement - 6) >> 2) + 1
+	f.velocity, f.validVelocity = calcSurfaceSpeed(movement)
+}
+
+func calcSurfaceSpeed(value uint64) (float64, bool) {
+	var gSpeed float64
+	var validVelocity bool
+	if (value > 0) && (value < 125) {
+		validVelocity = true
+		if value > 123 {
+			gSpeed = 175 // > 175kt
+		} else if value > 108 { // 109-123 - 5 kt steps
+			gSpeed = float64((value - 109) * 5) + 100.0
+
+		} else if value > 93 { // 94 - 108 | 70kt - <100kt
+			gSpeed = float64((value - 94) * 2) + 70
+
+		} else if value > 38 { // 39 - 93 | 15kt - <70kt | 1kt step
+			gSpeed = float64(value - 39) + 15
+
+		} else if value > 12 { //13-38 |  2 kt - <15kt | 0.5 kt steps
+			gSpeed = float64(value - 13) *0.5 + 2
+
+		} else if value > 8 { // 9-12 | 1kt - < 2kt | 0.25 kt steps
+			gSpeed = float64(value - 9) * 0.25 + 1
+
+		} else if value > 1 {
+			gSpeed = float64(value-1) * 0.125
+
+		} else if value == 1 {
+			// stopped
+			gSpeed = 0
 		} else {
 			gSpeed = 0
+			validVelocity = false
 		}
-		f.velocity = float64(gSpeed)
-		f.validVelocity = true
 	}
+	return gSpeed, validVelocity
 }
