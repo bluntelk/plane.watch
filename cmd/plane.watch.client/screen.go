@@ -154,7 +154,11 @@ func (d *display) OnEvent(e tracker.Event) {
 
 	case *tracker.PlaneLocationEvent:
 		ple := e.(*tracker.PlaneLocationEvent)
-		d.planes.Store(ple.Plane().IcaoIdentifier(), ple.Plane())
+		if ple.Removed() {
+			d.planes.Delete(ple.Plane().IcaoIdentifier())
+		} else {
+			d.planes.Store(ple.Plane().IcaoIdentifier(), ple.Plane())
+		}
 		d.drawTable()
 
 	case *tracker.FrameEvent:

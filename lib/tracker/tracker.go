@@ -405,7 +405,7 @@ func (t *Tracker) prunePlanes() {
 		select {
 		case <-ticker.C:
 		// prune the planes in the list if they have not been seen > 5 minutes
-		oldest := time.Now().Add(-5 * time.Second)
+		oldest := time.Now().Add(-5 * time.Minute)
 			t.EachPlane(func(p *Plane) bool {
 				if p.lastSeen.Before(oldest) {
 					t.planeList.Delete(p.icaoIdentifier)
