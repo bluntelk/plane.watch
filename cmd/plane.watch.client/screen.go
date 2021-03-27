@@ -5,6 +5,8 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"plane.watch/lib/tracker"
+	"sort"
+	"sync"
 	"time"
 )
 
@@ -13,6 +15,8 @@ type (
 		app    *tview.Application
 		top    *tview.Table
 		bottom *tview.TextView
+
+		planes sync.Map
 	}
 	pacerEvent struct {
 
@@ -34,9 +38,12 @@ func newPacer() *pacerEvent {
 func (d *display) Run() error {
 	go func() {
 		c := time.NewTicker(time.Second)
-		select {
-		case <- c.C:
-			d.OnEvent(newPacer())
+		defer c.Stop()
+		for {
+			select {
+			case <- c.C:
+				d.OnEvent(newPacer())
+			}
 		}
 	}()
 	if err := d.app.Run(); nil != err {
@@ -59,17 +66,20 @@ func newAppDisplay() (*display, error) {
 	}
 	d.top = tview.NewTable()
 	d.top.SetTitle("Current Planes")
-	d.top.SetBorders(true).
+	d.top.
 		SetCell(0, 0, hdr("ICAO", 9)).
 		SetCell(0, 1, hdr("Ident", 9)).
-		SetCell(0, 2, hdr("Squawk", 6)).
-		SetCell(0, 3, hdr("Altitude", 12)).
-		SetCell(0, 4, hdr("Speed", 12)).
-		SetCell(0, 5, hdr("Heading", 12)).
-		SetCell(0, 6, hdr("# Msgs", 6)).
-		SetCell(0, 7, hdr("Age (s)", 7))
+		SetCell(0, 2, hdr("squawk", 6)).
+		SetCell(0, 3, hdr("Lat/Lon", 19)).
+		SetCell(0, 4, hdr("altitude", 12)).
+		SetCell(0, 5, hdr("Speed", 12)).
+		SetCell(0, 6, hdr("heading", 12)).
+		SetCell(0, 7, hdr("# Msgs", 6)).
+		SetCell(0, 8, hdr("Age (s)", 7)).
+		SetCell(0, 9, hdr("Extra", 10)).
+		SetBorder(true)
 
-	d.bottom = tview.NewTextView()
+	d.bottom = tview.NewTextView().SetDynamicColors(true)
 	d.bottom.SetBorder(true).SetTitle("Logs")
 
 	_, _, _, height := d.bottom.GetRect()
@@ -93,6 +103,44 @@ func newAppDisplay() (*display, error) {
 	return &d, nil
 }
 
+func (d *display) drawTable() {
+	table := make(map[uint32]*tracker.Plane)
+	icaos := make([]uint32,0)
+	d.planes.Range(func(key, value interface{}) bool {
+		table[key.(uint32)] = value.(*tracker.Plane)
+		icaos  = append(icaos, key.(uint32))
+		return true
+	})
+
+	sort.Slice(icaos, func(i, j int) bool {
+		return icaos[i] < icaos[j]
+	})
+
+	row := 1
+	var latLon string
+	for _, icao := range icaos {
+		d.top.SetCellSimple(row, 0, table[icao].IcaoIdentifierStr())
+		d.top.SetCellSimple(row, 1, table[icao].FlightNumber())
+		d.top.SetCellSimple(row, 2, table[icao].SquawkIdentityStr())
+		if table[icao].HasLocation() {
+			latLon = fmt.Sprintf("%0.4f/%0.4f", table[icao].Lat(), table[icao].Lon())
+		} else {
+			latLon = "?"
+		}
+		d.top.SetCellSimple(row, 3, latLon)
+		d.top.SetCellSimple(row, 4, fmt.Sprint(table[icao].Altitude()))
+		d.top.SetCellSimple(row, 5, fmt.Sprintf("%0.2f",table[icao].Velocity()))
+		d.top.SetCellSimple(row, 6, table[icao].HeadingStr())
+		d.top.SetCellSimple(row, 7, fmt.Sprint(table[icao].MsgCount()))
+
+		since := time.Now().Sub(table[icao].LastSeen()).Seconds()
+		d.top.SetCellSimple(row, 8, fmt.Sprintf("%0.0f",since))
+		d.top.SetCellSimple(row, 9, table[icao].Special())
+
+		row++
+	}
+}
+
 func (d *display) OnEvent(e tracker.Event) {
 	d.app.QueueUpdate(func() {
 		_, _, _, height := d.bottom.GetRect()
@@ -100,11 +148,19 @@ func (d *display) OnEvent(e tracker.Event) {
 	})
 	switch e.(type) {
 	case *tracker.LogEvent:
-		_, _ = fmt.Fprintln(d.bottom, e)
+		w := tview.ANSIWriter(d.bottom)
+		_, _ = fmt.Fprintln(w, e)
 		d.bottom.ScrollToEnd()
+
 	case *tracker.PlaneLocationEvent:
+		ple := e.(*tracker.PlaneLocationEvent)
+		d.planes.Store(ple.Plane().IcaoIdentifier(), ple.Plane())
+		d.drawTable()
+
 	case *tracker.FrameEvent:
-		_, _ = fmt.Fprintln(d.bottom, e)
-		d.bottom.ScrollToEnd()
+		// show the received frame
+	case *pacerEvent:
+		// cleanup our planes list
+		d.drawTable()
 	}
 }

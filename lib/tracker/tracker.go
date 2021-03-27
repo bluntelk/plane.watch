@@ -6,6 +6,7 @@ import (
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
 	"sync"
+	"time"
 )
 
 const (
@@ -35,6 +36,8 @@ type (
 
 		events       chan Event
 		eventsWaiter sync.WaitGroup
+
+		pruneExitChan chan bool
 	}
 )
 
@@ -47,17 +50,21 @@ func NewTracker(opts ...Option) *Tracker {
 		middlewares:   []Middleware{},
 		decodingQueue: make(chan Frame, 1000), // a nice deep buffer
 		events:        make(chan Event, 1000),
+		pruneExitChan: make(chan bool),
 	}
 
 	for _, opt := range opts {
 		opt(t)
 	}
 
+	// Process our event queue and send them to all the Sinks that are currently listening to us
 	go t.processEvents()
 
 	for i := 0; i < 5; i++ {
 		go t.decodeQueue()
 	}
+
+	go t.prunePlanes()
 
 	return t
 }
@@ -76,6 +83,15 @@ func (t *Tracker) infoMessage(sfmt string, a ...interface{}) {
 
 func (t *Tracker) errorMessage(sfmt string, a ...interface{}) {
 	t.AddEvent(NewLogEvent(LogLevelError, "Tracker", fmt.Sprintf("ERROR : "+sfmt, a...)))
+}
+
+func (t *Tracker) numPlanes() int {
+	count := 0
+	t.planeList.Range(func(key, value interface{}) bool {
+		count++
+		return true
+	})
+	return count
 }
 
 func (t *Tracker) GetPlane(icao uint32) *Plane {
@@ -108,11 +124,12 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 	var hasChanged bool
 
 	plane := t.GetPlane(icao)
-	plane.SetLastSeen(frame.TimeStamp())
-	//plane.MarkFrameTime(frame.TimeStamp()) // todo, make this fast!
+	plane.setLastSeen(frame.TimeStamp())
+	plane.incMsgCount()
+	//plane.MarkFrameTime(frame.timeStamp()) // todo, make this fast!
 
 	debugMessage := func(sfmt string, a ...interface{}) {
-		planeFormat = fmt.Sprintf("DF%02d - \033[0;97mPlane (\033[38;5;118m%s %-8s\033[0;97m)", frame.DownLinkType(), plane.Icao, plane.Flight.Identifier)
+		planeFormat = fmt.Sprintf("DF%02d - \033[0;97mPlane (\033[38;5;118m%s %-8s\033[0;97m)", frame.DownLinkType(), plane.IcaoIdentifierStr(), plane.FlightNumber())
 		t.debugMessage(planeFormat+sfmt, a...)
 	}
 
@@ -122,14 +139,14 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 		// grab the altitude
 		if frame.AltitudeValid() {
 			alt, _ := frame.Altitude()
-			plane.SetAltitude(alt, frame.AltitudeUnits())
+			plane.setAltitude(alt, frame.AltitudeUnits())
 		}
 		if frame.VerticalStatusValid() {
 			onGround, _ := frame.OnGround()
-			plane.SetGroundStatus(onGround)
+			plane.setGroundStatus(onGround)
 		}
-		plane.SetLocationUpdateTime(frame.TimeStamp())
-		debugMessage(" is at %d %s \033[0m", plane.Location.Altitude, plane.Location.AltitudeUnits)
+		plane.setLocationUpdateTime(frame.TimeStamp())
+		debugMessage(" is at %d %s \033[0m", plane.Altitude(), plane.AltitudeUnits())
 
 		hasChanged = true
 
@@ -137,11 +154,11 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 		hasChanged = true
 		if frame.VerticalStatusValid() {
 			onGround, _ := frame.OnGround()
-			plane.SetGroundStatus(onGround)
+			plane.setGroundStatus(onGround)
 		}
-		plane.SetLocationUpdateTime(frame.TimeStamp())
+		plane.setLocationUpdateTime(frame.TimeStamp())
 		if frame.Alert() {
-			plane.SetSpecial("Alert")
+			plane.setSpecial("Alert")
 		}
 	case 6, 7, 8, 9, 10, 12, 13, 14, 15, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31:
 		debugMessage(" \033[38;5;52mIgnoring Mode S Frame: %d (%s)\033[0m\n", frame.DownLinkType(), frame.DownLinkFormat())
@@ -149,27 +166,27 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 	case 11:
 		if frame.VerticalStatusValid() {
 			onGround, _ := frame.OnGround()
-			plane.SetGroundStatus(onGround)
+			plane.setGroundStatus(onGround)
 			hasChanged = plane.GroundStatus() != onGround
 		}
 	case 4, 5:
 		hasChanged = true
 		if frame.VerticalStatusValid() {
 			onGround, _ := frame.OnGround()
-			plane.SetGroundStatus(onGround)
+			plane.setGroundStatus(onGround)
 		}
 		if frame.Alert() {
-			plane.SetSpecial("Alert")
+			plane.setSpecial("Alert")
 		}
 		if frame.AltitudeValid() {
 			alt, _ := frame.Altitude()
-			plane.SetAltitude(alt, frame.AltitudeUnits())
+			plane.setAltitude(alt, frame.AltitudeUnits())
 		}
-		plane.SetLocationUpdateTime(frame.TimeStamp())
-		plane.SetFlightStatus(frame.FlightStatus(), frame.FlightStatusString())
+		plane.setLocationUpdateTime(frame.TimeStamp())
+		plane.setFlightStatus(frame.FlightStatus(), frame.FlightStatusString())
 
 		if 5 == frame.DownLinkType() || 21 == frame.DownLinkType() {
-			plane.SetSquawkIdentity(frame.SquawkIdentity())
+			plane.setSquawkIdentity(frame.SquawkIdentity())
 		}
 		hasChanged = true
 		debugMessage(" is at %d %s and flight status is: %s. \033[2mMode S Frame: %d \033[0m",
@@ -179,13 +196,13 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 		hasChanged = true
 		if frame.AltitudeValid() {
 			alt, _ := frame.Altitude()
-			plane.SetAltitude(alt, frame.AltitudeUnits())
+			plane.setAltitude(alt, frame.AltitudeUnits())
 		}
 		if frame.VerticalStatusValid() {
 			onGround, _ := frame.OnGround()
-			plane.SetGroundStatus(onGround)
+			plane.setGroundStatus(onGround)
 		}
-		plane.SetLocationUpdateTime(frame.TimeStamp())
+		plane.setLocationUpdateTime(frame.TimeStamp())
 
 	case 17, 18: // ADS-B
 		//if debug {
@@ -198,9 +215,9 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 		switch messageType {
 		case mode_s.DF17FrameIdCat: // "Aircraft Identification and Category"
 			{
-				plane.SetFlightIdentifier(frame.FlightNumber())
+				plane.setFlightNumber(frame.FlightNumber())
 				if frame.ValidCategory() {
-					plane.SetAirFrameCategory(frame.Category())
+					plane.setAirFrameCategory(frame.Category())
 				}
 				hasChanged = true
 				break
@@ -209,26 +226,26 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 			{
 				if frame.HeadingValid() {
 					heading, _ := frame.Heading()
-					plane.SetHeading(heading)
+					plane.setHeading(heading)
 				}
 				if frame.VelocityValid() {
 					velocity, _ := frame.Velocity()
-					plane.SetVelocity(velocity)
+					plane.setVelocity(velocity)
 				}
 				if frame.VerticalStatusValid() {
 					onGround, _ := frame.OnGround()
-					plane.SetGroundStatus(onGround)
+					plane.setGroundStatus(onGround)
 				}
 
 				if frame.IsEven() {
-					_ = plane.SetCprEvenLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
+					_ = plane.setCprEvenLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
 				} else {
-					_ = plane.SetCprOddLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
+					_ = plane.setCprOddLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
 				}
-				if err := plane.DecodeCpr(frame.TimeStamp()); nil != err {
+				if err := plane.decodeCpr(frame.TimeStamp()); nil != err {
 					debugMessage("%s", err)
 				}
-				plane.SetLocationUpdateTime(frame.TimeStamp())
+				plane.setLocationUpdateTime(frame.TimeStamp())
 
 				heading := "unknown heading"
 				if plane.HasHeading() {
@@ -238,24 +255,24 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 				hasChanged = true
 				break
 			}
-		case mode_s.DF17FrameAirPositionBarometric: // "Airborne Position (with Barometric Altitude)"
+		case mode_s.DF17FrameAirPositionBarometric: // "Airborne Position (with Barometric altitude)"
 			{
 				if frame.VerticalStatusValid() {
 					onGround, _ := frame.OnGround()
-					plane.SetGroundStatus(onGround)
+					plane.setGroundStatus(onGround)
 				}
-				plane.SetLocationUpdateTime(frame.TimeStamp())
+				plane.setLocationUpdateTime(frame.TimeStamp())
 				hasChanged = true
 
 				if frame.IsEven() {
-					_ = plane.SetCprEvenLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
+					_ = plane.setCprEvenLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
 				} else {
-					_ = plane.SetCprOddLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
+					_ = plane.setCprOddLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
 				}
 
 				altitude, _ := frame.Altitude()
-				plane.SetAltitude(altitude, frame.AltitudeUnits())
-				if err := plane.DecodeCpr(frame.TimeStamp()); nil != err {
+				plane.setAltitude(altitude, frame.AltitudeUnits())
+				if err := plane.decodeCpr(frame.TimeStamp()); nil != err {
 					debugMessage("%s", err)
 				}
 
@@ -266,31 +283,31 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 
 				break
 			}
-		case mode_s.DF17FrameAirVelocity: // "Airborne Velocity"
+		case mode_s.DF17FrameAirVelocity: // "Airborne velocity"
 			{
 				if frame.HeadingValid() {
 					heading, _ := frame.Heading()
-					plane.SetHeading(heading)
+					plane.setHeading(heading)
 				}
 				if frame.VelocityValid() {
 					velocity, _ := frame.Velocity()
-					plane.SetVelocity(velocity)
+					plane.setVelocity(velocity)
 				}
 				if frame.VerticalStatusValid() {
 					onGround, _ := frame.OnGround()
-					plane.SetGroundStatus(onGround)
+					plane.setGroundStatus(onGround)
 				}
 				if frame.VerticalRateValid() {
 					vr, _ := frame.VerticalRate()
-					plane.SetVerticalRate(vr)
+					plane.setVerticalRate(vr)
 				}
-				plane.SetLocationUpdateTime(frame.TimeStamp())
+				plane.setLocationUpdateTime(frame.TimeStamp())
 
-				heading := "unknown heading"
+				headingStr := "unknown heading"
 				if plane.HasHeading() {
-					heading = fmt.Sprintf("heading %0.2f", plane.Heading())
+					headingStr = fmt.Sprintf("heading %0.2f", plane.Heading())
 				}
-				debugMessage(" has %s and is travelling at %0.2f knots\033[0m", heading, plane.Velocity())
+				debugMessage(" has %s and is travelling at %0.2f knots\033[0m", headingStr, plane.Velocity())
 				hasChanged = true
 				break
 			}
@@ -306,34 +323,34 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 			{
 				if frame.SquawkIdentity() > 0 {
 					hasChanged = plane.SquawkIdentity() != frame.SquawkIdentity()
-					plane.SetSquawkIdentity(frame.SquawkIdentity())
+					plane.setSquawkIdentity(frame.SquawkIdentity())
 				}
 				break
 			}
-		case mode_s.DF17FrameSurfaceSystemStatus: //, "Surface System Status":
+		case mode_s.DF17FrameSurfaceSystemStatus: //, "Surface System status":
 			{
 				debugMessage("\033[2m Ignoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
 			}
-		case mode_s.DF17FrameEmergencyPriority: //, "Extended Squitter Aircraft Status (Emergency)":
+		case mode_s.DF17FrameEmergencyPriority: //, "Extended Squitter Aircraft status (Emergency)":
 			{
 				debugMessage("\033[2m %s\033[0m", messageType)
-				plane.SetSpecial("Emergency")
-				plane.SetSquawkIdentity(frame.SquawkIdentity())
+				plane.setSpecial("Emergency")
+				plane.setSquawkIdentity(frame.SquawkIdentity())
 				hasChanged = true
 				break
 			}
-		case mode_s.DF17FrameTcasRA: //, "Extended Squitter Aircraft Status (1090ES TCAS RA)":
+		case mode_s.DF17FrameTcasRA: //, "Extended Squitter Aircraft status (1090ES TCAS RA)":
 			{
 				debugMessage("\033[2m Ignoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
 			}
-		case mode_s.DF17FrameTargetStateStatus: //, "Target State and Status Message":
+		case mode_s.DF17FrameTargetStateStatus: //, "Target State and status Message":
 			{
 				debugMessage("\033[2m Ignoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
 			}
-		case mode_s.DF17FrameAircraftOperational: //, "Aircraft Operational Status Message":
+		case mode_s.DF17FrameAircraftOperational: //, "Aircraft Operational status Message":
 			{
 				debugMessage("\033[2m Ignoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
 				break
@@ -343,19 +360,20 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 	case 20, 21:
 		switch frame.BdsMessageType() {
 		case mode_s.BdsElsDataLinkCap: // 1.0
-			plane.SetSquawkIdentity(frame.SquawkIdentity())
+			plane.setSquawkIdentity(frame.SquawkIdentity())
 		case mode_s.BdsElsGicbCap: // 1.7
 			if frame.AltitudeValid() {
 				alt, _ := frame.Altitude()
-				plane.SetAltitude(alt, frame.AltitudeUnits())
+				plane.setAltitude(alt, frame.AltitudeUnits())
 			}
 		case mode_s.BdsElsAircraftIdent: // 2.0
-			plane.SetFlightIdentifier(frame.FlightNumber())
+			plane.setFlightNumber(frame.FlightNumber())
 		default:
 			// let's see if we can decode more BDS info
 			// TODO: Decode Other BDS frames
 		}
 	}
+	t.AddEvent(newPlaneLocationEvent(plane))
 	if hasChanged {
 		return plane
 	} else {
@@ -366,9 +384,10 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 func (t *Tracker) HandleSbs1Frame(frame *sbs1.Frame) *Plane {
 	var hasChanged bool
 	plane := t.GetPlane(frame.IcaoInt)
-	plane.SetLastSeen(frame.TimeStamp())
+	plane.setLastSeen(frame.TimeStamp())
+	plane.incMsgCount()
 	if frame.HasPosition {
-		if err := plane.AddLatLong(frame.Lat, frame.Lon, frame.Received); nil != err {
+		if err := plane.addLatLong(frame.Lat, frame.Lon, frame.Received); nil != err {
 			t.debugMessage("%s", err)
 		}
 		hasChanged = true
@@ -378,4 +397,28 @@ func (t *Tracker) HandleSbs1Frame(frame *sbs1.Frame) *Plane {
 		return plane
 	}
 	return nil
+}
+
+func (t *Tracker) prunePlanes() {
+	ticker := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-ticker.C:
+		// prune the planes in the list if they have not been seen > 5 minutes
+		oldest := time.Now().Add(-5 * time.Second)
+			t.EachPlane(func(p *Plane) bool {
+				if p.lastSeen.Before(oldest) {
+					t.planeList.Delete(p.icaoIdentifier)
+
+					// now send an event
+					t.AddEvent(newPlaneActionEvent(p, false, true))
+				}
+
+				return true
+			})
+
+		case <-t.pruneExitChan:
+			return
+		}
+	}
 }

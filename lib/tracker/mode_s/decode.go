@@ -278,7 +278,7 @@ func (f *Frame) decodeFlightStatus() {
 	}
 }
 
-// VS == Vertical Status
+// VS == Vertical status
 func (f *Frame) decodeVerticalStatus() {
 	f.vs = f.message[0] & 4 >> 2
 	f.onGround = f.vs != 0

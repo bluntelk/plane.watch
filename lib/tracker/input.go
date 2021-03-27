@@ -65,6 +65,7 @@ func (t *Tracker) Finish() {
 		p.Stop()
 	}
 	close(t.decodingQueue)
+	t.pruneExitChan <- true
 }
 
 // AddProducer wires up a Producer to start feeding data into the tracker
@@ -80,21 +81,7 @@ func (t *Tracker) AddProducer(p Producer) {
 				// send this event on!
 				t.AddEvent(e)
 			case *LogEvent:
-				logEvent := e.(*LogEvent)
-				switch logEvent.Level {
-				case LogLevelQuiet:
-					continue
-				case LogLevelError:
-					t.errorMessage("%s: %s", logEvent.Section, logEvent.Message)
-				case LogLevelInfo:
-					if t.logLevel >= LogLevelInfo {
-						t.infoMessage("%s: %s", logEvent.Section, logEvent.Message)
-					}
-				case LogLevelDebug:
-					if t.logLevel >= LogLevelDebug {
-						t.debugMessage("%s: %s", logEvent.Section, logEvent.Message)
-					}
-				}
+				t.AddEvent(e)
 			}
 		}
 		t.producerWaiter.Done()

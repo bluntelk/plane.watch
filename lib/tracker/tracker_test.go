@@ -42,22 +42,22 @@ func TestCprDecode(t *testing.T) {
 	for i, d := range testData {
 		plane := trk.GetPlane(11234)
 
-		plane.SetCprOddLocation(d.oddLat, d.oddLon, time.Now())
+		plane.setCprOddLocation(d.oddLat, d.oddLon, time.Now())
 		time.Sleep(2)
-		plane.SetCprEvenLocation(d.evenLat, d.evenLon, time.Now())
+		plane.setCprEvenLocation(d.evenLat, d.evenLon, time.Now())
 		loc, err := plane.cprLocation.decodeGlobalAir()
 		if err != nil {
 			t.Error(err)
 		}
 
-		lat := fmt.Sprintf("%+0.6f", loc.Latitude);
-		lon := fmt.Sprintf("%+0.6f", loc.Longitude);
+		lat := fmt.Sprintf("%+0.6f", loc.latitude);
+		lon := fmt.Sprintf("%+0.6f", loc.longitude);
 
 		if lat != d.oddRlat {
-			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.oddRlat, lat)
+			t.Errorf("Plane latitude is wrong for packet %d: should be %s, was %s", i, d.oddRlat, lat)
 		}
 		if lon != d.oddRlon {
-			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.oddRlon, lon)
+			t.Errorf("Plane latitude is wrong for packet %d: should be %s, was %s", i, d.oddRlon, lon)
 		}
 
 		if airDlat0 != fmt.Sprintf("%+0.6f", plane.cprLocation.airDLat0) {
@@ -67,22 +67,22 @@ func TestCprDecode(t *testing.T) {
 			t.Error("AirDlat1 is wrong")
 		}
 
-		plane.SetCprEvenLocation(d.evenLat, d.evenLon, time.Now())
+		plane.setCprEvenLocation(d.evenLat, d.evenLon, time.Now())
 		time.Sleep(2)
-		plane.SetCprOddLocation(d.oddLat, d.oddLon, time.Now())
+		plane.setCprOddLocation(d.oddLat, d.oddLon, time.Now())
 		loc, err = plane.cprLocation.decodeGlobalAir()
 		if err != nil {
 			t.Error(err)
 		}
 
-		lat = fmt.Sprintf("%+0.6f", loc.Latitude);
-		lon = fmt.Sprintf("%+0.6f", loc.Longitude);
+		lat = fmt.Sprintf("%+0.6f", loc.latitude);
+		lon = fmt.Sprintf("%+0.6f", loc.longitude);
 
 		if lat != d.evenRlat {
-			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.evenRlat, lat)
+			t.Errorf("Plane latitude is wrong for packet %d: should be %s, was %s", i, d.evenRlat, lat)
 		}
 		if lon != d.evenRlon {
-			t.Errorf("Plane Latitude is wrong for packet %d: should be %s, was %s", i, d.evenRlon, lon)
+			t.Errorf("Plane latitude is wrong for packet %d: should be %s, was %s", i, d.evenRlon, lon)
 		}
 
 		if airDlat0 != fmt.Sprintf("%+0.6f", plane.cprLocation.airDLat0) {

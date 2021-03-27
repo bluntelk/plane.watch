@@ -39,9 +39,9 @@ var (
 		// ADSB Service
 		"0.5": "Extended Squitter Airborne Position",
 		"0.6": "Extended Squitter Surface Position",
-		"0.7": "Extended Squitter Status",
+		"0.7": "Extended Squitter status",
 		"0.8": "Extended Squitter Identification and Category",
-		"0.9": "Extended Squitter Airborne Velocity Information",
+		"0.9": "Extended Squitter Airborne velocity Information",
 		"1.0": "Data Link Capability Report",         // ELS Service
 		"1.7": "Common usage GICB capability report", // ELS Service
 		"2.0": "Aircraft Identity",                   // ELS Service
@@ -54,7 +54,7 @@ var (
 		"5.1": "Position Report Coarse",
 		"5.2": "Position Report Fine",
 		"5.3": "Air-referenced State Vector",
-		"6.0": "Heading and Speed Report", // EHS Service
+		"6.0": "heading and Speed Report", // EHS Service
 	}
 )
 

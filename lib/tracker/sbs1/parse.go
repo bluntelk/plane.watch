@@ -120,7 +120,7 @@ func (f *Frame) Parse() error {
 			f.OnGround = "-1" == bits[sbsOnGroundField]
 		//SPI Flag Ignored
 
-		case "4": // ES Airborne Velocity Message
+		case "4": // ES Airborne velocity Message
 			f.GroundSpeed, _ = strconv.Atoi(bits[sbsGroundSpeedField])
 			f.Track, _ = strconv.ParseFloat(bits[sbsTrackField], 32)
 			f.VerticalRate, _ = strconv.Atoi(bits[sbsVerticalRateField])

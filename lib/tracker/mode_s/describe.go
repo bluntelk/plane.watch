@@ -22,7 +22,7 @@ type featureBreakdown struct {
 
 var featureDescription = map[string]featureDescriptionType{
 	"AA":   {field: "Address Announced", meaning: "aircraft identification in All-Call reply - ICAO"},
-	"AC":   {field: "Altitude Code", meaning: "Aircraft altitude code. All bits are Zeros if altitude information is not available."},
+	"AC":   {field: "altitude Code", meaning: "Aircraft altitude code. All bits are Zeros if altitude information is not available."},
 	"AP":   {field: "Address/Parity", meaning: "Error detection field. Parity overlaid on the address"},
 	"AQ":   {field: "Acquisition", meaning: "part of air-to-air protocol"},
 	"AB":   {field: "Air Speed Bit", meaning: "0=indicated air speed, 1=true air speed"},
@@ -32,8 +32,8 @@ var featureDescription = map[string]featureDescriptionType{
 	"DF":   {field: "Downlink Format", meaning: "downlink descriptor"},
 	"DI":   {field: "Designator Identification", meaning: "describes content of SD field"},
 	"DR":   {field: "Downlink Request", meaning: "aircraft requests permission to send data"},
-	"FS":   {field: "Flight Status", meaning: "aircraft's situation report"},
-	"ID":   {field: "Identification", meaning: "equivalent to ATCRBS identity number (Squawk)"},
+	"FS":   {field: "flight status", meaning: "aircraft's situation report"},
+	"ID":   {field: "Identification", meaning: "equivalent to ATCRBS identity number (squawk)"},
 	"II":   {field: "Interrogator Identification", meaning: "site number for multisite features"},
 	"KE":   {field: "Control, ELM", meaning: "part of Extended Length Message protocol"},
 	"MA":   {field: "Message, Comm-A", meaning: "message to aircraft"},
@@ -51,12 +51,12 @@ var featureDescription = map[string]featureDescriptionType{
 	"RI":   {field: "Reply Information", meaning: "aircraft status information for TCAS"},
 	"RL":   {field: "Reply Length", meaning: "commands air-to-air reply length"},
 	"RR":   {field: "Reply Request", meaning: "commands details of reply"},
-	"SD":   {field: "Special Designator", meaning: "control codes to transponder"},
+	"SD":   {field: "special Designator", meaning: "control codes to transponder"},
 	"SL":   {field: "Sensitivity level, ACAS", meaning: "Reports the current operating sensitivity level of TCAS"},
-	"SS":   {field: "Surveillance Status", meaning: "  0: No condition,  1: Permanent alert, 2: Temporary alert, 3: SPI condition"},
+	"SS":   {field: "Surveillance status", meaning: "  0: No condition,  1: Permanent alert, 2: Temporary alert, 3: SPI condition"},
 	"UF":   {field: "Uplink Format", meaning: "format descriptor"},
 	"UM":   {field: "Utility Message", meaning: "protocol message"},
-	"VS":   {field: "Vertical Status", meaning: "aircraft status, airborne (0) or on the ground (1)"},
+	"VS":   {field: "Vertical status", meaning: "aircraft status, airborne (0) or on the ground (1)"},
 	"  ":   {field: "Padding", meaning: "Unused"},
 	"??":   {field: "???", meaning: "Unknown"},
 	"CCC":  {field: "Capability Class Code", meaning: "Capability Class Code"},
@@ -65,28 +65,28 @@ var featureDescription = map[string]featureDescriptionType{
 	"TC":   {field: "DF 17 Message Type", meaning: "Message Type Code"},
 	"SUB":  {field: "DF 17 Message Sub Type", meaning: "Message Sub Type"},
 	"DATA": {field: "ADS-B Data", meaning: "ADS-B Data"},
-	"CHAR": {field: "Flight Number", meaning: "1 character of the AIS charset"},
+	"CHAR": {field: "flight Number", meaning: "1 character of the AIS charset"},
 	"TI":   {field: "UTC Sync Time Bit", meaning: "Indicates if the Time of Applicability of the message is UTC Sync'd. 0=no"},
 	"CPR":  {field: "CPR Odd/Even", meaning: "CPR Odd/Even Frame Type"},
-	"LAT":  {field: "CPR Latitude", meaning: "1 of 4 sets of data required to decode planes lat/lon"},
-	"LON":  {field: "CPR Longitude", meaning: "1 of 4 sets of data required to decode planes lat/lon"},
+	"LAT":  {field: "CPR latitude", meaning: "1 of 4 sets of data required to decode planes lat/lon"},
+	"LON":  {field: "CPR longitude", meaning: "1 of 4 sets of data required to decode planes lat/lon"},
 	"CAT":  {field: "Aircraft Category", meaning: "Category field includes DF field"},
 	"MOV":  {field: "Movement Field", meaning: "Ground Speed"},
-	"HB":   {field: "Heading Bit", meaning: "There is a heading available"},
-	"HD":   {field: "Heading Field", meaning: "The direction the plane is facing"},
+	"HB":   {field: "heading Bit", meaning: "There is a heading available"},
+	"HD":   {field: "heading Field", meaning: "The direction the plane is facing"},
 	"VR":   {field: "Vertical Rate", meaning: "How fast the plane is going up or down"},
 	"VRS":  {field: "Vertical Rate Sign", meaning: "0=up 1=down"},
 	"EWD":  {field: "East/West Direction", meaning: "Non-zero == negative velocity. 0=east, 1=west"},
-	"EWV":  {field: "East/West Velocity", meaning: "How fast the plane is going in the indicated direction"},
+	"EWV":  {field: "East/West velocity", meaning: "How fast the plane is going in the indicated direction"},
 	"NSD":  {field: "North/South Direction", meaning: "Non-zero == negative velocity. 0=north,1=south"},
-	"NSV":  {field: "North/South Velocity", meaning: "How fast the plane is going in the indicated direction"},
+	"NSV":  {field: "North/South velocity", meaning: "How fast the plane is going in the indicated direction"},
 	"VSRC": {field: "Source Antenna", meaning: "Which antenna this signal was transitted from"},
 	"HAED": {field: "Height Above Ellipsoid (HAE) Direction", meaning: "Direction indicator: 1=down, 0=up"},
 	"HAEV": {field: "Height Above Ellipsoid (HAE) Delta", meaning: "Barometer offset"},
 	"EID":  {field: "Emergency ID", meaning: "Emergency Table Lookup ID"},
 
 	"IC":  {field: "Intent Change", meaning: "If aircraft wants to change altitude etc"},
-	"IFR": {field: "Instrument Flight Rules Capability", meaning: "ADSB v1 Only"},
+	"IFR": {field: "Instrument flight Rules Capability", meaning: "ADSB v1 Only"},
 
 	"NICp": {field: "Navigation Integrity Category", meaning: ""},
 	"NICb": {field: "Navigation Integrity Category Supplement B", meaning: ""},
@@ -97,8 +97,8 @@ var featureDescription = map[string]featureDescriptionType{
 	"VER":  {field: "ADSB Version", meaning: "This airframes ADSB Compatability"},
 	"GVA":  {field: "Geometric Vertical Accuracy", meaning: ""},
 
-	"NTH": {field: "NIC Altiude|Track/Heading", meaning: "Altudude (sub type 0) or track/heading (sub type 1) have been cross checked with other sources"},
-	"HRD": {field: "Heading North Info", meaning: "heading based on 0=true north, 1=magnetic north"},
+	"NTH": {field: "NIC Altiude|Track/heading", meaning: "Altudude (sub type 0) or track/heading (sub type 1) have been cross checked with other sources"},
+	"HRD": {field: "heading North Info", meaning: "heading based on 0=true north, 1=magnetic north"},
 }
 
 var featureDF17FlightName = []featureBreakdown{
@@ -224,7 +224,7 @@ var asdbFeatures = map[string][]featureBreakdown{
 			"0": {
 				{name: "??", start: 40, end: 88},
 			},
-			"1": { // EMERGENCY (or priority), Status
+			"1": { // EMERGENCY (or priority), status
 				{name: "EID", start: 40, end: 43},
 				{name: "ID", start: 43, end: 56},
 				{name: "  ", start: 56, end: 88},
@@ -295,7 +295,7 @@ var bdsFeatures = map[string][]featureBreakdown{
 		{name: "ELM Dn", start: 60, end: 64, longName: "Downlink ELM throughput"},
 		{name: "ID Cap", start: 64, end: 65, longName: "Aircraft Identification Capability"},
 		{name: "SCS", start: 65, end: 66, longName: "Squitter Capability Subfield"},
-		{name: "SIC", start: 66, end: 67, longName: "Surveillance Identifier Code"},
+		{name: "SIC", start: 66, end: 67, longName: "Surveillance identifier Code"},
 		{name: "GICB", start: 67, end: 68, longName: "Common usage GICB capability report"},
 		{name: "??ACAS", start: 68, end: 72, longName: "Reserved for ACAS"},
 		{name: "DTE", start: 72, end: 88, longName: "Data terminal equipment (DTE) status"},
@@ -324,7 +324,7 @@ var bdsFeatures = map[string][]featureBreakdown{
 		{name: "F21", start: 52, end: 53, longName: "5,5 Waypoint 2"},
 		{name: "F22", start: 53, end: 54, longName: "5,6 Waypoint 3"},
 		{name: "F23", start: 54, end: 55, longName: "5,F Quasi-static parameter monitoring"},
-		{name: "F24", start: 55, end: 56, longName: "6,0 Heading and speed report"},
+		{name: "F24", start: 55, end: 56, longName: "6,0 heading and speed report"},
 		{name: "F25", start: 56, end: 57, longName: "Reserved for aircraft capability"},
 		{name: "F26", start: 57, end: 58, longName: "Reserved for aircraft capability"},
 		{name: "F27", start: 58, end: 59, longName: "E,1 Reserved for Mode S BITE (Built In Test Equipment)"},
@@ -521,9 +521,9 @@ func (f *Frame) showVerticalStatus(output io.Writer) {
 		return
 	}
 	if f.onGround {
-		fprintln(output, "VS: Vertical Status : On The Ground")
+		fprintln(output, "VS: Vertical status : On The Ground")
 	} else {
-		fprintln(output, "VS: Vertical Status : Airborne")
+		fprintln(output, "VS: Vertical status : Airborne")
 	}
 }
 
@@ -543,12 +543,12 @@ func (f *Frame) showCrossLinkCapability(output io.Writer) {
 func (f *Frame) showAltitude(output io.Writer) {
 	if f.validAltitude {
 		if f.isGnssAlt {
-			fprintf(output, "AC: Altitude        : %d %s (GNSS)\n", f.altitude, f.AltitudeUnits())
+			fprintf(output, "AC: altitude        : %d %s (GNSS)\n", f.altitude, f.AltitudeUnits())
 		} else {
-			fprintf(output, "AC: Altitude        : %d %s (q bit: %t, m bit: %t)\n", f.altitude, f.AltitudeUnits(), f.acQ, f.acM)
+			fprintf(output, "AC: altitude        : %d %s (q bit: %t, m bit: %t)\n", f.altitude, f.AltitudeUnits(), f.acQ, f.acM)
 		}
 	} else {
-		fprintln(output, "AC: Altitude        : Invalid")
+		fprintln(output, "AC: altitude        : Invalid")
 	}
 }
 
@@ -578,7 +578,7 @@ func (f *Frame) showContainmentRadius(output io.Writer) {
 }
 
 func (f *Frame) showSurveilanceStatus(output io.Writer) {
-	fprintf(output, "  Surveillance      : (Status:%d) %s\n", f.surveillanceStatus, surveillanceStatus[f.surveillanceStatus])
+	fprintf(output, "  Surveillance      : (status:%d) %s\n", f.surveillanceStatus, surveillanceStatus[f.surveillanceStatus])
 }
 
 func (f *Frame) showNavigationIntegrity(output io.Writer) {
@@ -592,9 +592,9 @@ func (f *Frame) showNavigationIntegrity(output io.Writer) {
 }
 
 func (f *Frame) showFlightStatus(output io.Writer) {
-	fprintf(output, "FS: Flight Status   : (%d) %s\n", f.fs, flightStatusTable[f.fs])
+	fprintf(output, "FS: flight status   : (%d) %s\n", f.fs, flightStatusTable[f.fs])
 	if "" != f.special {
-		fprintf(output, "FS: Special Status  : %s\n", f.special)
+		fprintf(output, "FS: special status  : %s\n", f.special)
 	}
 	f.showAlert(output)
 	f.showVerticalStatus(output)
@@ -602,7 +602,7 @@ func (f *Frame) showFlightStatus(output io.Writer) {
 
 //
 //func (f *Frame) showFlightId(output io.Writer) {
-//	fprintf(output, "Flight          : %s", f.Flight())
+//	fprintf(output, "flight          : %s", f.flight())
 //	fprintln(output, "")
 //}
 
@@ -617,7 +617,7 @@ func (f *Frame) showCapability(output io.Writer) {
 }
 
 func (f *Frame) showIdentity(output io.Writer) {
-	fprintf(output, "ID: Squawk Identity : %04d\n", f.identity)
+	fprintf(output, "ID: squawk Identity : %04d\n", f.identity)
 }
 
 func (f *Frame) showDownLinkRequest(output io.Writer) {
@@ -643,18 +643,18 @@ func (f *Frame) showVelocity(output io.Writer) {
 		fprintln(output, "  Super Sonic?      : No")
 	}
 	if f.validVelocity {
-		fprintf(output, "  Velocity          : %0.2f\n", f.velocity)
+		fprintf(output, "  velocity          : %0.2f\n", f.velocity)
 		fprintf(output, "  EW/NS VEL         : (East/west: %d) (North/South: %d)\n", f.eastWestVelocity, f.northSouthVelocity)
 	} else {
-		fprintln(output, "  Velocity          : Invalid")
+		fprintln(output, "  velocity          : Invalid")
 	}
 }
 
 func (f *Frame) showHeading(output io.Writer) {
 	if f.validHeading {
-		fprintf(output, "  Heading           : %0.2f\n", f.heading)
+		fprintf(output, "  heading           : %0.2f\n", f.heading)
 	} else {
-		fprintln(output, "  Heading           : Not Valid")
+		fprintln(output, "  heading           : Not Valid")
 		fprintln(output, "")
 
 	}
@@ -681,8 +681,8 @@ func (f *Frame) showCprLatLon(output io.Writer) {
 	}
 	fprintf(output, "  UTC Sync?     : %t\n", f.timeFlag != 0)
 	fprintf(output, "  CPR Frame     : %s\n", oddEven)
-	fprintf(output, "  CPR Latitude  : %d\n", f.rawLatitude)
-	fprintf(output, "  CPR Longitude : %d\n", f.rawLongitude)
+	fprintf(output, "  CPR latitude  : %d\n", f.rawLatitude)
+	fprintf(output, "  CPR longitude : %d\n", f.rawLongitude)
 	fprintln(output, "")
 }
 
@@ -712,7 +712,7 @@ func (f *Frame) showAdsb(output io.Writer) {
 		f.showHeading(output)
 		f.showCprLatLon(output)
 	case 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22:
-		// 20-22 is GNSS Altitude, 9-18 is barometric
+		// 20-22 is GNSS altitude, 9-18 is barometric
 		f.showContainmentRadius(output)
 		f.showSurveilanceStatus(output)
 		f.showNavigationIntegrity(output)
@@ -794,9 +794,9 @@ func (f *Frame) showCrossCheck(output io.Writer) {
 }
 func (f *Frame) showCompassNorth(output io.Writer) {
 	if f.northReference != 0 {
-		fprintf(output, "  Compass Heading   : Magnetic North\n")
+		fprintf(output, "  Compass heading   : Magnetic North\n")
 	} else {
-		fprintf(output, "  Compass Heading   : True North\n")
+		fprintf(output, "  Compass heading   : True North\n")
 	}
 }
 
@@ -808,12 +808,12 @@ func (f *Frame) showAlert(output io.Writer) {
 }
 func (f *Frame) showSpecial(output io.Writer) {
 	if "" != f.special {
-		fprintf(output, "  Special           : %s\n", f.special)
+		fprintf(output, "  special           : %s\n", f.special)
 	}
 }
 
 func (f *Frame) showFlightNumber(output io.Writer) {
-	fprintf(output, "    Flight Number   : %s\n", f.FlightNumber())
+	fprintf(output, "    flight Number   : %s\n", f.FlightNumber())
 }
 
 // determines what type of mode S Message this frame is

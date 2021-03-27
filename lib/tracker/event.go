@@ -25,6 +25,7 @@ type (
 
 	// a PlaneLocationEvent is send whenever a planes information has been updated
 	PlaneLocationEvent struct {
+		new, removed bool
 		p *Plane
 	}
 
@@ -32,6 +33,14 @@ type (
 	FrameEvent struct {
 		frame Frame
 	}
+
+	// InfoEvent periodically sends out some interesting stats
+	InfoEvent struct {
+		receivedFrames uint64
+		numReceivers uint
+		uptime uint64
+	}
+
 )
 
 func (t *Tracker) AddEvent(e Event) {
@@ -66,11 +75,24 @@ func newPlaneLocationEvent(p *Plane) *PlaneLocationEvent {
 	return &PlaneLocationEvent{p: p}
 }
 
+func newPlaneActionEvent(p *Plane, isNew, isRemoved bool) *PlaneLocationEvent {
+	return &PlaneLocationEvent{p: p, new: isNew, removed: isRemoved}
+}
+
 func (p *PlaneLocationEvent) Type() string {
 	return PlaneLocationEventType
 }
 func (p *PlaneLocationEvent) String() string {
 	return p.p.String()
+}
+func (p *PlaneLocationEvent) Plane() *Plane {
+	return p.p
+}
+func (p *PlaneLocationEvent) New() bool {
+	return p.new
+}
+func (p *PlaneLocationEvent) Removed() bool {
+	return p.removed
 }
 
 func (f *FrameEvent) Type() string {

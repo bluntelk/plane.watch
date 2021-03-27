@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"sync"
 	"time"
@@ -13,106 +12,176 @@ const (
 )
 
 type (
-	PlaneLocation struct {
-		Latitude, Longitude  float64
-		Altitude             int32
-		VerticalRate         int
-		AltitudeUnits        string
-		Heading, Velocity    float64
-		TimeStamp            time.Time
+	heading struct {
+		from, to float64
+		label    string
+	}
+	planeLocation struct {
+		rwlock sync.RWMutex
+
+		latitude, longitude  float64
+		altitude             int32
+		hasVerticalRate      bool
+		verticalRate         int
+		altitudeUnits        string
+		heading, velocity    float64
+		timeStamp            time.Time
 		onGround, hasHeading bool
 		hasLatLon            bool
-		DistanceTravelled    float64
-		DurationTravelled    float64
+		distanceTravelled    float64
+		durationTravelled    float64
 		TrackFinished        bool
 	}
 
-	Flight struct {
-		Identifier string
-		Status     string
-		StatusId   byte
+	flight struct {
+		identifier string
+		status     string
+		statusId   byte
 	}
 
 	Plane struct {
+		trackedSince     time.Time
 		lastSeen         time.Time
 		icaoIdentifier   uint32
-		Icao             string
-		Squawk           uint32
-		Flight           Flight
-		LocationHistory  []PlaneLocation
-		Location         PlaneLocation
+		icao             string
+		squawk           uint32
+		flight           flight
+		locationHistory  []*planeLocation
+		location         *planeLocation
 		cprLocation      CprLocation
-		Special          string
-		NumUpdates       int
+		special          string
 		frameTimes       []time.Time
-		RecentFrameCount int
-		AirframeCategory string
+		recentFrameCount int
+		msgCount         uint64
+		airframeCategory string
 
 		rwLock sync.RWMutex
 	}
 
-	PlaneList struct {
-		list sync.Map
-	}
-
 	PlaneIterator func(p *Plane) bool
 
-	DistanceTravelled struct {
+	distanceTravelled struct {
 		metres   float64
 		duration float64
 	}
+
+	headingInfo []heading
 )
 
 var (
 	MaxLocationHistory = 10
 	PointCounter       int
+	headingLookup      = headingInfo{
+		{from: 348.75, to: 360, label: "N"},
+		{from: 0, to: 11.25, label: "N"},
+		{from: 11.25, to: 33.75, label: "NNE"},
+		{from: 33.75, to: 56.25, label: "NE"},
+		{from: 56.25, to: 78.75, label: "ENE"},
+		{from: 78.75, to: 101.25, label: "E"},
+		{from: 101.25, to: 123.75, label: "ESE"},
+		{from: 123.75, to: 146.25, label: "SE"},
+		{from: 146.25, to: 168.75, label: "SSE"},
+		{from: 168.75, to: 191.25, label: "S"},
+		{from: 191.25, to: 213.75, label: "SSW"},
+		{from: 213.75, to: 236.25, label: "SW"},
+		{from: 236.25, to: 258.75, label: "WSW"},
+		{from: 258.75, to: 281.25, label: "W"},
+		{from: 281.25, to: 303.75, label: "WNW"},
+		{from: 303.75, to: 326.25, label: "NW"},
+		{from: 326.25, to: 348.75, label: "NNW"},
+	}
 )
 
 func newPlane(icao uint32) *Plane {
-	p := &Plane{}
-	p.SetIcaoIdentifier(icao)
-	p.ResetLocationHistory()
-	p.ZeroCpr()
+	p := &Plane{
+		location: &planeLocation{},
+	}
+	p.setIcaoIdentifier(icao)
+	p.resetLocationHistory()
+	p.zeroCpr()
+	p.trackedSince = time.Now()
 	return p
 }
 
+// TrackedSince tells us when we started tracking this plane (on this run, not historical)
+func (p *Plane) TrackedSince() time.Time {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.trackedSince
+}
+
+// LastSeen is when we last received a message from this Plane
 func (p *Plane) LastSeen() time.Time {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
 	return p.lastSeen
 }
 
-func (p *Plane) SetLastSeen(lastSeen time.Time) {
+// setLastSeen sets the last seen timestamp
+func (p *Plane) setLastSeen(lastSeen time.Time) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	p.lastSeen = lastSeen
 }
 
+// MsgCount is the number of messages we have received from this plane while we have been tracking it
+func (p *Plane) MsgCount() uint64 {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.msgCount
+}
+
+// incMsgCount increments our message count by 1
+func (p *Plane) incMsgCount() {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	p.msgCount++
+}
+
+// IcaoIdentifier returns the ICAO identifier this plane is using
 func (p *Plane) IcaoIdentifier() uint32 {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
 	return p.icaoIdentifier
 }
 
-func (p *Plane) SetIcaoIdentifier(icaoIdentifier uint32) {
+// IcaoIdentifierStr returns a pretty printed ICAO identifier, fit for human consumption
+func (p *Plane) IcaoIdentifierStr() string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.icao
+}
+
+// setIcaoIdentifier sets the tracking identifier for this Plane
+func (p *Plane) setIcaoIdentifier(icaoIdentifier uint32) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	p.icaoIdentifier = icaoIdentifier
-	p.Icao = fmt.Sprintf("%06X", icaoIdentifier)
+	p.icao = fmt.Sprintf("%06X", icaoIdentifier)
 }
 
-func (p *Plane) ResetLocationHistory() {
+// resetLocationHistory Zeros out the tracking history for this aircraft
+func (p *Plane) resetLocationHistory() {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
-	p.LocationHistory = make([]PlaneLocation, 0)
+	p.locationHistory = make([]*planeLocation, 0)
 }
 
-func (p *Plane) SetSpecial(status string) {
+// setSpecial allows us to set any special status this plane is transmitting
+func (p *Plane) setSpecial(status string) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	p.special = status
+}
+
+// Special returns any special status for this aircraft
+func (p *Plane) Special() string {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
-	p.Special = status
+	return p.special
 }
 
+// String gives us a nicely printable ANSI escaped string
 func (p *Plane) String() string {
 	var id, alt, position, direction, special, strength string
 
@@ -122,167 +191,250 @@ func (p *Plane) String() string {
 	blue := "\033[38;5;122m"
 	red := "\033[38;5;160m"
 
-	id = fmt.Sprintf("%sPlane (%s%s %-8s%s)", white, lime, p.Icao, p.Flight.Identifier, white)
+	id = fmt.Sprintf("%sPlane (%s%s %-8s%s)", white, lime, p.icao, p.flight.identifier, white)
 
-	if p.Location.onGround {
+	if p.location.onGround {
 		position += " is on the ground."
-	} else if p.Location.Altitude > 0 {
-		alt = fmt.Sprintf(" %s%d%s %s,", orange, p.Location.Altitude, white, p.Location.AltitudeUnits)
+	} else if p.location.altitude > 0 {
+		alt = fmt.Sprintf(" %s%d%s %s,", orange, p.location.altitude, white, p.location.altitudeUnits)
 	}
 
-	if p.Location.hasLatLon {
-		position += fmt.Sprintf(" %s%+03.13f%s, %s%+03.13f%s,", blue, p.Location.Latitude, white, blue, p.Location.Longitude, white)
+	if p.location.hasLatLon {
+		position += fmt.Sprintf(" %s%+03.13f%s, %s%+03.13f%s,", blue, p.location.latitude, white, blue, p.location.longitude, white)
 	}
 
-	if p.Location.hasHeading {
-		direction += fmt.Sprintf(" heading %s%0.2f%s, speed %s%0.2f%s knots", orange, p.Location.Heading, white, orange, p.Location.Velocity, white)
+	if p.location.hasHeading {
+		direction += fmt.Sprintf(" heading %s%0.2f%s, speed %s%0.2f%s knots", orange, p.location.heading, white, orange, p.location.velocity, white)
 	}
 
-	strength = fmt.Sprintf(" %0.2f pps", float64(p.RecentFrameCount)/10.0)
+	strength = fmt.Sprintf(" %0.2f pps", float64(p.recentFrameCount)/10.0)
 
-	if "" != p.Special {
-		special = " " + red + p.Special + white + ", "
+	if "" != p.special {
+		special = " " + red + p.special + white + ", "
 	}
 
 	return id + alt + position + direction + special + strength + "\033[0m"
 }
 
-// todo: reimplement as a last seens timestamp? how do we do a count of packets? do we need it?
-func (p *Plane) MarkFrameTime(ts time.Time) {
-	// cull anything older than 10 seconds
-	frameTimes := make([]time.Time, 0)
-	cutOff := time.Now().Add(time.Second * -10)
-	for _, t := range p.frameTimes {
-		if t.After(cutOff) {
-			frameTimes = append(frameTimes, t)
-		}
-	}
-	frameTimes = append(frameTimes, ts)
-	p.frameTimes = frameTimes
-	p.RecentFrameCount = len(p.frameTimes)
-}
-
-func (p *Plane) SetLocationUpdateTime(t time.Time) {
+// setLocationUpdateTime sets the last time the location was updated
+func (p *Plane) setLocationUpdateTime(t time.Time) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
-	p.Location.TimeStamp = t
+	p.location.timeStamp = t
 }
-func (p *Plane) SetAltitude(altitude int32, altitudeUnits string) {
+
+// setAltitude puts our plane in the sky
+func (p *Plane) setAltitude(altitude int32, altitudeUnits string) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	// set the current altitude
-	p.Location.Altitude = altitude
-	p.Location.AltitudeUnits = altitudeUnits
+	p.location.altitude = altitude
+	p.location.altitudeUnits = altitudeUnits
 }
+
+// Altitude is the planes altitude in AltitudeUnits units
 func (p *Plane) Altitude() int32 {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
 	// set the current altitude
-	return p.Location.Altitude
+	return p.location.altitude
 }
+
+// AltitudeUnits how we are measuring altitude (feet / metres)
 func (p *Plane) AltitudeUnits() string {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
 	// set the current altitude
-	return p.Location.AltitudeUnits
+	return p.location.altitudeUnits
 }
-func (p *Plane) SetGroundStatus(onGround bool) {
+
+// setGroundStatus puts our plane on the ground (or not). Use carefully, planes do not like being put on
+//the ground suddenly.
+func (p *Plane) setGroundStatus(onGround bool) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
-	p.Location.onGround = onGround
+	p.location.onGround = onGround
 }
+
+// GroundStatus tells us where the plane thinks it is (In the sky or on the ground)
 func (p *Plane) GroundStatus() bool {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
-	return p.Location.onGround
+	return p.location.onGround
 }
-func (p *Plane) SetFlightStatus(statusId byte, statusString string) {
+
+// setFlightStatus sets the flight status of the aircraft, the string is one from mode_s.flightStatusTable
+func (p *Plane) setFlightStatus(statusId byte, statusString string) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
-	p.Flight.StatusId = statusId
-	p.Flight.Status = statusString
+	p.flight.statusId = statusId
+	p.flight.status = statusString
 }
+
+// FlightStatus gives us the flight status of this aircraft
 func (p *Plane) FlightStatus() string {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
-	return p.Flight.Status
+	return p.flight.status
 }
-func (p *Plane) SetSquawkIdentity(ident uint32) {
+
+// FlightNumber is the planes self identifier for the route it is flying. e.g. QF1, SPTR644
+func (p *Plane) FlightNumber() string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.flight.identifier
+}
+
+// setFlightNumber is the flights identifier/number
+func (p *Plane) setFlightNumber(flightIdentifier string) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
-	p.Squawk = ident
+	p.flight.identifier = flightIdentifier
 }
+
+// setSquawkIdentity Sets the planes squawk. A squawk is set by the pilots for various reasons (including flight control)
+func (p *Plane) setSquawkIdentity(ident uint32) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	p.squawk = ident
+}
+
+// SquawkIdentity the integer version of the squawk
 func (p *Plane) SquawkIdentity() uint32 {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
-	return p.Squawk
+	return p.squawk
 }
-func (p *Plane) SetFlightIdentifier(flightIdentifier string) {
+
+// SquawkIdentityStr is the string version of SquawkIdentity
+func (p *Plane) SquawkIdentityStr() string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return fmt.Sprint(p.squawk)
+}
+
+// setAirFrameCategory is the type of airframe for this aircraft
+func (p *Plane) setAirFrameCategory(category string) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
-	p.Flight.Identifier = flightIdentifier
+	p.airframeCategory = category
 }
-func (p *Plane) SetAirFrameCategory(category string) {
-	p.rwLock.Lock()
-	defer p.rwLock.Unlock()
-	p.AirframeCategory = category
-}
-func (p *Plane) SetHeading(heading float64) {
+
+// setHeading gives our plane some direction in life
+func (p *Plane) setHeading(heading float64) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	// set the current altitude
-	p.Location.Heading = heading
-	p.Location.hasHeading = true
+	p.location.heading = heading
+	p.location.hasHeading = true
 }
+
+// Heading tells us which way the plane is currently facing
 func (p *Plane) Heading() float64 {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
 	// set the current altitude
-	return p.Location.Heading
+	return p.location.heading
 }
+
+// HeadingStr gives a nice printable version of the heading, including compass heading
+func (p *Plane) HeadingStr() string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	if !p.location.hasHeading {
+		return "?"
+	}
+	return fmt.Sprintf("%s (%0.2f)", headingLookup.getCompassLabel(p.location.heading), p.location.heading)
+}
+
+// HasHeading let's us know if this plane has found it's way in life and knows where it is heading
 func (p *Plane) HasHeading() bool {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
 	// set the current altitude
-	return p.Location.hasHeading
+	return p.location.hasHeading
 }
-func (p *Plane) SetVelocity(velocity float64) {
+
+// setVelocity allows us to set the speed the plane is heading
+func (p *Plane) setVelocity(velocity float64) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	// set the current altitude
-	p.Location.Velocity = velocity
+	p.location.velocity = velocity
 }
+
+// Velocity is how fast the plane is going in it's Heading
 func (p *Plane) Velocity() float64 {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
 	// set the current altitude
-	return p.Location.Velocity
+	return p.location.velocity
 }
-func (p *Plane) DistanceTravelled() DistanceTravelled {
+
+// distanceTravelled Tells us how far we have tracked this plane
+func (p *Plane) DistanceTravelled() distanceTravelled {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
-	return DistanceTravelled{
-		metres:   p.Location.DistanceTravelled,
-		duration: p.Location.DurationTravelled,
+	return distanceTravelled{
+		metres:   p.location.distanceTravelled,
+		duration: p.location.durationTravelled,
 	}
 }
-func (p *Plane) SetVerticalRate(rate int) {
+
+// setVerticalRate shows us how fast the plane is going up and down and uuupp aaannndd doooowwn
+func (p *Plane) setVerticalRate(rate int) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
-	p.Location.VerticalRate = rate
+	p.location.hasVerticalRate = true
+	p.location.verticalRate = rate
 }
 
-func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) (warn error) {
-	if lat < -95.0 || lat > 95 || lon < -180 || lon > 180 {
-		log.Printf("Invalid Coordinate {%0.6f, %0.6f}", lat, lon)
-		return
-	}
+// VerticalRate tells us how fast the plane is going up and down
+func (p *Plane) VerticalRate() int {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.location.verticalRate
+}
 
-	var distanceTravelled float64
+// HasVerticalRate tells us if the plane has reported its vertical rate
+func (p *Plane) HasVerticalRate() bool {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.location.hasVerticalRate
+}
+
+// HasLocation tells us if we have a latitude/longitude decoded
+func (p *Plane) HasLocation() bool {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.location.hasLatLon
+}
+
+// Lat tells use the planes last reported latitude
+func (p *Plane) Lat() float64 {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.location.latitude
+}
+func (p *Plane) Lon() float64 {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.location.longitude
+}
+
+// addLatLong Adds a Lat/Long pair to our location tracking and sets it as the current plane location
+func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
+	if lat < -95.0 || lat > 95 || lon < -180 || lon > 180 {
+		return fmt.Errorf("cannot add invalid coordinates {%0.6f, %0.6f}", lat, lon)
+	}
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+
+	var travelledDistance float64
 	var durationTravelled float64
-	numHistoryItems := len(p.LocationHistory)
-	if numHistoryItems > 0 && p.Location.Latitude != 0 && p.Location.Longitude != 0 {
-		referenceTime := p.LocationHistory[numHistoryItems-1].TimeStamp
+	numHistoryItems := len(p.locationHistory)
+	if numHistoryItems > 0 && p.location.latitude != 0 && p.location.longitude != 0 {
+		referenceTime := p.locationHistory[numHistoryItems-1].timeStamp
 		if !referenceTime.IsZero() {
 			durationTravelled = float64(ts.Sub(referenceTime)) / float64(time.Second)
 			if 0.0 == durationTravelled {
@@ -293,13 +445,13 @@ func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) (warn error) {
 				acceptableMaxDistance = 50000
 			}
 
-			distanceTravelled = distance(lat, lon, p.Location.Latitude, p.Location.Longitude)
+			travelledDistance = distance(lat, lon, p.location.latitude, p.location.longitude)
 
 			//log.Printf("%s travelled %0.2fm in %0.2f seconds (%s -> %s)", p.icaoStr, distanceTravelled, durationTravelled, referenceTime.Format(time.RFC3339Nano), ts.Format(time.RFC3339Nano))
 
-			if distanceTravelled > acceptableMaxDistance {
-				warn = fmt.Errorf("The distance (%0.2fm) between {%0.4f,%0.4f} and {%0.4f,%0.4f} is too great for %s to travel in %0.2f seconds. New Track", distanceTravelled, lat, lon, p.Location.Latitude, p.Location.Longitude, p.Icao, durationTravelled)
-				p.Location.TrackFinished = true
+			if travelledDistance > acceptableMaxDistance {
+				warn = fmt.Errorf("the distance (%0.2fm) between {%0.4f,%0.4f} and {%0.4f,%0.4f} is too great for %s to travel in %0.2f seconds. New Track", travelledDistance, lat, lon, p.location.latitude, p.location.longitude, p.icao, durationTravelled)
+				p.location.TrackFinished = true
 			}
 		}
 
@@ -307,29 +459,17 @@ func (p *Plane) AddLatLong(lat, lon float64, ts time.Time) (warn error) {
 	PointCounter++
 
 	if MaxLocationHistory > 0 && numHistoryItems >= MaxLocationHistory {
-		p.LocationHistory = p.LocationHistory[1:]
+		p.locationHistory = p.locationHistory[1:]
 	}
-	p.LocationHistory = append(p.LocationHistory, p.Location)
-
-	var newLocation PlaneLocation
-	newLocation.DistanceTravelled = distanceTravelled
-	newLocation.DurationTravelled = durationTravelled
-	newLocation.Altitude = p.Location.Altitude
-	newLocation.AltitudeUnits = p.Location.AltitudeUnits
-	newLocation.hasHeading = p.Location.hasHeading
-	newLocation.hasLatLon = true
-	newLocation.Heading = p.Location.Heading
-	newLocation.Latitude = lat
-	newLocation.Longitude = lon
-	newLocation.onGround = p.Location.onGround
-	newLocation.TimeStamp = ts
-	newLocation.Velocity = p.Location.Velocity
-
-	p.Location = newLocation
+	locCopy := p.location.Copy()
+	p.locationHistory = append(p.locationHistory, locCopy)
+	p.location = locCopy
 	return
 }
 
-func (p *Plane) ZeroCpr() {
+
+// zeroCpr is called once we have successfully decoded our CPR pair
+func (p *Plane) zeroCpr() {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	p.cprLocation.evenLat = 0
@@ -344,7 +484,8 @@ func (p *Plane) ZeroCpr() {
 	p.cprLocation.oddFrame = false
 }
 
-func (p *Plane) SetCprEvenLocation(lat, lon float64, t time.Time) error {
+// setCprEvenLocation sets our Even CPR location for LAT/LON decoding
+func (p *Plane) setCprEvenLocation(lat, lon float64, t time.Time) error {
 
 	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
 	if lat > max17Bits || lat < 0 || lon > max17Bits || lon < 0 {
@@ -358,7 +499,8 @@ func (p *Plane) SetCprEvenLocation(lat, lon float64, t time.Time) error {
 	return nil
 }
 
-func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) error {
+// setCprOddLocation sets our Even CPR location for LAT/LON decoding
+func (p *Plane) setCprOddLocation(lat, lon float64, t time.Time) error {
 
 	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
 	if lat > max17Bits || lat < 0 || lon > max17Bits || lon < 0 {
@@ -377,17 +519,18 @@ func (p *Plane) SetCprOddLocation(lat, lon float64, t time.Time) error {
 	return nil
 }
 
-func (p *Plane) DecodeCpr(ts time.Time) error {
+// decodeCpr decodes the CPR Even and Odd frames and gets our Plane position
+func (p *Plane) decodeCpr(ts time.Time) error {
 
 	if !(p.cprLocation.oddFrame && p.cprLocation.evenFrame) {
 		return nil
 	}
-		// attempt to decode the CPR LAT/LON
-	var loc PlaneLocation
+	// attempt to decode the CPR LAT/LON
+	var loc planeLocation
 	var err error
 
-	if p.Location.onGround {
-		//loc, err = p.cprLocation.decodeSurface(p.Location.Latitude, p.Location.Longitude)
+	if p.location.onGround {
+		//loc, err = p.cprLocation.decodeSurface(p.location.latitude, p.location.longitude)
 	} else {
 		loc, err = p.cprLocation.decodeGlobalAir()
 	}
@@ -395,10 +538,17 @@ func (p *Plane) DecodeCpr(ts time.Time) error {
 	if nil != err {
 		return err
 	}
-	p.Location.hasLatLon = true
-	err = p.AddLatLong(loc.Latitude, loc.Longitude, ts)
-	p.ZeroCpr()
+	p.location.hasLatLon = true
+	err = p.addLatLong(loc.latitude, loc.longitude, ts)
+	p.zeroCpr()
 	return err
+}
+
+// LocationHistory returns the track history of the Plane
+func (p *Plane) LocationHistory() []*planeLocation {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.locationHistory
 }
 
 // Distance function returns the distance (in meters) between two points of
@@ -427,13 +577,55 @@ func distance(lat1, lon1, lat2, lon2 float64) float64 {
 	return 2 * r * math.Asin(math.Sqrt(h))
 }
 
-func (dt *DistanceTravelled) Valid() bool {
+func (dt *distanceTravelled) Valid() bool {
 	return dt.metres > 0 && dt.duration > 0
 }
 
-func (dt *DistanceTravelled) Metres() float64 {
+func (dt *distanceTravelled) Metres() float64 {
 	return dt.metres
 }
-func (dt *DistanceTravelled) Duration() float64 {
+func (dt *distanceTravelled) Duration() float64 {
 	return dt.duration
+}
+
+func (hi headingInfo) getCompassLabel(heading float64) string {
+	for _, h := range hi {
+		if heading >= h.from && heading <= h.to {
+			return h.label
+		}
+	}
+	return "?"
+}
+
+func (pl *planeLocation) Copy() *planeLocation {
+	pl.rwlock.RLock()
+	defer pl.rwlock.RUnlock()
+	return &planeLocation{
+		latitude:        pl.latitude,
+		longitude:       pl.longitude,
+		altitude:        pl.altitude,
+		hasVerticalRate: pl.hasVerticalRate,
+		verticalRate:    pl.verticalRate,
+		altitudeUnits:   pl.altitudeUnits,
+		heading:         pl.heading,
+		velocity:        pl.velocity,
+		timeStamp:       pl.timeStamp,
+		onGround:        pl.onGround,
+		hasHeading:      pl.hasHeading,
+		hasLatLon:       pl.hasLatLon,
+		distanceTravelled: pl.distanceTravelled,
+		durationTravelled: pl.durationTravelled,
+		TrackFinished:     pl.TrackFinished,
+	}
+}
+func (pl *planeLocation) Lat() float64 {
+	pl.rwlock.RLock()
+	defer pl.rwlock.RUnlock()
+	return pl.latitude
+}
+
+func (pl *planeLocation) Lon() float64 {
+	pl.rwlock.RLock()
+	defer pl.rwlock.RUnlock()
+	return pl.longitude
 }

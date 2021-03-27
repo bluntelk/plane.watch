@@ -58,14 +58,14 @@ func TestDecodeString_DF17_EVEN_LAT(t *testing.T) {
 	}
 
 	if 2175 != frame.altitude {
-		t.Errorf("Incorrect Altitude! expected 2175 - got: %d", frame.altitude)
+		t.Errorf("Incorrect altitude! expected 2175 - got: %d", frame.altitude)
 	}
 
 	if 92095 != frame.rawLatitude {
-		t.Errorf("Incorrectly decoded the RAW Latitude for this frame. expected 92095, got %d", frame.rawLatitude)
+		t.Errorf("Incorrectly decoded the RAW latitude for this frame. expected 92095, got %d", frame.rawLatitude)
 	}
 	if 39846 != frame.rawLongitude {
-		t.Errorf("Incorrectly decoded the RAW Latitude for this frame. expected 39846, got %d", frame.rawLongitude)
+		t.Errorf("Incorrectly decoded the RAW latitude for this frame. expected 39846, got %d", frame.rawLongitude)
 	}
 
 }
@@ -115,14 +115,14 @@ func TestDecodeString_DF17_ODD_LAT(t *testing.T) {
 	}
 
 	if 2175 != frame.altitude {
-		t.Errorf("Incorrect Altitude! expected 2175 - got: %d", frame.altitude)
+		t.Errorf("Incorrect altitude! expected 2175 - got: %d", frame.altitude)
 	}
 
 	if 88385 != frame.rawLatitude {
-		t.Errorf("Incorrectly decoded the RAW Latitude for this frame. expected 92095, got %d", frame.rawLatitude)
+		t.Errorf("Incorrectly decoded the RAW latitude for this frame. expected 92095, got %d", frame.rawLatitude)
 	}
 	if 125818 != frame.rawLongitude {
-		t.Errorf("Incorrectly decoded the RAW Latitude for this frame. expected 39846, got %d", frame.rawLongitude)
+		t.Errorf("Incorrectly decoded the RAW latitude for this frame. expected 39846, got %d", frame.rawLongitude)
 	}
 
 }
@@ -197,7 +197,7 @@ type tIcaoMessage struct {
 //		if nil != err {
 //			t.Error("Fail", err)
 //		}
-//		decodedIcao := fmt.Sprintf("%06x", frame.Icao())
+//		decodedIcao := fmt.Sprintf("%06x", frame.icao())
 //		if sut.expectedIcao != decodedIcao {
 //			t.Errorf("%s: Bad ICAO Decode: expected %s != %s actual", sut.df, sut.expectedIcao, decodedIcao)
 //		}

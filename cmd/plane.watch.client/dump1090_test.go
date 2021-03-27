@@ -17,17 +17,17 @@ func TestTracking(t *testing.T) {
 
 	trk := tracker.NewTracker()
 	plane := trk.GetPlane(4219421)
-	if plane.Location.Altitude != 38000 {
+	if plane.Altitude() != 38000 {
 		t.Error("Plane should be at 38000 feet")
 	}
 
 	lat := "+52.2572021484375"
 	lon := "+3.9193725585938";
-	if lon != fmt.Sprintf("%+03.13f", plane.Location.Longitude) {
-		t.Errorf("Longitude Calculation was incorrect: expected %s, got %+0.13f", lon, plane.Location.Longitude)
+	if lon != fmt.Sprintf("%+03.13f", plane.Lon()) {
+		t.Errorf("longitude Calculation was incorrect: expected %s, got %+0.13f", lon, plane.Lon())
 	}
-	if lat != fmt.Sprintf("%+03.13f", plane.Location.Latitude) {
-		t.Errorf("Latitude Calculation was incorrect: expected %s, got %+0.13f", lat, plane.Location.Latitude)
+	if lat != fmt.Sprintf("%+03.13f", plane.Lat()) {
+		t.Errorf("latitude Calculation was incorrect: expected %s, got %+0.13f", lat, plane.Lat())
 	}
 }
 
@@ -119,18 +119,18 @@ func TestCprDecode(t *testing.T) {
 			t.Errorf("Plane data should have been updated")
 			continue
 		}
-		if plane.Location.Altitude != d.alt {
-			t.Errorf("Plane Altitude is wrong for packet %d: should be %d, was %d", i, d.alt, plane.Location.Altitude)
+		if plane.Altitude() != d.alt {
+			t.Errorf("Plane altitude is wrong for packet %d: should be %d, was %d", i, d.alt, plane.Altitude())
 		}
 
-		lat := fmt.Sprintf("%+0.6f", plane.Location.Latitude);
-		lon := fmt.Sprintf("%+0.6f", plane.Location.Longitude);
+		lat := fmt.Sprintf("%+0.6f", plane.Lat())
+		lon := fmt.Sprintf("%+0.6f", plane.Lon())
 
 		if lat != d.lat {
-			t.Errorf("Plane Latitude is wrong for packet %d: should be %s was %s", i, d.lat, lat)
+			t.Errorf("Plane latitude is wrong for packet %d: should be %s was %s", i, d.lat, lat)
 		}
 		if lon != d.lon {
-			t.Errorf("Plane Latitude is wrong for packet %d: should be %s was %s", i, d.lon, lon)
+			t.Errorf("Plane latitude is wrong for packet %d: should be %s was %s", i, d.lon, lon)
 		}
 	}
 }

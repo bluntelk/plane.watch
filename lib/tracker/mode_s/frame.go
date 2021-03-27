@@ -15,18 +15,18 @@ const (
 	modesUnitMetres                   = 1
 	DF17FrameIdCat                    = "Aircraft Identification and Category"
 	DF17FrameSurfacePos               = "Surface Position"
-	DF17FrameAirPositionBarometric    = "Airborne Position (with Barometric Altitude)"
-	DF17FrameAirVelocity              = "Airborne Velocity"
-	DF17FrameAirVelocityUnknown       = "Airborne Velocity (unknown sub type)"
+	DF17FrameAirPositionBarometric    = "Airborne Position (with Barometric altitude)"
+	DF17FrameAirVelocity              = "Airborne velocity"
+	DF17FrameAirVelocityUnknown       = "Airborne velocity (unknown sub type)"
 	DF17FrameAirPositionGnss          = "Airborne Position (with GNSS Height)"
 	DF17FrameTestMessage              = "Test Message"
-	DF17FrameTestMessageSquawk        = "Test Message with Squawk"
-	DF17FrameSurfaceSystemStatus      = "Surface System Status"
-	DF17FrameEmergencyPriority        = "Extended Squitter Aircraft Status (Emergency Or Priority)"
+	DF17FrameTestMessageSquawk        = "Test Message with squawk"
+	DF17FrameSurfaceSystemStatus      = "Surface System status"
+	DF17FrameEmergencyPriority        = "Extended Squitter Aircraft status (Emergency Or Priority)"
 	DF17FrameEmergencyPriorityUnknown = "Unknown Emergency or Priority message"
-	DF17FrameTcasRA                   = "Extended Squitter Aircraft Status (1090ES TCAS Resolution Advisory)"
-	DF17FrameTargetStateStatus        = "Target State and Status Message"
-	DF17FrameAircraftOperational      = "Aircraft Operational Status Message"
+	DF17FrameTcasRA                   = "Extended Squitter Aircraft status (1090ES TCAS Resolution Advisory)"
+	DF17FrameTargetStateStatus        = "Target State and status Message"
+	DF17FrameAircraftOperational      = "Aircraft Operational status Message"
 )
 
 type Position struct {
@@ -73,7 +73,7 @@ type df17 struct {
 	compatibilityClass      int
 	cccHasOperationalTcas   *bool
 	cccHas1090EsIn          bool
-	cccHasAirRefVel         *bool // supports Air Referenced Velocity
+	cccHasAirRefVel         *bool // supports Air Referenced velocity
 	cccHasLowTxPower        *bool
 	cccHasTargetStateRpt    *bool // supports Target State Report
 	cccHasTargetChangeRpt   *bool // supports Target Change Report
@@ -145,8 +145,8 @@ type Frame struct {
 var (
 	downlinkFormatTable = map[byte]string{
 		0:  "Short air-air surveillance (TCAS)",
-		4:  "Roll Call Reply - Altitude (~100ft accuracy)",
-		5:  "Roll Call Reply - Squawk",
+		4:  "Roll Call Reply - altitude (~100ft accuracy)",
+		5:  "Roll Call Reply - squawk",
 		11: "All-Call reply containing aircraft address", // transponder capabilities
 		16: "Long air-air surveillance (TCAS)",
 		17: "ADS-B",
@@ -175,8 +175,8 @@ var (
 		1: "Normal, On the ground",
 		2: "ALERT, Airborne",
 		3: "ALERT, On the ground",
-		4: "ALERT, Special Position Identification. Airborne or Ground",
-		5: "Normal, Special Position Identification. Airborne or Ground",
+		4: "ALERT, special Position Identification. Airborne or Ground",
+		5: "Normal, special Position Identification. Airborne or Ground",
 		6: "Value 6 is not assigned",
 		7: "Value 7 is not assigned",
 	}
@@ -486,7 +486,7 @@ func (f *Frame) VerticalRateValid() bool {
 	return f.validVerticalRate
 }
 
-//func (f *Frame) Flight() string {
+//func (f *Frame) flight() string {
 //	flight := string(f.flightId)
 //	if "" == flight {
 //		flight = "??????"
@@ -527,7 +527,7 @@ func (f *Frame) MessageSubType() byte {
 	return f.messageSubType
 }
 
-// Whether or not this frame is even or odd, for CPR Location
+// Whether or not this frame is even or odd, for CPR location
 func (f *Frame) IsEven() bool {
 	return f.cprFlagOddEven == 0
 }
@@ -548,7 +548,7 @@ func (f *Frame) isNoOp() bool {
 
 /**
  * horizontal containment radius limit in meters.
- * Set NIC supplement A from Operational Status Message for better precision.
+ * Set NIC supplement A from Operational status Message for better precision.
  * Otherwise, we'll be pessimistic.
  * Note: For ADS-B versions < 2, this is inaccurate for NIC class 6, since there was
  * no NIC supplement B in earlier versions.

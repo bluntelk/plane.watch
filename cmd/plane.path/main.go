@@ -35,7 +35,7 @@ func main() {
 	app := cli.NewApp()
 
 	app.Version = "v0.0.2"
-	app.Name = "Plane Watch Flight Path Renderer"
+	app.Name = "Plane Watch flight Path Renderer"
 	app.Usage = "Reads AVR frames or SBS1 data from a file and generates a GeoJSON file"
 	app.Authors = []cli.Author{
 		{Name: "Jason Playne", Email: "jason@jasonplayne.com"},
@@ -212,28 +212,28 @@ func writeResult(trk *tracker.Tracker, outFileName string) error {
 	addFeature := func(coordinates geojson.Coordinates, p *tracker.Plane) {
 		trackCounter++
 		props := make(map[string]interface{})
-		props["icao"] = p.Icao
+		props["icao"] = p.IcaoIdentifierStr()
 		props["trackNo"] = trackCounter
 		if len(coordinates) > 1 {
-			fc.AddFeatures(geojson.NewFeature(geojson.NewLineString(coordinates), props, fmt.Sprintf("%s_%d", p.Icao, trackCounter)))
+			fc.AddFeatures(geojson.NewFeature(geojson.NewLineString(coordinates), props, fmt.Sprintf("%s_%d", p.IcaoIdentifierStr(), trackCounter)))
 		}
 	}
 
 	trk.EachPlane(func(p *tracker.Plane) bool {
 		var coords geojson.Coordinates
-		if 0 == len(p.LocationHistory) {
+		if 0 == len(p.LocationHistory()) {
 			return true
 		}
 		planeCounter++
-		numLocations := len(p.LocationHistory)
+		numLocations := len(p.LocationHistory())
 		coords = make(geojson.Coordinates, 0, numLocations)
-		for index, l := range p.LocationHistory {
-			if l.Latitude == 0.0 && l.Longitude == 0.0 {
+		for index, l := range p.LocationHistory() {
+			if l.Lat() == 0.0 && l.Lon() == 0.0 {
 				continue
 			}
 
 			coordCounter++
-			coords = append(coords, geojson.Coordinate{geojson.CoordType(l.Longitude), geojson.CoordType(l.Latitude)})
+			coords = append(coords, geojson.Coordinate{geojson.CoordType(l.Lon()), geojson.CoordType(l.Lat())})
 
 			if l.TrackFinished {
 				addFeature(coords, p)

@@ -74,7 +74,7 @@ func (f *Frame) decodeAdsb() {
 		f.decodeAdsbLatLon()
 
 	case 19:
-		/* Airborne Velocity Message */
+		/* Airborne velocity Message */
 		f.onGround = false
 		f.validVerticalStatus = true
 
@@ -193,7 +193,7 @@ func (f *Frame) decodeAdsb() {
 	case 30:
 	// NoOp
 	case 31:
-		// Operational Status Message
+		// Operational status Message
 		// TODO: Finish this off - it is not in a good working state
 
 		// bool pointer helper

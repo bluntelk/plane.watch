@@ -2,7 +2,7 @@ package mode_s
 
 //var format string = "%20s = %13s"
 
-// decode an AC12 Altitude field
+// decode an AC12 altitude field
 func decodeAC12Field(AC12Field int32) int32 {
 	qBit := (AC12Field & 0x10) == 0x10
 	var n int32
@@ -94,7 +94,7 @@ func decodeID13Field(ID13Field int32) int32 {
 	return hexGillham
 }
 
-// Mode A to Mode C Height/Altitude
+// Mode A to Mode C Height/altitude
 func modeAToModeC(ModeA int32) int32 {
 	var OneHundreds, FiveHundreds int32
 	//log.Printf(format, "Mode A -> C", strconv.FormatInt(int64(ModeA), 2))

@@ -14,7 +14,7 @@ func TestDecodeDF17BaroAlt1(t *testing.T) {
 	}
 
 	if a, _ := frame.Altitude(); a != 5250 {
-		t.Errorf("DF17 Baro Alt: Failed to decode Altitude field correctly 5250 != %d", a)
+		t.Errorf("DF17 Baro Alt: Failed to decode altitude field correctly 5250 != %d", a)
 	}
 
 	sicao := fmt.Sprintf("%x", frame.Icao())
@@ -32,7 +32,7 @@ func TestDecodeDF17BaroAlt2(t *testing.T) {
 	}
 
 	if a, _ := frame.Altitude(); a != 16025 {
-		t.Errorf("DF17 Baro Alt: Failed to decode Altitude field correctly 16025 != %d", a)
+		t.Errorf("DF17 Baro Alt: Failed to decode altitude field correctly 16025 != %d", a)
 	}
 
 	sicao := fmt.Sprintf("%x", frame.Icao())
@@ -50,7 +50,7 @@ func TestDecodeDF17BaroAlt3(t *testing.T) {
 	}
 
 	if a, _ := frame.Altitude(); a != 11650 {
-		t.Errorf("DF17 Baro Alt: Failed to decode Altitude field correctly 16025 != %d", a)
+		t.Errorf("DF17 Baro Alt: Failed to decode altitude field correctly 16025 != %d", a)
 	}
 
 	sicao := fmt.Sprintf("%x", frame.Icao())
