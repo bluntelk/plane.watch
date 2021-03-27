@@ -57,3 +57,26 @@ func NewAvrFetcher(host, port string) tracker.Producer {
 
 	return p
 }
+
+func NewAvrFile(filePaths []string) tracker.Producer {
+	p := NewProducer("AVR File")
+
+	go func() {
+		for line := range p.readFiles(filePaths) {
+			p.AddEvent(tracker.NewFrameEvent(mode_s.NewFrame(line, time.Now())))
+		}
+		p.addDebug("Done with reading")
+		p.Cleanup()
+	}()
+
+	go func() {
+		for cmd := range p.cmdChan {
+			switch cmd {
+			case cmdExit:
+				return
+			}
+		}
+	}()
+
+	return p
+}

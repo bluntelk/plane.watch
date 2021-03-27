@@ -88,6 +88,11 @@ func main() {
 			Usage:  "Gather ADSB data and sends it to plane.watch",
 			Action: run,
 		},
+		{
+			Name:   "simple",
+			Usage:  "Gather ADSB data and sends it to plane.watch",
+			Action: runSimple,
+		},
 	}
 
 	if err := app.Run(os.Args); nil != err {
@@ -95,6 +100,14 @@ func main() {
 	}
 }
 
+func runSimple(c *cli.Context) error {
+	trk := tracker.NewTracker(tracker.WithVerboseOutput())
+	trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
+	trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
+
+	trk.Wait()
+	return nil
+}
 
 // run is our method for running things
 func run(c *cli.Context) error {

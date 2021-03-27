@@ -3,11 +3,14 @@ package tracker
 import (
 	"fmt"
 	"math"
+	"sync"
 	"time"
 )
 
 // meanings: 0 is even frame, 1 is odd frame
 type CprLocation struct {
+	rwLock sync.RWMutex
+
 	evenLat, oddLat, evenLon, oddLon float64
 
 	time0, time1 time.Time
@@ -85,7 +88,84 @@ var NLTable = map[int32]float64{
 	2:  87.00000000,
 }
 
+func (cpr *CprLocation) canDecode() bool {
+	cpr.rwLock.RLock()
+	defer cpr.rwLock.RUnlock()
+	return cpr.oddFrame && cpr.evenFrame
+}
 
+func (cpr *CprLocation) zero(lock bool) {
+	if lock {
+		cpr.rwLock.Lock()
+		defer cpr.rwLock.Unlock()
+	}
+	cpr.evenLat = 0
+	cpr.evenLon = 0
+	cpr.oddLat = 0
+	cpr.oddLon = 0
+	cpr.rlat0 = 0
+	cpr.rlat1 = 0
+	cpr.time0 = time.Unix(0, 0)
+	cpr.time1 = time.Unix(0, 0)
+	cpr.evenFrame = false
+	cpr.oddFrame = false
+}
+
+func (cpr *CprLocation) SetEvenLocation(lat, lon float64, t time.Time) error {
+	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
+	if lat > max17Bits || lat < 0 || lon > max17Bits || lon < 0 {
+		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %0.4f,%0.4f", max17Bits, lat, lon)
+	}
+	cpr.rwLock.Lock()
+	defer cpr.rwLock.Unlock()
+
+	cpr.evenLat = lat
+	cpr.evenLon = lon
+	cpr.time0 = t
+	cpr.evenFrame = true
+	return nil
+}
+
+func (cpr *CprLocation) SetOddLocation(lat, lon float64, t time.Time) error {
+	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
+	if lat > max17Bits || lat < 0 || lon > max17Bits || lon < 0 {
+		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %0.4f,%0.4f", max17Bits, lat, lon)
+	}
+	cpr.rwLock.Lock()
+	defer cpr.rwLock.Unlock()
+	// only set the odd frame after the even frame is set
+	//if !p.cprLocation.evenFrame {
+	//	return
+	//}
+
+	cpr.oddLat = lat
+	cpr.oddLon = lon
+	cpr.time1 = t
+	cpr.oddFrame = true
+	return nil
+}
+
+func (cpr *CprLocation) decode(onGround bool, ts time.Time) (*PlaneLocation, error) {
+	if !cpr.canDecode() {
+		return nil, nil
+	}
+	// now guard the entire decode process
+	cpr.rwLock.Lock()
+	defer cpr.rwLock.Unlock()
+
+	// attempt to decode the CPR LAT/LON
+	var loc *PlaneLocation
+	var err error
+
+	if onGround {
+		//loc, err = p.cprLocation.decodeSurface(p.location.latitude, p.location.longitude)
+	} else {
+		loc, err = cpr.decodeGlobalAir()
+	}
+	cpr.zero(false)
+	return loc, err
+
+}
 
 func (cpr *CprLocation) computeLatitudeIndex() {
 	cpr.latitudeIndex = int32(math.Floor((((59 * cpr.evenLat) - (60 * cpr.oddLat)) / 131072) + 0.5))

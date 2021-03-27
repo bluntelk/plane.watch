@@ -69,11 +69,11 @@ func newAppDisplay() (*display, error) {
 	d.top.
 		SetCell(0, 0, hdr("ICAO", 9)).
 		SetCell(0, 1, hdr("Ident", 9)).
-		SetCell(0, 2, hdr("squawk", 6)).
+		SetCell(0, 2, hdr("Squawk", 6)).
 		SetCell(0, 3, hdr("Lat/Lon", 19)).
-		SetCell(0, 4, hdr("altitude", 12)).
+		SetCell(0, 4, hdr("Altitude", 12)).
 		SetCell(0, 5, hdr("Speed", 12)).
-		SetCell(0, 6, hdr("heading", 12)).
+		SetCell(0, 6, hdr("Heading", 12)).
 		SetCell(0, 7, hdr("# Msgs", 6)).
 		SetCell(0, 8, hdr("Age (s)", 7)).
 		SetCell(0, 9, hdr("Extra", 10)).
@@ -103,41 +103,77 @@ func newAppDisplay() (*display, error) {
 	return &d, nil
 }
 
-func (d *display) drawTable() {
-	table := make(map[uint32]*tracker.Plane)
+func (d *display) sortedPlaneIdSlice() []uint32 {
 	icaos := make([]uint32,0)
 	d.planes.Range(func(key, value interface{}) bool {
-		table[key.(uint32)] = value.(*tracker.Plane)
 		icaos  = append(icaos, key.(uint32))
 		return true
 	})
-
 	sort.Slice(icaos, func(i, j int) bool {
 		return icaos[i] < icaos[j]
 	})
-
-	row := 1
-	var latLon string
-	for _, icao := range icaos {
-		d.top.SetCellSimple(row, 0, table[icao].IcaoIdentifierStr())
-		d.top.SetCellSimple(row, 1, table[icao].FlightNumber())
-		d.top.SetCellSimple(row, 2, table[icao].SquawkIdentityStr())
-		if table[icao].HasLocation() {
-			latLon = fmt.Sprintf("%0.4f/%0.4f", table[icao].Lat(), table[icao].Lon())
-		} else {
-			latLon = "?"
+	return icaos
+}
+func (d *display) getPlaneRow(icao uint32) int {
+	list := d.sortedPlaneIdSlice()
+	for i, id := range list {
+		if id == icao {
+			return i+1
 		}
-		d.top.SetCellSimple(row, 3, latLon)
-		d.top.SetCellSimple(row, 4, fmt.Sprint(table[icao].Altitude()))
-		d.top.SetCellSimple(row, 5, fmt.Sprintf("%0.2f",table[icao].Velocity()))
-		d.top.SetCellSimple(row, 6, table[icao].HeadingStr())
-		d.top.SetCellSimple(row, 7, fmt.Sprint(table[icao].MsgCount()))
+	}
+	return -1
+}
+func (d *display) drawTable() {
+	icaoList := d.sortedPlaneIdSlice()
 
-		since := time.Now().Sub(table[icao].LastSeen()).Seconds()
-		d.top.SetCellSimple(row, 8, fmt.Sprintf("%0.0f",since))
-		d.top.SetCellSimple(row, 9, table[icao].Special())
-
+	row := 0
+	for _, icao := range icaoList {
 		row++
+		d.drawRow(icao, row)
+	}
+}
+
+func (d *display) drawRow(icao uint32, row int) {
+	var latLon string
+	item, found := d.planes.Load(icao)
+	if !found {
+		return
+	}
+	plane := item.(*tracker.Plane)
+
+	d.top.SetCellSimple(row, 0, plane.IcaoIdentifierStr())
+	d.top.SetCellSimple(row, 1, plane.FlightNumber())
+	d.top.SetCellSimple(row, 2, plane.SquawkIdentityStr())
+	if plane.HasLocation() {
+		latLon = fmt.Sprintf("%0.4f/%0.4f", plane.Lat(), plane.Lon())
+	} else {
+		latLon = "?"
+	}
+	d.top.SetCellSimple(row, 3, latLon)
+	d.top.SetCellSimple(row, 4, fmt.Sprint(plane.Altitude()))
+	d.top.SetCellSimple(row, 5, fmt.Sprintf("%0.2f",plane.Velocity()))
+	d.top.SetCellSimple(row, 6, plane.HeadingStr())
+	d.top.SetCellSimple(row, 7, fmt.Sprint(plane.MsgCount()))
+
+	since := time.Now().Sub(plane.LastSeen()).Seconds()
+	d.top.SetCellSimple(row, 8, fmt.Sprintf("%0.0f",since))
+	d.top.SetCellSimple(row, 9, plane.Special())
+}
+
+func (d *display) updateAgeColumn() {
+	icaoList := d.sortedPlaneIdSlice()
+
+	row := 0
+	for _, icao := range icaoList {
+		row++
+
+		item, found := d.planes.Load(icao)
+		if !found {
+			return
+		}
+		plane := item.(*tracker.Plane)
+		since := time.Now().Sub(plane.LastSeen()).Seconds()
+		d.top.SetCellSimple(row, 8, fmt.Sprintf("%0.0f",since))
 	}
 }
 
@@ -155,9 +191,11 @@ func (d *display) OnEvent(e tracker.Event) {
 	case *tracker.PlaneLocationEvent:
 		ple := e.(*tracker.PlaneLocationEvent)
 		if ple.Removed() {
+			d.top.RemoveRow(d.getPlaneRow(ple.Plane().IcaoIdentifier()))
 			d.planes.Delete(ple.Plane().IcaoIdentifier())
 		} else {
 			d.planes.Store(ple.Plane().IcaoIdentifier(), ple.Plane())
+			d.drawRow(ple.Plane().IcaoIdentifier(), d.getPlaneRow(ple.Plane().IcaoIdentifier()))
 		}
 		//d.drawTable()
 
@@ -165,6 +203,7 @@ func (d *display) OnEvent(e tracker.Event) {
 		// show the received frame
 	case *pacerEvent:
 		// cleanup our planes list
-		d.drawTable()
+		d.updateAgeColumn()
+		//d.drawTable()
 	}
 }

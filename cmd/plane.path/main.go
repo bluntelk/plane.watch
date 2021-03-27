@@ -1,40 +1,20 @@
 package main
 
 import (
-	"bufio"
-	"compress/bzip2"
-	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/kpawlik/geojson"
 	"github.com/urfave/cli"
+	"io"
 	"os"
 	"plane.watch/lib/tracker"
-	"strings"
-	"time"
-)
-
-type (
-	producer struct {
-		outFile   string
-		dataFiles []string
-		verbose   bool
-
-		input   chan string
-		errChan chan error
-		logChan chan tracker.LogEvent
-		out     chan tracker.Event
-
-		newFrame frameFunc
-	}
-
-	frameFunc func(string) *tracker.FrameEvent
+	"runtime/pprof"
 )
 
 func main() {
 	app := cli.NewApp()
 
-	app.Version = "v0.0.2"
+	app.Version = "v0.1.0"
 	app.Name = "Plane Watch flight Path Renderer"
 	app.Usage = "Reads AVR frames or SBS1 data from a file and generates a GeoJSON file"
 	app.Authors = []cli.Author{
@@ -48,163 +28,94 @@ func main() {
 			Usage:     "Renders all the plane paths found in an AVR file",
 			Action:    parseAvr,
 			ArgsUsage: "[outfile if not --stdout] input-file.txt [input-file.gz [input-file.bz2]]",
+			Before: validateParams,
 		},
 		{
 			Name:      "sbs",
 			Aliases:   []string{"sbs1"},
 			Usage:     "Renders all the plane paths found in an SBS file",
-			Action:    parseSbs,
+			Action:    parseSbs1,
 			ArgsUsage: "[outfile if not --stdout] input-file.txt [input-file.gz [input-file.bz2]]",
+			Before:    validateParams,
 		},
 	}
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
-			Name:  "v",
+			Name:  "verbose, v",
 			Usage: "verbose debugging output",
 		},
 		cli.BoolFlag{
 			Name:  "stdout",
 			Usage: "Output to stdout instead of to a file (disables any other output)",
 		},
+		cli.BoolFlag{
+			Name:  "profile",
+			Usage: "creates a CPU Profile of the code",
+		},
 	}
 
 	tracker.MaxLocationHistory = -1
-	//
-	//f, err := os.Create("cpuprofile")
-	//if err != nil {
-	//	fmt.Fprintf(os.Stderr, "could not create CPU profile: %v\n", err)
-	//	os.Exit(1)
-	//}
-	//if err := pprof.StartCPUProfile(f); err != nil {
-	//	fmt.Fprintf(os.Stderr, "could not start CPU profile: %v\n", err)
-	//	os.Exit(1)
-	//}
-	//defer pprof.StopCPUProfile()
-	//
+	app.Before = func(context *cli.Context) error {
+		if context.Bool("profile") {
+
+			f, err := os.Create("cpuprofile")
+			if err != nil {
+				return err
+			}
+			if err = pprof.StartCPUProfile(f); err != nil {
+				return err
+			}
+			defer pprof.StopCPUProfile()
+		}
+		return nil
+	}
 
 	if err := app.Run(os.Args); nil != err {
 		fmt.Println(err)
 	}
 }
 
-func produceOutput(c *cli.Context, newFrame frameFunc) (*producer, error) {
+func validateParams(c *cli.Context) error {
 	stdOut := c.GlobalBool("stdout")
-
-	p := producer{
-		outFile:   "",
-		dataFiles: []string{},
-		verbose:   c.GlobalBool("v"),
-		newFrame:  newFrame,
-		logChan:   make(chan tracker.LogEvent, 50),
-		input:     make(chan string, 50),
-		errChan:   make(chan error, 50),
-		out:       make(chan tracker.Event, 50),
-	}
-
 	if c.NArg() == 0 {
-		return nil, fmt.Errorf("you need to specify some files")
+		return fmt.Errorf("you need to specify some files")
+	}
+	if !stdOut {
+		if c.NArg() <= 1 {
+			return fmt.Errorf("the first file is the output file, the other files are the input files")
+		}
+	}
+	return nil
+}
+
+func getFilePaths(c *cli.Context) []string {
+	stdOut := c.GlobalBool("stdout")
+	if c.NArg() == 0 {
+		return []string{}
 	}
 
 	if stdOut {
-		p.debugOutput("Writing json output to stdout")
-		p.dataFiles = c.Args()
+		return c.Args()
 	} else {
-		p.outFile = c.Args().First()
-		p.debugOutput("Writing json output to ", p.outFile)
-		p.dataFiles = c.Args()[1:]
-	}
-	if 0 == len(p.dataFiles) {
-		return nil, fmt.Errorf("you need to specify some files")
-	}
-	p.debugOutput("using ", len(p.dataFiles), " data files")
-
-	go p.handleErrors()
-
-	return &p, nil
-}
-
-func (p producer) debugOutput(v ...interface{}) {
-	p.logChan <- tracker.LogEvent{
-		When:    time.Now(),
-		Level:   tracker.LogLevelDebug,
-		Section: "Reader",
-		Message: fmt.Sprint(v...),
+		return c.Args()[1:]
 	}
 }
 
-func (p *producer) Listen() chan tracker.Event {
-	go p.readFiles()
-
-	go func() {
-		var lineCounter uint64
-		for line := range p.input {
-			_, _ = fmt.Fprintf(os.Stderr, "Processing line: %d\r", lineCounter)
-			p.out <- p.newFrame(line)
-			lineCounter++
-			if 0 == lineCounter%10000 {
-				_, _ = fmt.Fprintf(os.Stderr, "Processing line: %d\r", lineCounter)
-			}
-		}
-		p.debugOutput("Done reading lines. Processed ", lineCounter, " lines")
-		close(p.out)
-		close(p.errChan)
-	}()
-
-	return p.out
-}
-
-func (p producer) Stop() {
-	close(p.input)
-	close(p.errChan)
-}
-
-func (p producer) handleErrors() {
-	for err := range p.errChan {
+func getOutput(c *cli.Context) (io.WriteCloser, error) {
+	stdOut := c.GlobalBool("stdout")
+	if c.NArg() == 0 || stdOut {
+		return os.Stdout, nil
+	} else {
+		f, err := os.OpenFile(c.Args().First(), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 		if nil != err {
-			p.out <- tracker.NewLogEvent(tracker.LogLevelError, "Reader", fmt.Sprint(err))
+			return os.Stderr, err
 		}
+		return f, nil
 	}
+
 }
 
-func (p *producer) readFiles() {
-	var err error
-	var inFile *os.File
-	var gzipFile *gzip.Reader
-	for _, inFileName := range p.dataFiles {
-		p.debugOutput("Loading lines from ", inFileName)
-		inFile, err = os.Open(inFileName)
-		if err != nil {
-			p.errChan <- fmt.Errorf("failed to open file {%s}: %s", inFileName, err)
-			continue
-		}
-
-		isGzip := strings.ToLower(inFileName[len(inFileName)-2:]) == "gz"
-		isBzip2 := strings.ToLower(inFileName[len(inFileName)-3:]) == "bz2"
-		p.debugOutput("Is Gzip?", isGzip, " Is Bzip2?", isBzip2)
-
-		var scanner *bufio.Scanner
-		if isGzip {
-			gzipFile, err = gzip.NewReader(inFile)
-			if nil != err {
-				p.errChan <- err
-				continue
-			}
-			scanner = bufio.NewScanner(gzipFile)
-		} else if isBzip2 {
-			bzip2File := bzip2.NewReader(inFile)
-			scanner = bufio.NewScanner(bzip2File)
-		} else {
-			scanner = bufio.NewScanner(inFile)
-		}
-		for scanner.Scan() {
-			p.input <- scanner.Text()
-		}
-		_ = inFile.Close()
-	}
-	close(p.input)
-}
-
-func writeResult(trk *tracker.Tracker, outFileName string) error {
+func writeResult(trk *tracker.Tracker, out io.WriteCloser) error {
 	fc := geojson.NewFeatureCollection([]*geojson.Feature{})
 	var coordCounter, planeCounter int
 	var trackCounter int
@@ -250,17 +161,6 @@ func writeResult(trk *tracker.Tracker, outFileName string) error {
 	if nil != err {
 		panic(err)
 	}
-	if outFileName != "" {
-		var f *os.File
-		f, err = os.Create(outFileName)
-		if nil == err {
-			_, _ = f.Write(jsonContent)
-			_ = f.Close()
-			fmt.Println("Wrote content to file: " + outFileName)
-			return nil
-		}
-	}
-	// no writing to a file? output to screen!
-	fmt.Println("\n" + string(jsonContent))
-	return nil
+	_, _ = out.Write(jsonContent)
+	return out.Close()
 }

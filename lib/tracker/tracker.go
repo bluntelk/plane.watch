@@ -24,13 +24,15 @@ type (
 		logLevel int
 
 		// Input Handling
-		producers   []Producer
-		middlewares []Middleware
-		sinks       []Sink
+		producers       []Producer
+		middlewares     []Middleware
+		middlewaresLock sync.RWMutex
+		sinks           []Sink
+		sinksLock       sync.RWMutex
 
 		producerWaiter sync.WaitGroup
 
-		decodeWorkerCount   uint
+		decodeWorkerCount   int
 		decodingQueue       chan Frame
 		decodingQueueWaiter sync.WaitGroup
 
@@ -40,6 +42,15 @@ type (
 		pruneExitChan chan bool
 	}
 )
+var (
+	Levels = [4]string{
+		"Quiet",
+		"Error",
+		"Info",
+		"Debug",
+	}
+
+)
 
 // NewTracker creates a new tracker with which we can populate with plane tracking data
 func NewTracker(opts ...Option) *Tracker {
@@ -48,6 +59,7 @@ func NewTracker(opts ...Option) *Tracker {
 		logLevel:      LogLevelQuiet,
 		producers:     []Producer{},
 		middlewares:   []Middleware{},
+		decodeWorkerCount: 5,
 		decodingQueue: make(chan Frame, 1000), // a nice deep buffer
 		events:        make(chan Event, 1000),
 		pruneExitChan: make(chan bool),
@@ -60,7 +72,8 @@ func NewTracker(opts ...Option) *Tracker {
 	// Process our event queue and send them to all the Sinks that are currently listening to us
 	go t.processEvents()
 
-	for i := 0; i < 5; i++ {
+	t.decodingQueueWaiter.Add(t.decodeWorkerCount)
+	for i := 0; i < t.decodeWorkerCount; i++ {
 		go t.decodeQueue()
 	}
 
@@ -126,7 +139,6 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 	plane := t.GetPlane(icao)
 	plane.setLastSeen(frame.TimeStamp())
 	plane.incMsgCount()
-	//plane.MarkFrameTime(frame.timeStamp()) // todo, make this fast!
 
 	debugMessage := func(sfmt string, a ...interface{}) {
 		planeFormat = fmt.Sprintf("DF%02d - \033[0;97mPlane (\033[38;5;118m%s %-8s\033[0;97m)", frame.DownLinkType(), plane.IcaoIdentifierStr(), plane.FlightNumber())
@@ -167,7 +179,7 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 		if frame.VerticalStatusValid() {
 			onGround, _ := frame.OnGround()
 			plane.setGroundStatus(onGround)
-			hasChanged = plane.GroundStatus() != onGround
+			hasChanged = plane.OnGround() != onGround
 		}
 	case 4, 5:
 		hasChanged = true
@@ -398,14 +410,14 @@ func (t *Tracker) HandleSbs1Frame(frame *sbs1.Frame) *Plane {
 }
 
 func (t *Tracker) prunePlanes() {
-	ticker := time.NewTicker(time.Second*10)
+	ticker := time.NewTicker(time.Second * 10)
 	for {
 		select {
 		case <-ticker.C:
-		// prune the planes in the list if they have not been seen > 5 minutes
-		oldest := time.Now().Add(-5 * time.Minute)
+			// prune the planes in the list if they have not been seen > 5 minutes
+			oldest := time.Now().Add(-5 * time.Minute)
 			t.EachPlane(func(p *Plane) bool {
-				if p.lastSeen.Before(oldest) {
+				if p.LastSeen().Before(oldest) {
 					t.planeList.Delete(p.icaoIdentifier)
 
 					// now send an event

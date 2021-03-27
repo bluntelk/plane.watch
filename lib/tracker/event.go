@@ -49,9 +49,11 @@ func (t *Tracker) AddEvent(e Event) {
 
 func (t *Tracker) processEvents() {
 	for e := range t.events {
+		t.sinksLock.RLock()
 		for _, sink := range t.sinks {
 			sink.OnEvent(e)
 		}
+		t.sinksLock.RUnlock()
 	}
 }
 
@@ -68,7 +70,11 @@ func (l *LogEvent) Type() string {
 	return LogEventType
 }
 func (l *LogEvent) String() string {
-	return fmt.Sprintf("%s - %s - %s", l.When.Format(time.Stamp), l.Section, l.Message)
+	if l.Level > LogLevelDebug {
+		l.Level = LogLevelDebug
+	}
+	lvl := Levels[l.Level]
+	return fmt.Sprintf("%s - %s - %s - %s", l.When.Format(time.Stamp), lvl, l.Section, l.Message)
 }
 
 func newPlaneLocationEvent(p *Plane) *PlaneLocationEvent {

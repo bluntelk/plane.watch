@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"errors"
+	"fmt"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
 	"time"
@@ -22,6 +23,7 @@ type (
 	// processes further.
 	// A Producer can send *LogEvent and  *FrameEvent events
 	Producer interface {
+		String() string
 		Listen() chan Event
 		Stop()
 	}
@@ -35,6 +37,7 @@ type (
 )
 
 func (t *Tracker) setVerbosity(logLevel int) {
+	fmt.Printf("Setting Verbosity To %d\n", logLevel)
 	t.logLevel = logLevel
 }
 
@@ -53,7 +56,7 @@ func WithQuietOutput() Option {
 		ih.setVerbosity(LogLevelQuiet)
 	}
 }
-func WithDecodeWorkerCount(numDecodeWorkers uint) Option {
+func WithDecodeWorkerCount(numDecodeWorkers int) Option {
 	return func(ih *Tracker) {
 		ih.decodeWorkerCount = numDecodeWorkers
 	}
@@ -70,32 +73,51 @@ func (t *Tracker) Finish() {
 
 // AddProducer wires up a Producer to start feeding data into the tracker
 func (t *Tracker) AddProducer(p Producer) {
-	t.debugMessage("Adding a producer")
+	if nil == p {
+		return
+	}
+
+	t.debugMessage("Adding producer: %s", p)
 	t.producers = append(t.producers, p)
 	t.producerWaiter.Add(1)
+
 	go func() {
 		for e := range p.Listen() {
+			t.debugMessage("Producer (%s) Made Message: %s", p, e)
 			switch e.(type) {
 			case *FrameEvent:
 				t.decodingQueue <- e.(*FrameEvent).frame
 				// send this event on!
 				t.AddEvent(e)
 			case *LogEvent:
-				t.AddEvent(e)
+				if t.logLevel >= e.(*LogEvent).Level  {
+					t.AddEvent(e)
+				}
 			}
 		}
 		t.producerWaiter.Done()
+		t.debugMessage("Done with producer %s", p)
 	}()
 	t.debugMessage("Just added a producer")
 }
 
 // AddMiddleware wires up a Middleware which each message will go through before being added to the tracker
 func (t *Tracker) AddMiddleware(m Middleware) {
+	if nil == m {
+		return
+	}
+	t.middlewaresLock.Lock()
+	defer t.middlewaresLock.Unlock()
 	t.middlewares = append(t.middlewares, m)
 }
 
 // AddSink wires up a Sink in the tracker. Whenever an event happens it gets sent to each Sink
 func (t *Tracker) AddSink(s Sink) {
+	if nil == s {
+		return
+	}
+	t.sinksLock.Lock()
+	defer t.sinksLock.Unlock()
 	t.sinks = append(t.sinks, s)
 }
 
@@ -103,6 +125,8 @@ func (t *Tracker) AddSink(s Sink) {
 func (t *Tracker) Wait() {
 	t.debugMessage("and we are up and running...")
 	t.producerWaiter.Wait()
+	t.debugMessage("All producers have exited, cleaning up and closing down")
+	t.Finish()
 	t.decodingQueueWaiter.Wait()
 }
 
@@ -113,7 +137,6 @@ func (t *Tracker) handleError(err error) {
 }
 
 func (t *Tracker) decodeQueue() {
-	t.decodingQueueWaiter.Add(1)
 	for f := range t.decodingQueue {
 		ok, err := f.Decode()
 		if nil != err {
@@ -127,9 +150,11 @@ func (t *Tracker) decodeQueue() {
 			continue
 		}
 
+		t.middlewaresLock.RLock()
 		for _, m := range t.middlewares {
 			f = m(f)
 		}
+		t.middlewaresLock.RUnlock()
 
 		switch f.(type) {
 		case *mode_s.Frame:

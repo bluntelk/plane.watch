@@ -1,7 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"github.com/urfave/cli"
+	"os"
+	"plane.watch/lib/producer"
+	"plane.watch/lib/sink"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/mode_s"
 	"sync"
@@ -9,21 +13,23 @@ import (
 )
 
 func parseAvr(c *cli.Context) error {
-	newFrameFunc := func(line string) *tracker.FrameEvent {
-		return tracker.NewFrameEvent(mode_s.NewFrame(line, time.Now()))
+	opts := make([]tracker.Option,0)
+	if c.GlobalBool("verbose") {
+		opts = append(opts, tracker.WithVerboseOutput())
+	} else {
+		opts = append(opts, tracker.WithInfoOutput())
 	}
-	p, err := produceOutput(c, newFrameFunc)
+	out, err := getOutput(c)
 	if nil != err {
-		return err
+		fmt.Println(err)
 	}
 
-	ih := tracker.NewTracker()
-	//ih := tracker.NewTracker(tracker.WithVerboseOutput())
-	ih.AddProducer(p)
+	ih := tracker.NewTracker(opts...)
+	ih.AddProducer(producer.NewAvrFile(getFilePaths(c)))
 	ih.AddMiddleware(timeFiddler)
+	ih.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stderr)))
 	ih.Wait()
-
-	return writeResult(ih, p.outFile)
+	return writeResult(ih, out)
 }
 
 var lastSeenMap sync.Map

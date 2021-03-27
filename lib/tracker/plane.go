@@ -192,26 +192,26 @@ func (p *Plane) String() string {
 	blue := "\033[38;5;122m"
 	red := "\033[38;5;160m"
 
-	id = fmt.Sprintf("%sPlane (%s%s %-8s%s)", white, lime, p.icao, p.flight.identifier, white)
+	id = fmt.Sprintf("%sPlane (%s%s %-8s%s)", white, lime, p.IcaoIdentifierStr(), p.FlightNumber(), white)
 
-	if p.location.onGround {
+	if p.OnGround() {
 		position += " is on the ground."
-	} else if p.location.altitude > 0 {
-		alt = fmt.Sprintf(" %s%d%s %s,", orange, p.location.altitude, white, p.location.altitudeUnits)
+	} else if p.Altitude() > 0 {
+		alt = fmt.Sprintf(" %s%d%s %s,", orange, p.Altitude(), white, p.AltitudeUnits())
 	}
 
-	if p.location.hasLatLon {
-		position += fmt.Sprintf(" %s%+03.13f%s, %s%+03.13f%s,", blue, p.location.latitude, white, blue, p.location.longitude, white)
+	if p.HasLocation() {
+		position += fmt.Sprintf(" %s%+03.13f%s, %s%+03.13f%s,", blue, p.Lat(), white, blue, p.Lon(), white)
 	}
 
-	if p.location.hasHeading {
-		direction += fmt.Sprintf(" heading %s%0.2f%s, speed %s%0.2f%s knots", orange, p.location.heading, white, orange, p.location.velocity, white)
+	if p.HasHeading() {
+		direction += fmt.Sprintf(" heading %s%0.2f%s, speed %s%0.2f%s knots", orange, p.Heading(), white, orange, p.Velocity(), white)
 	}
 
-	strength = fmt.Sprintf(" %0.2f pps", float64(p.recentFrameCount)/10.0)
+	//strength = fmt.Sprintf(" %0.2f pps", float64(p.recentFrameCount)/10.0)
 
 	if "" != p.special {
-		special = " " + red + p.special + white + ", "
+		special = " " + red + p.Special() + white + ", "
 	}
 
 	return id + alt + position + direction + special + strength + "\033[0m"
@@ -257,8 +257,8 @@ func (p *Plane) setGroundStatus(onGround bool) {
 	p.location.onGround = onGround
 }
 
-// GroundStatus tells us where the plane thinks it is (In the sky or on the ground)
-func (p *Plane) GroundStatus() bool {
+// OnGround tells us where the plane thinks it is (In the sky or on the ground)
+func (p *Plane) OnGround() bool {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
 	return p.location.onGround
@@ -464,7 +464,6 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 				p.location.TrackFinished = true
 			}
 		}
-
 	}
 
 	if MaxLocationHistory > 0 && numHistoryItems >= MaxLocationHistory {
@@ -472,6 +471,7 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 	}
 	p.location.latitude = lat
 	p.location.latitude = lon
+	p.location.hasLatLon = true
 	p.locationHistory = append(p.locationHistory, p.location.Copy())
 	return
 }
@@ -479,77 +479,27 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 
 // zeroCpr is called once we have successfully decoded our CPR pair
 func (p *Plane) zeroCpr() {
-	p.rwLock.Lock()
-	defer p.rwLock.Unlock()
-	p.cprLocation.evenLat = 0
-	p.cprLocation.evenLon = 0
-	p.cprLocation.oddLat = 0
-	p.cprLocation.oddLon = 0
-	p.cprLocation.rlat0 = 0
-	p.cprLocation.rlat1 = 0
-	p.cprLocation.time0 = time.Unix(0, 0)
-	p.cprLocation.time1 = time.Unix(0, 0)
-	p.cprLocation.evenFrame = false
-	p.cprLocation.oddFrame = false
+	p.cprLocation.zero(true)
 }
 
 // setCprEvenLocation sets our Even CPR location for LAT/LON decoding
 func (p *Plane) setCprEvenLocation(lat, lon float64, t time.Time) error {
-
-	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
-	if lat > max17Bits || lat < 0 || lon > max17Bits || lon < 0 {
-		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %0.4f,%0.4f", max17Bits, lat, lon)
-	}
-
-	p.cprLocation.evenLat = lat
-	p.cprLocation.evenLon = lon
-	p.cprLocation.time0 = t
-	p.cprLocation.evenFrame = true
-	return nil
+	return p.cprLocation.SetEvenLocation(lat, lon, t)
 }
 
 // setCprOddLocation sets our Even CPR location for LAT/LON decoding
 func (p *Plane) setCprOddLocation(lat, lon float64, t time.Time) error {
-
-	// cpr locations are 17 bits long, if we get a value outside of this then we have a problem
-	if lat > max17Bits || lat < 0 || lon > max17Bits || lon < 0 {
-		return fmt.Errorf("CPR Raw Lat/Lon can be a max of %d, got %0.4f,%0.4f", max17Bits, lat, lon)
-	}
-
-	// only set the odd frame after the even frame is set
-	//if !p.cprLocation.evenFrame {
-	//	return
-	//}
-
-	p.cprLocation.oddLat = lat
-	p.cprLocation.oddLon = lon
-	p.cprLocation.time1 = t
-	p.cprLocation.oddFrame = true
-	return nil
+	return p.cprLocation.SetOddLocation(lat, lon, t)
 }
 
 // decodeCpr decodes the CPR Even and Odd frames and gets our Plane position
 func (p *Plane) decodeCpr(ts time.Time) error {
-
-	if !(p.cprLocation.oddFrame && p.cprLocation.evenFrame) {
-		return nil
-	}
-	// attempt to decode the CPR LAT/LON
-	var loc *PlaneLocation
-	var err error
-
-	if p.location.onGround {
-		//loc, err = p.cprLocation.decodeSurface(p.location.latitude, p.location.longitude)
-	} else {
-		loc, err = p.cprLocation.decodeGlobalAir()
-	}
-
-	if nil != err {
+	loc, err := p.cprLocation.decode(p.OnGround(), ts)
+	if nil != err || loc == nil{
 		return err
 	}
-	p.location.hasLatLon = true
+
 	err = p.addLatLong(loc.latitude, loc.longitude, ts)
-	p.zeroCpr()
 	return err
 }
 

@@ -1,23 +1,28 @@
 package main
 
 import (
+	"fmt"
 	"github.com/urfave/cli"
+	"plane.watch/lib/producer"
 	"plane.watch/lib/tracker"
-	"plane.watch/lib/tracker/sbs1"
 )
 
-func parseSbs(c *cli.Context) error {
-	newFrameFunc := func(line string) *tracker.FrameEvent {
-		return tracker.NewFrameEvent(sbs1.NewFrame(line))
+func parseSbs1(c *cli.Context) error {
+	opts := make([]tracker.Option,0)
+	if c.GlobalBool("verbose") {
+		opts = append(opts, tracker.WithVerboseOutput())
+	} else {
+		opts = append(opts, tracker.WithInfoOutput())
 	}
-	p, err := produceOutput(c, newFrameFunc)
+	out, err := getOutput(c)
 	if nil != err {
-		return err
+		fmt.Println(err)
 	}
 
-	ih := tracker.NewTracker(tracker.WithVerboseOutput())
-	ih.AddProducer(p)
-	ih.Wait()
+	ih := tracker.NewTracker(opts...)
 
-	return writeResult(ih, p.outFile)
+	ih.AddProducer(producer.NewSbs1File(getFilePaths(c)))
+	ih.AddMiddleware(timeFiddler)
+	ih.Wait()
+	return writeResult(ih, out)
 }
