@@ -28,7 +28,7 @@ func main() {
 			Usage:     "Renders all the plane paths found in an AVR file",
 			Action:    parseAvr,
 			ArgsUsage: "[outfile if not --stdout] input-file.txt [input-file.gz [input-file.bz2]]",
-			Before: validateParams,
+			Before:    validateParams,
 		},
 		{
 			Name:      "sbs",
@@ -58,14 +58,22 @@ func main() {
 	app.Before = func(context *cli.Context) error {
 		if context.Bool("profile") {
 
-			f, err := os.Create("cpuprofile")
+			f, err := os.Create("cpuprofile.pprof")
 			if err != nil {
 				return err
 			}
 			if err = pprof.StartCPUProfile(f); err != nil {
 				return err
 			}
-			defer pprof.StopCPUProfile()
+		}
+		return nil
+	}
+
+	app.After = func(context *cli.Context) error {
+		if context.Bool("profile") {
+			pprof.StopCPUProfile()
+			println("To analyze the profile, use this cmd")
+			println("go tool pprof -http=:7777 cpuprofile.pprof")
 		}
 		return nil
 	}
