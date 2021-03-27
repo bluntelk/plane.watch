@@ -535,7 +535,7 @@ func (p *Plane) decodeCpr(ts time.Time) error {
 		return nil
 	}
 	// attempt to decode the CPR LAT/LON
-	var loc PlaneLocation
+	var loc *PlaneLocation
 	var err error
 
 	if p.location.onGround {

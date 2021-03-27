@@ -117,7 +117,7 @@ func (cpr *CprLocation) checkFrameTiming() error {
 	return nil
 }
 
-func (cpr *CprLocation) computeLatLon() (PlaneLocation, error) {
+func (cpr *CprLocation) computeLatLon() (*PlaneLocation, error) {
 	var loc PlaneLocation
 	if cpr.time1.Before(cpr.time0) {
 		//log.Println("Odd Decode")
@@ -149,19 +149,19 @@ func (cpr *CprLocation) computeLatLon() (PlaneLocation, error) {
 	//log.Printf("post normalise rlat = %0.6f, rlon = %0.6f\n", loc.latitude, loc.longitude);
 
 	if loc.latitude < -90 || loc.latitude > 90 {
-		return PlaneLocation{}, fmt.Errorf("Failed to decode CPR Lat %0.13f is out of range", loc.latitude)
+		return &PlaneLocation{}, fmt.Errorf("Failed to decode CPR Lat %0.13f is out of range", loc.latitude)
 	}
 
-	return loc, nil
+	return &loc, nil
 }
 
-func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (PlaneLocation, error) {
+func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (*PlaneLocation, error) {
 	var loc PlaneLocation
 	var err error
 	cpr.globalSurfaceRange = 90.0
 
 	if 0 == refLat && 0 == refLon {
-		return loc, fmt.Errorf("Invalid Reference location")
+		return &loc, fmt.Errorf("Invalid Reference location")
 	}
 
 	// basic check - make sure we have both frames
@@ -172,7 +172,7 @@ func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (PlaneLocation, er
 		} else {
 			s = "Have Even Frame"
 		}
-		return loc, fmt.Errorf("Need both odd and even frames before decoding, %s", s)
+		return &loc, fmt.Errorf("Need both odd and even frames before decoding, %s", s)
 	}
 
 	// Compute the latitude Index "j"
@@ -190,7 +190,7 @@ func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (PlaneLocation, er
 	// If the computed latitude is more than 45 degrees north of
 	// the reference latitude (using the northern hemisphere
 	// solution), then the southern hemisphere solution will be
-	// closer to the refernce latitude.
+	// closer to the reference latitude.
 	//
 	// e.g. reflat=0, rlat=44, use rlat=44
 	//      reflat=0, rlat=46, use rlat=46-90 = -44
@@ -224,21 +224,21 @@ func (cpr *CprLocation) decodeSurface(refLat, refLon float64) (PlaneLocation, er
 
 	// Check to see that the latitude is in range: -90 .. +90
 	if cpr.rlat0 < -90 || cpr.rlat0 > 90 || cpr.rlat1 < -90 || cpr.rlat1 > 90 {
-		return PlaneLocation{}, fmt.Errorf("Failed to decode CPR. Lat out of bounds")
+		return &PlaneLocation{}, fmt.Errorf("Failed to decode CPR. Lat out of bounds")
 	}
 
 	if err = cpr.computeLongitudeZone(); nil != err {
-		return PlaneLocation{}, err
+		return &PlaneLocation{}, err
 	}
 
 	if err = cpr.checkFrameTiming(); nil != err {
-		return PlaneLocation{}, err
+		return &PlaneLocation{}, err
 	}
 
 	return cpr.computeLatLon()
 }
 
-func (cpr *CprLocation) decodeGlobalAir() (PlaneLocation, error) {
+func (cpr *CprLocation) decodeGlobalAir() (*PlaneLocation, error) {
 	var loc PlaneLocation
 	var err error
 
@@ -250,7 +250,7 @@ func (cpr *CprLocation) decodeGlobalAir() (PlaneLocation, error) {
 		} else {
 			s = "Have Even Frame"
 		}
-		return loc, fmt.Errorf("Need both odd and even frames before decoding, %s", s)
+		return &loc, fmt.Errorf("Need both odd and even frames before decoding, %s", s)
 	}
 	cpr.globalSurfaceRange = 360.0
 
@@ -269,11 +269,11 @@ func (cpr *CprLocation) decodeGlobalAir() (PlaneLocation, error) {
 	}
 
 	if err = cpr.computeLongitudeZone(); nil != err {
-		return loc, err
+		return &loc, err
 	}
 
 	if err = cpr.checkFrameTiming(); nil != err {
-		return loc, err
+		return &loc, err
 	}
 
 	return cpr.computeLatLon()
