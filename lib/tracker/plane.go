@@ -461,9 +461,7 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 	if MaxLocationHistory > 0 && numHistoryItems >= MaxLocationHistory {
 		p.locationHistory = p.locationHistory[1:]
 	}
-	locCopy := p.location.Copy()
-	p.locationHistory = append(p.locationHistory, locCopy)
-	p.location = locCopy
+	p.locationHistory = append(p.locationHistory, p.location.Copy())
 	return
 }
 

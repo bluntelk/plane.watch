@@ -270,7 +270,7 @@ func (f *Frame) decodeFlightStatus() {
 		// special pos
 		f.validVerticalStatus = true
 		f.onGround = false // assume in the air
-		f.special = flightStatusTable[f.fs]
+		f.special += flightStatusTable[f.fs]
 	}
 	if f.fs == 2 || f.fs == 3 || f.fs == 4 {
 		// ALERT!

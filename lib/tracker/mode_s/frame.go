@@ -137,6 +137,7 @@ type Frame struct {
 	crc, checkSum  uint32
 	identity       uint32
 	special        string
+	emergency      string
 	alert          bool
 	// if we have trouble decoding our frame, the message ends up here
 	err error
@@ -535,6 +536,13 @@ func (f *Frame) IsEven() bool {
 func (f *Frame) FlightNumber() string {
 	return string(f.flight)
 }
+func (f *Frame) Special() string {
+	return f.special
+}
+func (f *Frame) Emergency() string {
+	return f.emergency
+}
+
 
 // the first character can be * or @ (or left out)
 // if the entire string is then 0's, it's a noop

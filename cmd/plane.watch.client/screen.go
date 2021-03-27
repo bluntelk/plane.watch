@@ -159,7 +159,7 @@ func (d *display) OnEvent(e tracker.Event) {
 		} else {
 			d.planes.Store(ple.Plane().IcaoIdentifier(), ple.Plane())
 		}
-		d.drawTable()
+		//d.drawTable()
 
 	case *tracker.FrameEvent:
 		// show the received frame

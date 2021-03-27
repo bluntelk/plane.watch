@@ -335,7 +335,9 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 		case mode_s.DF17FrameEmergencyPriority: //, "Extended Squitter Aircraft status (Emergency)":
 			{
 				debugMessage("\033[2m %s\033[0m", messageType)
-				plane.setSpecial("Emergency")
+				if frame.Alert() {
+					plane.setSpecial(frame.Special() + " " + frame.Emergency())
+				}
 				plane.setSquawkIdentity(frame.SquawkIdentity())
 				hasChanged = true
 				break
@@ -400,7 +402,7 @@ func (t *Tracker) HandleSbs1Frame(frame *sbs1.Frame) *Plane {
 }
 
 func (t *Tracker) prunePlanes() {
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(time.Second*10)
 	for {
 		select {
 		case <-ticker.C:

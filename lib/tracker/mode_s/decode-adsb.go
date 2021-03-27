@@ -181,7 +181,7 @@ func (f *Frame) decodeAdsb() {
 			f.decodeSquawkIdentity(5, 6)
 			var emergencyId = int((f.message[5] & 0xe0) >> 5)
 			f.alert = emergencyId != 0
-			f.special = emergencyStateTable[emergencyId]
+			f.emergency = emergencyStateTable[emergencyId]
 
 			// can get the Mode A Address too
 			//mode_a_code = (short) (msg[2]|((msg[1]&0x1F)<<8));
