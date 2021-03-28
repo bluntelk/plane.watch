@@ -14,8 +14,10 @@ import (
 
 func parseAvr(c *cli.Context) error {
 	opts := make([]tracker.Option,0)
+	var verbose bool
 	if c.GlobalBool("verbose") {
 		opts = append(opts, tracker.WithVerboseOutput())
+		verbose=true
 	} else {
 		opts = append(opts, tracker.WithInfoOutput())
 	}
@@ -24,12 +26,14 @@ func parseAvr(c *cli.Context) error {
 		fmt.Println(err)
 	}
 
-	ih := tracker.NewTracker(opts...)
-	ih.AddProducer(producer.NewAvrFile(getFilePaths(c)))
-	ih.AddMiddleware(timeFiddler)
-	ih.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stderr)))
-	ih.Wait()
-	return writeResult(ih, out)
+	trk := tracker.NewTracker(opts...)
+	trk.AddMiddleware(timeFiddler)
+	if verbose {
+		trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stderr)))
+	}
+	trk.AddProducer(producer.NewAvrFile(getFilePaths(c)))
+	trk.Wait()
+	return writeResult(trk, out)
 }
 
 var lastSeenMap sync.Map

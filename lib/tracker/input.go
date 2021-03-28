@@ -40,23 +40,29 @@ func (t *Tracker) setVerbosity(logLevel int) {
 }
 
 func WithVerboseOutput() Option {
-	return func(ih *Tracker) {
-		ih.setVerbosity(LogLevelDebug)
+	return func(t *Tracker) {
+		t.setVerbosity(LogLevelDebug)
 	}
 }
 func WithInfoOutput() Option {
-	return func(ih *Tracker) {
-		ih.setVerbosity(LogLevelInfo)
+	return func(t *Tracker) {
+		t.setVerbosity(LogLevelInfo)
 	}
 }
 func WithQuietOutput() Option {
-	return func(ih *Tracker) {
-		ih.setVerbosity(LogLevelQuiet)
+	return func(t *Tracker) {
+		t.setVerbosity(LogLevelQuiet)
 	}
 }
 func WithDecodeWorkerCount(numDecodeWorkers int) Option {
-	return func(ih *Tracker) {
-		ih.decodeWorkerCount = numDecodeWorkers
+	return func(t *Tracker) {
+		t.decodeWorkerCount = numDecodeWorkers
+	}
+}
+func WithPruneTiming(pruneTick, pruneAfter time.Duration) Option {
+	return func(t *Tracker) {
+		t.pruneTick = pruneTick
+		t.pruneAfter = pruneAfter
 	}
 }
 

@@ -21,7 +21,12 @@ type (
 		logs      io.Writer
 		planeList sync.Map
 
+		// configurable options
 		logLevel int
+
+		// pruneTick is how long between pruning attempts
+		// pruneAfter is how long we wait from the last message before we remove it from the tracker
+		pruneTick, pruneAfter time.Duration
 
 		// Input Handling
 		producers       []Producer
@@ -42,6 +47,7 @@ type (
 		pruneExitChan chan bool
 	}
 )
+
 var (
 	Levels = [4]string{
 		"Quiet",
@@ -49,20 +55,21 @@ var (
 		"Info",
 		"Debug",
 	}
-
 )
 
 // NewTracker creates a new tracker with which we can populate with plane tracking data
 func NewTracker(opts ...Option) *Tracker {
 	t := &Tracker{
-		logs:          io.Discard,
-		logLevel:      LogLevelQuiet,
-		producers:     []Producer{},
-		middlewares:   []Middleware{},
+		logs:              io.Discard,
+		logLevel:          LogLevelQuiet,
+		producers:         []Producer{},
+		middlewares:       []Middleware{},
 		decodeWorkerCount: 5,
-		decodingQueue: make(chan Frame, 1000), // a nice deep buffer
-		events:        make(chan Event, 1000),
-		pruneExitChan: make(chan bool),
+		pruneTick:         10 * time.Second,
+		pruneAfter:        5 * time.Minute,
+		decodingQueue:     make(chan Frame, 1000), // a nice deep buffer
+		events:            make(chan Event, 1000),
+		pruneExitChan:     make(chan bool),
 	}
 
 	for _, opt := range opts {
@@ -410,12 +417,12 @@ func (t *Tracker) HandleSbs1Frame(frame *sbs1.Frame) *Plane {
 }
 
 func (t *Tracker) prunePlanes() {
-	ticker := time.NewTicker(time.Second * 10)
+	ticker := time.NewTicker(t.pruneTick)
 	for {
 		select {
 		case <-ticker.C:
 			// prune the planes in the list if they have not been seen > 5 minutes
-			oldest := time.Now().Add(-5 * time.Minute)
+			oldest := time.Now().Add(-t.pruneAfter)
 			t.EachPlane(func(p *Plane) bool {
 				if p.LastSeen().Before(oldest) {
 					t.planeList.Delete(p.icaoIdentifier)

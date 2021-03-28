@@ -200,6 +200,7 @@ func (d *display) OnEvent(e tracker.Event) {
 		d.App().QueueUpdate(func() {
 			ple := e.(*tracker.PlaneLocationEvent)
 			if ple.Removed() {
+				_, _ = fmt.Fprintln(d.bottom, "Remove Plane", ple.Plane())
 				d.top.RemoveRow(d.getPlaneRow(ple.Plane().IcaoIdentifier()))
 				d.planes.Delete(ple.Plane().IcaoIdentifier())
 			} else {
@@ -214,6 +215,8 @@ func (d *display) OnEvent(e tracker.Event) {
 	case *pacerEvent:
 		// cleanup our planes list
 		d.App().QueueUpdate(func() {
+			//_, _ = fmt.Fprintln(d.bottom, "Pacer Tick")
+
 			d.updateAgeColumn()
 		})
 		//d.drawTable()

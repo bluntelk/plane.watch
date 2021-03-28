@@ -19,10 +19,10 @@ func parseSbs1(c *cli.Context) error {
 		fmt.Println(err)
 	}
 
-	ih := tracker.NewTracker(opts...)
+	trk := tracker.NewTracker(opts...)
 
-	ih.AddProducer(producer.NewSbs1File(getFilePaths(c)))
-	ih.AddMiddleware(timeFiddler)
-	ih.Wait()
-	return writeResult(ih, out)
+	trk.AddProducer(producer.NewSbs1File(getFilePaths(c)))
+	trk.AddMiddleware(timeFiddler)
+	trk.Wait()
+	return writeResult(trk, out)
 }

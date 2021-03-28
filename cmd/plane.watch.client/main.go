@@ -62,7 +62,7 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:        "dump1090_host",
-			Value:       "localhost",
+			Value:       "",
 			Usage:       "The host to read dump1090 from",
 			Destination: &dump1090Host,
 			EnvVar:      "DUMP1090_HOST",
@@ -73,6 +73,11 @@ func main() {
 			Usage:       "The port to read dump1090 from",
 			Destination: &dump1090Port,
 			EnvVar:      "DUMP1090_PORT",
+		},
+		cli.StringFlag{
+			Name:        "avr-file",
+			Value:       "",
+			Usage:       "A file to read AVR frames from",
 		},
 		cli.BoolFlag{
 			Name:        "debug",
@@ -146,7 +151,12 @@ func run(c *cli.Context) error {
 		)
 	}
 
-	trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
+	if "" != dump1090Host {
+		trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
+	}
+	if file := c.GlobalString("avr-file"); "" != file {
+		trk.AddProducer(producer.NewAvrFile([]string{file}))
+	}
 	err = app.Run()
 	trk.Stop()
 	return err
