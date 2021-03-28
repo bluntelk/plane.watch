@@ -106,9 +106,21 @@ func main() {
 }
 
 func runSimple(c *cli.Context) error {
-	trk := tracker.NewTracker(tracker.WithVerboseOutput())
-	trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
-	trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
+	opts := make([]tracker.Option, 0)
+	if c.GlobalBool("debug") {
+		opts = append(opts, tracker.WithVerboseOutput())
+	} else {
+		opts = append(opts, tracker.WithInfoOutput())
+	}
+	trk := tracker.NewTracker(opts...)
+	//trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
+	trk.AddSink(sink.NewLoggerSink(sink.WithLogFile("app.log")))
+	if "" != dump1090Host {
+		trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
+	}
+	if file := c.GlobalString("avr-file"); "" != file {
+		trk.AddProducer(producer.NewAvrFile([]string{file}))
+	}
 
 	trk.Wait()
 	return nil

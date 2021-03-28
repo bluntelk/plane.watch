@@ -33,7 +33,6 @@ type (
 		middlewares     []Middleware
 		middlewaresLock sync.RWMutex
 		sinks           []Sink
-		sinksLock       sync.RWMutex
 
 		producerWaiter sync.WaitGroup
 

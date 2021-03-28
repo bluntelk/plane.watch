@@ -49,11 +49,9 @@ func (t *Tracker) AddEvent(e Event) {
 
 func (t *Tracker) processEvents() {
 	for e := range t.events {
-		t.sinksLock.RLock()
 		for _, sink := range t.sinks {
-			sink.OnEvent(e)
+			go sink.OnEvent(e)
 		}
-		t.sinksLock.RUnlock()
 	}
 }
 

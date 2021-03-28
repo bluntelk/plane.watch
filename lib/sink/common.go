@@ -1,6 +1,9 @@
 package sink
 
-import "io"
+import (
+	"io"
+	"os"
+)
 
 type (
 	Config struct {
@@ -29,5 +32,16 @@ func WithQueue(queue string) Option {
 func WithLogOutput(out io.Writer) Option {
 	return func(config *Config) {
 		config.out = out
+	}
+}
+
+func WithLogFile(file string) Option {
+	return func(config *Config) {
+		f, err := os.Create(file)
+		if nil != err {
+			println("Cannot open file: ", file)
+			return
+		}
+		config.out = f
 	}
 }

@@ -119,8 +119,6 @@ func (t *Tracker) AddSink(s Sink) {
 	if nil == s {
 		return
 	}
-	t.sinksLock.Lock()
-	defer t.sinksLock.Unlock()
 	t.sinks = append(t.sinks, s)
 }
 

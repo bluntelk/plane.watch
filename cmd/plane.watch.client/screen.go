@@ -133,12 +133,15 @@ func (d *display) getPlaneRow(icao uint32) int {
 }
 func (d *display) drawTable() {
 	icaoList := d.sortedPlaneIdSlice()
-
+	if d.top.GetRowCount() != len(icaoList)+1 {
+		d.top.Clear()
+	}
 	row := 0
 	for _, icao := range icaoList {
 		row++
 		d.drawRow(icao, row)
 	}
+	d.top.ScrollToBeginning()
 }
 
 func (d *display) drawRow(icao uint32, row int) {
@@ -200,12 +203,12 @@ func (d *display) OnEvent(e tracker.Event) {
 		d.App().QueueUpdate(func() {
 			ple := e.(*tracker.PlaneLocationEvent)
 			if ple.Removed() {
-				_, _ = fmt.Fprintln(d.bottom, "Remove Plane", ple.Plane())
-				d.top.RemoveRow(d.getPlaneRow(ple.Plane().IcaoIdentifier()))
+				//_, _ = fmt.Fprintln(d.bottom, "Remove Plane", ple.Plane())
+				//d.top.RemoveRow(d.getPlaneRow(ple.Plane().IcaoIdentifier()))
 				d.planes.Delete(ple.Plane().IcaoIdentifier())
 			} else {
 				d.planes.Store(ple.Plane().IcaoIdentifier(), ple.Plane())
-				d.drawRow(ple.Plane().IcaoIdentifier(), d.getPlaneRow(ple.Plane().IcaoIdentifier()))
+				//d.drawRow(ple.Plane().IcaoIdentifier(), d.getPlaneRow(ple.Plane().IcaoIdentifier()))
 			}
 		})
 		//d.drawTable()
@@ -218,6 +221,9 @@ func (d *display) OnEvent(e tracker.Event) {
 			//_, _ = fmt.Fprintln(d.bottom, "Pacer Tick")
 
 			d.updateAgeColumn()
+			if time.Now().Second() %6 ==0 {
+				d.drawTable()
+			}
 		})
 		//d.drawTable()
 	}
