@@ -110,8 +110,8 @@ func TestBeastAvrTimestampDecode112BitModeS(t *testing.T) {
 		t.Errorf("Failed to decode frame: %s", err)
 	}
 
-	if raw != frame.full + ";"{
-		t.Errorf("Failed to se the correct full frame")
+	if raw != frame.full {
+		t.Errorf("Failed to set the correct full frame. want: %s, got: %s", raw, frame.full)
 	}
 	if "MLAT" != frame.mode {
 		t.Errorf("Failed to identify frame as Beast AVR")

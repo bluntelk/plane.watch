@@ -13,12 +13,11 @@ func TestTracking(t *testing.T) {
 		"*8D40621D58C382D690C8AC2863A7;",
 		"*8D40621D58C386435CC412692AD6;",
 	}
-	performTrackingTest(frames, t)
+	trk := performTrackingTest(frames, t)
 
-	trk := tracker.NewTracker()
 	plane := trk.GetPlane(4219421)
-	if plane.Altitude() != 38000 {
-		t.Error("Plane should be at 38000 feet")
+	if alt := plane.Altitude(); alt != 38000 {
+		t.Errorf("Plane should be at 38000 feet, was %d", alt)
 	}
 
 	lat := "+52.2572021484375"
@@ -63,10 +62,11 @@ func TestTracking2(t *testing.T) {
 		"*8D7C7DAA9914670900080D9576E0;",
 		"*000005084A3646;",
 	}
-	performTrackingTest(frames, t)
+	performTrackingTest(frames, t).Finish()
+
 }
 
-func performTrackingTest(frames []string, t *testing.T) {
+func performTrackingTest(frames []string, t *testing.T) * tracker.Tracker{
 	trk := tracker.NewTracker()
 	for _, msg := range frames {
 		frame, err := mode_s.DecodeString(msg, time.Now())
@@ -75,6 +75,7 @@ func performTrackingTest(frames []string, t *testing.T) {
 		}
 		trk.HandleModeSFrame(frame)
 	}
+	return trk
 }
 
 func TestAltitudeDecode(t *testing.T) {

@@ -61,7 +61,7 @@ func NewAvrFetcher(host, port string) tracker.Producer {
 				p.addError(err)
 			}
 		}
-		p.addDebug("Done with Producer", p)
+		p.addDebug("Done with Producer %s", p)
 		p.Cleanup()
 	}()
 
