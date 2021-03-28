@@ -130,6 +130,7 @@ type Frame struct {
 	// beastTicksNs is the number of nanoseconds since the beast was turned on
 	beastTicksNs   uint64
 	beastAvrUptime time.Duration
+	// raw is our semi processed string, full is the original string
 	raw, full      string
 	message        []byte
 	downLinkFormat byte // Down link Format (DF)
@@ -551,7 +552,10 @@ func (f *Frame) isNoOp() bool {
 	if "" == f.raw {
 		return true
 	}
-	return noopRw.MatchString(f.full)
+	if len(f.raw) > 16 { // if we have a frame that is at least the right size, it is not a heart beat
+		return false
+	}
+	return noopRw.MatchString(f.raw)
 }
 
 /**
