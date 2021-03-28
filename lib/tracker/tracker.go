@@ -31,7 +31,6 @@ type (
 		// Input Handling
 		producers       []Producer
 		middlewares     []Middleware
-		middlewaresLock sync.RWMutex
 		sinks           []Sink
 
 		producerWaiter sync.WaitGroup

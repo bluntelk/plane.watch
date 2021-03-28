@@ -109,8 +109,6 @@ func (t *Tracker) AddMiddleware(m Middleware) {
 	if nil == m {
 		return
 	}
-	t.middlewaresLock.Lock()
-	defer t.middlewaresLock.Unlock()
 	t.middlewares = append(t.middlewares, m)
 }
 
@@ -158,11 +156,9 @@ func (t *Tracker) decodeQueue() {
 			continue
 		}
 
-		t.middlewaresLock.RLock()
 		for _, m := range t.middlewares {
 			f = m(f)
 		}
-		t.middlewaresLock.RUnlock()
 
 		switch f.(type) {
 		case *mode_s.Frame:
