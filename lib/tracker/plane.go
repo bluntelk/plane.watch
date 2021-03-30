@@ -494,7 +494,7 @@ func (p *Plane) setCprOddLocation(lat, lon float64, t time.Time) error {
 
 // decodeCpr decodes the CPR Even and Odd frames and gets our Plane position
 func (p *Plane) decodeCpr(ts time.Time) error {
-	loc, err := p.cprLocation.decode(p.OnGround(), ts)
+	loc, err := p.cprLocation.decode(p.OnGround())
 	if nil != err || loc == nil{
 		return err
 	}
