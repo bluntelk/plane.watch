@@ -105,6 +105,7 @@ func main() {
 			Name:   "simple",
 			Usage:  "Gather ADSB data and sends it to plane.watch",
 			Action: runSimple,
+			ArgsUsage: "[app.log - A file name to output to or stdout if not specified]",
 		},
 	}
 
@@ -121,8 +122,13 @@ func runSimple(c *cli.Context) error {
 		opts = append(opts, tracker.WithInfoOutput())
 	}
 	trk := tracker.NewTracker(opts...)
-	trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
-	//trk.AddSink(sink.NewLoggerSink(sink.WithLogFile("app.log")))
+	if c.NArg() > 0 {
+		// output to the file item as a file
+		trk.AddSink(sink.NewLoggerSink(sink.WithLogFile(c.Args()[0])))
+	} else {
+		trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
+	}
+
 	if "" != dump1090Host {
 		trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
 	}

@@ -48,11 +48,13 @@ func (t *Tracker) AddEvent(e Event) {
 }
 
 func (t *Tracker) processEvents() {
+	t.eventsWaiter.Add(1)
 	for e := range t.events {
 		for _, sink := range t.sinks {
-			go sink.OnEvent(e)
+			sink.OnEvent(e)
 		}
 	}
+	t.eventsWaiter.Done()
 }
 
 func NewLogEvent(level int, section, msg string) *LogEvent {

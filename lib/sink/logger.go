@@ -1,6 +1,7 @@
 package sink
 
 import (
+	"bufio"
 	"fmt"
 	"plane.watch/lib/tracker"
 )
@@ -8,22 +9,29 @@ import (
 type (
 	LoggerSink struct {
 		Config
+		bufOut *bufio.Writer
 	}
 )
 
 func NewLoggerSink(opts ...Option) *LoggerSink {
-	r := &LoggerSink{}
+	l := &LoggerSink{}
 	for _, opt := range opts {
-		opt(&r.Config)
+		opt(&l.Config)
 	}
-	return r
+	l.bufOut = bufio.NewWriter(l.out)
+	return l
+}
+
+func (l *LoggerSink) Finish() {
+	_ = l.bufOut.Flush()
+	l.Config.Finish()
 }
 
 func (l *LoggerSink) OnEvent(e tracker.Event) {
 	switch e.(type) {
 	case *tracker.LogEvent:
-		_, _ = fmt.Fprintln(l.out, e.String())
+		_, _ = fmt.Fprintln(l.bufOut, e.String())
 	case *tracker.PlaneLocationEvent:
-		_, _ = fmt.Fprintln(l.out, e.String())
+		_, _ = fmt.Fprintln(l.bufOut, e.String())
 	}
 }

@@ -29,6 +29,7 @@ type (
 
 	Sink interface {
 		OnEvent(Event)
+		Finish()
 	}
 
 	// a Middleware has a chance to modify a frame before we send it to the plane Tracker
@@ -81,6 +82,14 @@ func (t *Tracker) Finish() {
 	}
 	close(t.decodingQueue)
 	t.pruneExitChan <- true
+	t.eventSync.Lock()
+	t.eventsOpen = false
+	t.eventSync.Unlock()
+
+	close(t.events)
+	for _, s := range t.sinks {
+		s.Finish()
+	}
 }
 
 // AddProducer wires up a Producer to start feeding data into the tracker
@@ -134,14 +143,17 @@ func (t *Tracker) Stop() {
 	t.Finish()
 	t.producerWaiter.Wait()
 	t.decodingQueueWaiter.Wait()
+	t.eventsWaiter.Wait()
 }
 
 // Wait waits for all producers to stop producing input and then returns
 // use this method if you are processing a file
 func (t *Tracker) Wait() {
 	t.producerWaiter.Wait()
+	time.Sleep(time.Millisecond*50)
 	t.Finish()
 	t.decodingQueueWaiter.Wait()
+	t.eventsWaiter.Wait()
 }
 
 func (t *Tracker) handleError(err error) {

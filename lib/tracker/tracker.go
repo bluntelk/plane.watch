@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"fmt"
-	"io"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
 	"sync"
@@ -18,7 +17,6 @@ const (
 
 type (
 	Tracker struct {
-		logs      io.Writer
 		planeList sync.Map
 
 		// configurable options
@@ -29,9 +27,9 @@ type (
 		pruneTick, pruneAfter time.Duration
 
 		// Input Handling
-		producers       []Producer
-		middlewares     []Middleware
-		sinks           []Sink
+		producers   []Producer
+		middlewares []Middleware
+		sinks       []Sink
 
 		producerWaiter sync.WaitGroup
 
@@ -39,6 +37,8 @@ type (
 		decodingQueue       chan Frame
 		decodingQueueWaiter sync.WaitGroup
 
+		eventSync    sync.Mutex
+		eventsOpen   bool
 		events       chan Event
 		eventsWaiter sync.WaitGroup
 
@@ -60,7 +60,6 @@ var (
 // NewTracker creates a new tracker with which we can populate with plane tracking data
 func NewTracker(opts ...Option) *Tracker {
 	t := &Tracker{
-		logs:              io.Discard,
 		logLevel:          LogLevelQuiet,
 		producers:         []Producer{},
 		middlewares:       []Middleware{},
@@ -68,7 +67,8 @@ func NewTracker(opts ...Option) *Tracker {
 		pruneTick:         10 * time.Second,
 		pruneAfter:        5 * time.Minute,
 		decodingQueue:     make(chan Frame, 1000), // a nice deep buffer
-		events:            make(chan Event, 1000),
+		events:            make(chan Event, 10000),
+		eventsOpen:        true,
 		pruneExitChan:     make(chan bool),
 	}
 

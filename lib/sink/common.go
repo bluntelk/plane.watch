@@ -3,6 +3,7 @@ package sink
 import (
 	"io"
 	"os"
+	"sync"
 )
 
 type (
@@ -11,7 +12,8 @@ type (
 		secure bool
 		queue string
 
-		out io.Writer
+		out io.WriteCloser
+		waiter sync.WaitGroup
 	}
 	Option func(*Config)
 )
@@ -29,7 +31,7 @@ func WithQueue(queue string) Option {
 	}
 }
 
-func WithLogOutput(out io.Writer) Option {
+func WithLogOutput(out io.WriteCloser) Option {
 	return func(config *Config) {
 		config.out = out
 	}
@@ -44,4 +46,9 @@ func WithLogFile(file string) Option {
 		}
 		config.out = f
 	}
+}
+
+func (c *Config) Finish() {
+	c.waiter.Wait()
+	_ = c.out.Close()
 }

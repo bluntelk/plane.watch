@@ -188,6 +188,9 @@ func (d *display) updateAgeColumn() {
 	}
 }
 
+func (d *display) Finish() {
+
+}
 func (d *display) OnEvent(e tracker.Event) {
 	switch e.(type) {
 	case *tracker.LogEvent:

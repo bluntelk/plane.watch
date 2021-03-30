@@ -5,10 +5,15 @@ import (
 	"compress/bzip2"
 	"compress/gzip"
 	"fmt"
+	"io"
+	"math/rand"
+	"net"
 	"os"
 	"plane.watch/lib/tracker"
+	"plane.watch/lib/tracker/mode_s"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -72,12 +77,14 @@ func (p *producer) AddEvent(e tracker.Event) {
 func (p *producer) Cleanup() {
 	p.outLocker.Lock()
 	defer p.outLocker.Unlock()
+	if p.outClosed {
+		return
+	}
 	p.outClosed=true
 	close(p.out)
 }
 
-func (p *producer) readFiles(dataFiles []string) chan string {
-	fileLines := make(chan string)
+func (p *producer) readFiles(dataFiles []string, read func(io.Reader) error) {
 	var err error
 	var inFile *os.File
 	var gzipFile *gzip.Reader
@@ -94,28 +101,99 @@ func (p *producer) readFiles(dataFiles []string) chan string {
 			isBzip2 := strings.ToLower(inFileName[len(inFileName)-3:]) == "bz2"
 			p.addDebug("Is Gzip? %t Is Bzip2? %t", isGzip, isBzip2)
 
-			var scanner *bufio.Scanner
 			if isGzip {
 				gzipFile, err = gzip.NewReader(inFile)
 				if nil != err {
-					p.addError(err)
-					continue
+					err = read(gzipFile)
 				}
-				scanner = bufio.NewScanner(gzipFile)
+				err = read(gzipFile)
 			} else if isBzip2 {
 				bzip2File := bzip2.NewReader(inFile)
-				scanner = bufio.NewScanner(bzip2File)
+				err = read(bzip2File)
 			} else {
-				scanner = bufio.NewScanner(inFile)
+				err = read(inFile)
 			}
-			for scanner.Scan() {
-				fileLines <- scanner.Text()
+			if nil != err {
+				p.addError(err)
 			}
 			_ = inFile.Close()
 			p.addDebug("Finished with file %s", inFileName)
 		}
-		close(fileLines)
 		p.addDebug("Done loading lines")
+		p.Cleanup()
 	}()
-	return fileLines
+
+
+	go func() {
+		for cmd := range p.cmdChan {
+			switch cmd {
+			case cmdExit:
+				return
+			}
+		}
+	}()
+}
+
+func (p *producer) fetcher(host, port string, read func(net.Conn) error) {
+	var conn net.Conn
+	var wLock sync.RWMutex
+	working := true
+
+	isWorking := func () bool {
+		wLock.RLock()
+		defer wLock.RUnlock()
+		return working
+	}
+
+	go func() {
+		var backOff = time.Second
+		var err error
+		for isWorking() {
+			p.addDebug("We are working!")
+			wLock.Lock()
+			conn, err = net.Dial("tcp", net.JoinHostPort(host, port))
+			wLock.Unlock()
+			if nil != err {
+				p.addError(err)
+				time.Sleep(backOff)
+				backOff = backOff * 2 + ((time.Duration(rand.Intn(20)) * time.Millisecond * 100) - time.Second)
+				if backOff > time.Minute {
+					backOff = time.Minute
+				}
+				continue
+			}
+			p.addDebug("Connected!")
+			backOff = time.Second
+
+			err = read(conn)
+			scan := bufio.NewScanner(conn)
+			for scan.Scan() {
+				line := scan.Text()
+				p.addFrame(mode_s.NewFrame(line, time.Now()))
+				p.addDebug("AVR Frame: %s", line)
+			}
+			if err = scan.Err(); nil != err {
+				p.addError(err)
+			}
+		}
+		p.addDebug("Done with Producer %s", p)
+		p.Cleanup()
+	}()
+
+	go func() {
+		for cmd := range p.cmdChan {
+			switch cmd {
+			case cmdExit:
+				p.addDebug("Got Cmd Exit")
+				wLock.Lock()
+				working = false
+				if nil != conn {
+					_ = conn.Close()
+				}
+				wLock.Unlock()
+				return
+			}
+		}
+	}()
+
 }

@@ -1,6 +1,8 @@
 package producer
 
 import (
+	"bufio"
+	"io"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/sbs1"
 )
@@ -8,12 +10,17 @@ import (
 func NewSbs1File(filePaths []string) tracker.Producer {
 	p := NewProducer("AVR File")
 
-	go func() {
-		for line := range p.readFiles(filePaths) {
-			p.AddEvent(tracker.NewFrameEvent(sbs1.NewFrame(line)))
+	p.readFiles(filePaths, func(reader io.Reader) error {
+		var count uint64
+		scanner := bufio.NewScanner(reader)
+		for scanner.Scan() {
+			count++
+			p.AddEvent(tracker.NewFrameEvent(sbs1.NewFrame(scanner.Text())))
 		}
-		p.Cleanup()
-	}()
+		p.addInfo("We processed %d lines", count)
+		return scanner.Err()
+
+	})
 
 	return p
 }
