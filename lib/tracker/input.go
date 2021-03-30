@@ -66,6 +66,14 @@ func WithPruneTiming(pruneTick, pruneAfter time.Duration) Option {
 	}
 }
 
+// WithReferenceLatLon sets up the reference lat/lon for decoding surface position messages
+func WithReferenceLatLon(lat, lon float64) Option {
+	return func(t *Tracker) {
+		t.refLat = lat
+		t.refLon = lon
+	}
+}
+
 // Finish begins the ending of the tracking by closing our decoding queue
 func (t *Tracker) Finish() {
 	for _, p := range t.producers {

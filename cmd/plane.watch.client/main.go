@@ -79,6 +79,14 @@ func main() {
 			Value:       "",
 			Usage:       "A file to read AVR frames from",
 		},
+		cli.Float64Flag{
+			Name:        "ref-lat",
+			Usage:       "The reference latitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
+		},
+		cli.Float64Flag{
+			Name:        "ref-lon",
+			Usage:       "The reference longitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
+		},
 		cli.BoolFlag{
 			Name:        "debug",
 			Usage:       "Show Extra Debug Information",
@@ -113,8 +121,8 @@ func runSimple(c *cli.Context) error {
 		opts = append(opts, tracker.WithInfoOutput())
 	}
 	trk := tracker.NewTracker(opts...)
-	//trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
-	trk.AddSink(sink.NewLoggerSink(sink.WithLogFile("app.log")))
+	trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
+	//trk.AddSink(sink.NewLoggerSink(sink.WithLogFile("app.log")))
 	if "" != dump1090Host {
 		trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
 	}
@@ -139,6 +147,12 @@ func run(c *cli.Context) error {
 	} else {
 		opts = append(opts, tracker.WithInfoOutput())
 	}
+	refLat := c.GlobalFloat64("refLat")
+	refLon := c.GlobalFloat64("refLon")
+	if refLat != 0 && refLon != 0 {
+		opts = append(opts, tracker.WithReferenceLatLon(refLat, refLon))
+	}
+
 	trk := tracker.NewTracker(opts...)
 	trk.AddSink(app)
 	f, err := os.Create("app.log")
@@ -147,14 +161,14 @@ func run(c *cli.Context) error {
 	}
 	trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(f)))
 
-	if "" != c.String("redis-host") {
+	if "" != c.GlobalString("redis-host") {
 		trk.AddSink(
 			sink.NewRedisSink(
 				sink.WithHost(c.String("redis-host"), c.String("redis-port")),
 			),
 		)
 	}
-	if "" != c.String("rabbit-host") {
+	if "" != c.GlobalString("rabbit-host") {
 		trk.AddSink(
 			sink.NewRabbitMqSink(
 				sink.WithHost(c.String("rabbit-host"), c.String("rabbit-port")),
@@ -162,6 +176,7 @@ func run(c *cli.Context) error {
 			),
 		)
 	}
+
 
 	if "" != dump1090Host {
 		trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))

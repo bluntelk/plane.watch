@@ -43,6 +43,8 @@ type (
 		eventsWaiter sync.WaitGroup
 
 		pruneExitChan chan bool
+
+		refLat, refLon float64
 	}
 )
 
@@ -259,7 +261,7 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 				} else {
 					_ = plane.setCprOddLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
 				}
-				if err := plane.decodeCpr(frame.TimeStamp()); nil != err {
+				if err := plane.decodeCpr(t.refLat, t.refLon, frame.TimeStamp()); nil != err {
 					debugMessage("%s", err)
 				}
 				plane.setLocationUpdateTime(frame.TimeStamp())
@@ -285,7 +287,7 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 
 				altitude, _ := frame.Altitude()
 				plane.setAltitude(altitude, frame.AltitudeUnits())
-				if err := plane.decodeCpr(frame.TimeStamp()); nil != err {
+				if err := plane.decodeCpr(t.refLat, t.refLon, frame.TimeStamp()); nil != err {
 					debugMessage("%s", err)
 				}
 
