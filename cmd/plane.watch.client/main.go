@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/urfave/cli"
 	"os"
@@ -79,6 +80,11 @@ func main() {
 			Value:       "",
 			Usage:       "A file to read AVR frames from",
 		},
+		cli.StringFlag{
+			Name:        "beast-file",
+			Value:       "",
+			Usage:       "A file to read beast format AVR frames from",
+		},
 		cli.Float64Flag{
 			Name:        "ref-lat",
 			Usage:       "The reference latitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
@@ -114,39 +120,7 @@ func main() {
 	}
 }
 
-func runSimple(c *cli.Context) error {
-	opts := make([]tracker.Option, 0)
-	if c.GlobalBool("debug") {
-		opts = append(opts, tracker.WithVerboseOutput())
-	} else {
-		opts = append(opts, tracker.WithInfoOutput())
-	}
-	trk := tracker.NewTracker(opts...)
-	if c.NArg() > 0 {
-		// output to the file item as a file
-		trk.AddSink(sink.NewLoggerSink(sink.WithLogFile(c.Args()[0])))
-	} else {
-		trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
-	}
-
-	if "" != dump1090Host {
-		trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
-	}
-	if file := c.GlobalString("avr-file"); "" != file {
-		trk.AddProducer(producer.NewAvrFile([]string{file}))
-	}
-
-	trk.Wait()
-	return nil
-}
-
-// run is our method for running things
-func run(c *cli.Context) error {
-	app, err := newAppDisplay()
-	if nil != err {
-		return err
-	}
-
+func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	opts := make([]tracker.Option, 0)
 	if c.GlobalBool("debug") {
 		opts = append(opts, tracker.WithVerboseOutput())
@@ -160,12 +134,6 @@ func run(c *cli.Context) error {
 	}
 
 	trk := tracker.NewTracker(opts...)
-	trk.AddSink(app)
-	f, err := os.Create("app.log")
-	if nil != err {
-		return err
-	}
-	trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(f)))
 
 	if "" != c.GlobalString("redis-host") {
 		trk.AddSink(
@@ -185,11 +153,50 @@ func run(c *cli.Context) error {
 
 
 	if "" != dump1090Host {
-		trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
+		switch dump1090Port {
+		case "30002":
+			trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
+		case "30005":
+			trk.AddProducer(producer.NewBeastFetcher(dump1090Host, dump1090Port))
+		default:
+			return nil, errors.New("don't know how to handle port:" +dump1090Port)
+		}
 	}
 	if file := c.GlobalString("avr-file"); "" != file {
 		trk.AddProducer(producer.NewAvrFile([]string{file}))
 	}
+	if file := c.GlobalString("beast-file"); "" != file {
+		trk.AddProducer(producer.NewBeastFile([]string{file}))
+	}
+	return trk, nil
+}
+
+func runSimple(c *cli.Context) error {
+	trk, err := commonSetup(c)
+	if nil != err {
+		return err
+	}
+	trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
+
+
+	trk.Wait()
+	return nil
+}
+
+// run is our method for running things
+func run(c *cli.Context) error {
+	app, err := newAppDisplay()
+	if nil != err {
+		return err
+	}
+
+	trk, err := commonSetup(c)
+	if nil != err {
+		return err
+	}
+	trk.AddSink(sink.NewLoggerSink(sink.WithLogFile("app.log")))
+	trk.AddSink(app)
+
 	err = app.Run()
 	trk.Stop()
 	return err

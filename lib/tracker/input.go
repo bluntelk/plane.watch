@@ -164,6 +164,9 @@ func (t *Tracker) handleError(err error) {
 
 func (t *Tracker) decodeQueue() {
 	for f := range t.decodingQueue {
+		if nil == f {
+			continue
+		}
 		ok, err := f.Decode()
 		if nil != err {
 			// the decode operation failed to produce valid output, and we tell someone about it
