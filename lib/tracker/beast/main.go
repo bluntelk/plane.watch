@@ -41,7 +41,6 @@ func newBeastMsg(rawBytes []byte) *beastMsg {
 }
 func NewFrame(rawBytes []byte) tracker.Frame {
 	if msg := newBeastMsg(rawBytes); nil != msg {
-		fmt.Println(msg)
 		return msg.decode()
 	}
 
