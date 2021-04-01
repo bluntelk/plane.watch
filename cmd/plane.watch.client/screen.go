@@ -63,29 +63,8 @@ func (d *display) Run() error {
 func newAppDisplay() (*display, error) {
 	d := display{}
 	d.app = tview.NewApplication()
-	hdr := func(title string, width int) *tview.TableCell {
-		return &tview.TableCell{
-			Text:          title,
-			MaxWidth:      width,
-			Color:         tcell.ColorYellowGreen,
-			NotSelectable: true,
-			Expansion: 1,
-		}
-	}
 	d.top = tview.NewTable()
 	d.top.SetTitle("Current Planes")
-	d.top.
-		SetCell(0, 0, hdr("ICAO", 9)).
-		SetCell(0, 1, hdr("Ident", 9)).
-		SetCell(0, 2, hdr("Squawk", 6)).
-		SetCell(0, 3, hdr("Lat/Lon", 19)).
-		SetCell(0, 4, hdr("Altitude", 12)).
-		SetCell(0, 5, hdr("Speed", 12)).
-		SetCell(0, 6, hdr("Heading", 12)).
-		SetCell(0, 7, hdr("# Msgs", 6)).
-		SetCell(0, 8, hdr("Age (s)", 7)).
-		SetCell(0, 9, hdr("Extra", 10)).
-		SetBorder(true)
 
 	d.bottom = tview.NewTextView().SetDynamicColors(true)
 	d.bottom.SetBorder(true).SetTitle("Logs")
@@ -136,6 +115,30 @@ func (d *display) drawTable() {
 	if d.top.GetRowCount() != len(icaoList)+1 {
 		d.top.Clear()
 	}
+
+	hdr := func(title string, width int) *tview.TableCell {
+		return &tview.TableCell{
+			Text:          title,
+			MaxWidth:      width,
+			Color:         tcell.ColorYellowGreen,
+			NotSelectable: true,
+			Expansion: 1,
+		}
+	}
+
+	d.top.
+		SetCell(0, 0, hdr("ICAO", 9)).
+		SetCell(0, 1, hdr("Ident", 9)).
+		SetCell(0, 2, hdr("Squawk", 6)).
+		SetCell(0, 3, hdr("Lat/Lon", 19)).
+		SetCell(0, 4, hdr("Altitude", 12)).
+		SetCell(0, 5, hdr("Speed", 12)).
+		SetCell(0, 6, hdr("Heading", 12)).
+		SetCell(0, 7, hdr("# Msgs", 6)).
+		SetCell(0, 8, hdr("Age (s)", 7)).
+		SetCell(0, 9, hdr("Extra", 10)).
+		SetBorder(true)
+
 	row := 0
 	for _, icao := range icaoList {
 		row++
@@ -221,12 +224,7 @@ func (d *display) OnEvent(e tracker.Event) {
 	case *pacerEvent:
 		// cleanup our planes list
 		d.App().QueueUpdate(func() {
-			//_, _ = fmt.Fprintln(d.bottom, "Pacer Tick")
-
-			d.updateAgeColumn()
-			if time.Now().Second() %6 ==0 {
-				d.drawTable()
-			}
+			d.drawTable()
 		})
 		//d.drawTable()
 	}
