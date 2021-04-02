@@ -128,5 +128,5 @@ func (i *InfoEvent) Type() string {
 }
 
 func (i *InfoEvent) String() string {
-	return fmt.Sprintf("Info: #feeders=%d, #frames=%d. update=%0.2f", i.numReceivers, i.receivedFrames, i.uptime)
+	return fmt.Sprintf("Info: #feeders=%d, #frames=%d. uptime(s)=%0.2f", i.numReceivers, i.receivedFrames, i.uptime)
 }

@@ -33,6 +33,7 @@ type (
 	frame struct {
 		Type, RouteKey string
 		Body           []byte
+		Source         tracker.Source
 	}
 )
 
@@ -98,6 +99,7 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 		if nil == ourFrame {
 			return
 		}
+		source := e.(*tracker.FrameEvent).Source()
 
 		sendMessage := func(info frame) error {
 			body, err = json.Marshal(info)
@@ -114,12 +116,12 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 
 		switch ourFrame.(type) {
 		case *mode_s.Frame:
-			err = sendMessage(frame{Type: "avr", Body: ourFrame.Raw(), RouteKey: QueueTypeAvrAll})
+			err = sendMessage(frame{Type: "avr", Body: ourFrame.Raw(), RouteKey: QueueTypeAvrAll, Source: source})
 		case *beast.Frame:
-			err = sendMessage(frame{Type: "beast", Body: ourFrame.Raw(), RouteKey: QueueTypeBeastAll})
-			err = sendMessage(frame{Type: "avr", Body: ourFrame.(*beast.Frame).AvrFrame().Raw(), RouteKey: QueueTypeAvrAll})
+			err = sendMessage(frame{Type: "beast", Body: ourFrame.Raw(), RouteKey: QueueTypeBeastAll, Source: source})
+			err = sendMessage(frame{Type: "avr", Body: ourFrame.(*beast.Frame).AvrFrame().Raw(), RouteKey: QueueTypeAvrAll, Source: source})
 		case *sbs1.Frame:
-			err = sendMessage(frame{Type: "sbs1", Body: ourFrame.Raw(), RouteKey: QueueTypeSbs1All})
+			err = sendMessage(frame{Type: "sbs1", Body: ourFrame.Raw(), RouteKey: QueueTypeSbs1All, Source: source})
 		}
 	}
 
