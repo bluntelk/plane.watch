@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"os"
 	"plane.watch/lib/producer"
 	"plane.watch/lib/sink"
@@ -11,7 +11,6 @@ import (
 )
 
 var (
-	pwHost, pwUser, pwPass, pwVhost string
 	pwPort                          int
 	showDebug                       bool
 	dump1090Host                    string
@@ -26,91 +25,82 @@ func main() {
 	app.Usage = "Reads from dump1090 and sends it to http://plane.watch/"
 
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:        "pw_host",
-			Value:       "mq.plane.watch",
-			Usage:       "How we connect to plane.watch",
-			Destination: &pwHost,
-			EnvVar:      "PW_HOST",
+		&cli.StringFlag{
+			Name:        "rabbit-host",
+			Value:       "localhost",
+			Usage:       "the rabbitmq host to talk to",
 		},
-		cli.StringFlag{
-			Name:        "pw_user",
-			Value:       "",
-			Usage:       "user for plane.watch",
-			Destination: &pwUser,
-			EnvVar:      "PW_USER",
-		},
-		cli.StringFlag{
-			Name:        "pw_pass",
-			Value:       "",
-			Usage:       "plane.watch password",
-			Destination: &pwPass,
-			EnvVar:      "PW_PASS",
-		},
-		cli.IntFlag{
-			Name:        "pw_port",
+		&cli.IntFlag{
+			Name:        "rabbit-port",
 			Value:       5672,
-			Usage:       "How we connect to plane.watch",
+			Usage:       "The rabbitmq port to talk to",
 			Destination: &pwPort,
-			EnvVar:      "PW_PORT",
 		},
-		cli.StringFlag{
-			Name:        "pw_vhost",
-			Value:       "/pw_feedin",
-			Usage:       "the virtual host on the plane watch rabbit server",
-			Destination: &pwVhost,
-			EnvVar:      "PW_VHOST",
+		&cli.StringFlag{
+			Name:        "rabbit-user",
+			Value:       "",
+			Usage:       "user for rabbitmq",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
+			Name:        "rabbit-pass",
+			Value:       "",
+			Usage:       "rabbitmq password",
+		},
+		&cli.StringFlag{
+			Name:        "rabbit-vhost",
+			Value:       "plane.watch",
+			Usage:       "the virtual host on the rabbit server to use",
+		},
+		&cli.StringFlag{
 			Name:        "dump1090_host",
 			Value:       "",
 			Usage:       "The host to read dump1090 from",
 			Destination: &dump1090Host,
-			EnvVar:      "DUMP1090_HOST",
+			EnvVars:     []string{"DUMP1090_HOST"},
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:        "dump1090_port",
 			Value:       "30002",
 			Usage:       "The port to read dump1090 from",
 			Destination: &dump1090Port,
-			EnvVar:      "DUMP1090_PORT",
+			EnvVars:     []string{"DUMP1090_PORT"},
 		},
-		cli.StringFlag{
-			Name:        "avr-file",
-			Value:       "",
-			Usage:       "A file to read AVR frames from",
+		&cli.StringFlag{
+			Name:  "avr-file",
+			Value: "",
+			Usage: "A file to read AVR frames from",
 		},
-		cli.StringFlag{
-			Name:        "beast-file",
-			Value:       "",
-			Usage:       "A file to read beast format AVR frames from",
+		&cli.StringFlag{
+			Name:  "beast-file",
+			Value: "",
+			Usage: "A file to read beast format AVR frames from",
 		},
-		cli.Float64Flag{
-			Name:        "ref-lat",
-			Usage:       "The reference latitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
+		&cli.Float64Flag{
+			Name:  "ref-lat",
+			Usage: "The reference latitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
 		},
-		cli.Float64Flag{
-			Name:        "ref-lon",
-			Usage:       "The reference longitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
+		&cli.Float64Flag{
+			Name:  "ref-lon",
+			Usage: "The reference longitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:        "debug",
 			Usage:       "Show Extra Debug Information",
 			Destination: &showDebug,
-			EnvVar:      "DEBUG",
+			EnvVars:     []string{"DEBUG"},
 		},
 	}
 
-	app.Commands = []cli.Command{
+	app.Commands = []*cli.Command{
 		{
 			Name:   "run",
 			Usage:  "Gather ADSB data and sends it to plane.watch",
 			Action: run,
 		},
 		{
-			Name:   "simple",
-			Usage:  "Gather ADSB data and sends it to plane.watch",
-			Action: runSimple,
+			Name:      "simple",
+			Usage:     "Gather ADSB data and sends it to plane.watch",
+			Action:    runSimple,
 			ArgsUsage: "[app.log - A file name to output to or stdout if not specified]",
 		},
 	}
@@ -122,50 +112,56 @@ func main() {
 
 func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	opts := make([]tracker.Option, 0)
-	if c.GlobalBool("debug") {
+	if c.Bool("debug") {
 		opts = append(opts, tracker.WithVerboseOutput())
 	} else {
 		opts = append(opts, tracker.WithInfoOutput())
 	}
-	refLat := c.GlobalFloat64("refLat")
-	refLon := c.GlobalFloat64("refLon")
+	refLat := c.Float64("refLat")
+	refLon := c.Float64("refLon")
 	if refLat != 0 && refLon != 0 {
 		opts = append(opts, tracker.WithReferenceLatLon(refLat, refLon))
 	}
 
 	trk := tracker.NewTracker(opts...)
 
-	if "" != c.GlobalString("redis-host") {
+	if "" != c.String("redis-host") {
 		trk.AddSink(
 			sink.NewRedisSink(
 				sink.WithHost(c.String("redis-host"), c.String("redis-port")),
 			),
 		)
 	}
-	if "" != c.GlobalString("rabbit-host") {
-		trk.AddSink(
-			sink.NewRabbitMqSink(
-				sink.WithHost(c.String("rabbit-host"), c.String("rabbit-port")),
-				sink.WithQueue(c.String("rabbit-queue")),
-			),
+	if "" != c.String("rabbit-host") {
+		rabbitSink, err := sink.NewRabbitMqSink(
+			sink.WithHost(c.String("rabbit-host"), c.String("rabbit-port")),
+			sink.WithUserPass(c.String("rabbit-user"), c.String("rabbit-pass")),
+			sink.WithRabbitVhost(c.String("rabbit-vhost")),
+			sink.WithAllRabbitQueues(),
 		)
-	}
+		if nil != err {
+			return nil, err
+		}
 
+		trk.AddSink(rabbitSink)
+	}
 
 	if "" != dump1090Host {
 		switch dump1090Port {
 		case "30002":
 			trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
+		case "30003":
+			trk.AddProducer(producer.NewSbs1Fetcher(dump1090Host, dump1090Port))
 		case "30005":
 			trk.AddProducer(producer.NewBeastFetcher(dump1090Host, dump1090Port))
 		default:
-			return nil, errors.New("don't know how to handle port:" +dump1090Port)
+			return nil, errors.New("don't know how to handle port:" + dump1090Port)
 		}
 	}
-	if file := c.GlobalString("avr-file"); "" != file {
+	if file := c.String("avr-file"); "" != file {
 		trk.AddProducer(producer.NewAvrFile([]string{file}))
 	}
-	if file := c.GlobalString("beast-file"); "" != file {
+	if file := c.String("beast-file"); "" != file {
 		trk.AddProducer(producer.NewBeastFile([]string{file}, true))
 	}
 	return trk, nil
@@ -177,7 +173,6 @@ func runSimple(c *cli.Context) error {
 		return err
 	}
 	trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
-
 
 	trk.Wait()
 	return nil

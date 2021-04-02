@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"os"
 	"plane.watch/internal/mixer"
 )
@@ -14,22 +14,22 @@ func main() {
 	app.Version = "1"
 	app.Usage = "Aggregate individual feeds and reduce bandwidth"
 
-	app.Commands = []cli.Command{
+	app.Commands = []*cli.Command{
 		{
-			Name: "env",
+			Name:   "env",
 			Action: mixer.ShowConfig,
 		},
 		{
-			Name: "run",
+			Name:   "run",
 			Action: mixer.Run,
 		},
 	}
 
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name: "config-file",
-			Value: "/etc/plane.watch/mixer.json",
-			EnvVar: "CONFIG_FILE",
+		&cli.StringFlag{
+			Name:    "config-file",
+			Value:   "/etc/plane.watch/mixer.json",
+			EnvVars: []string{"CONFIG_FILE"},
 		},
 	}
 

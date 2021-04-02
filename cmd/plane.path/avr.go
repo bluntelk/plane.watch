@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"os"
 	"plane.watch/lib/producer"
 	"plane.watch/lib/sink"
@@ -15,7 +15,7 @@ import (
 func parseAvr(c *cli.Context) error {
 	opts := make([]tracker.Option,0)
 	var verbose bool
-	if c.GlobalBool("verbose") {
+	if c.Bool("verbose") {
 		opts = append(opts, tracker.WithVerboseOutput())
 		verbose=true
 	} else {

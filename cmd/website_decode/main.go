@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"io/fs"
 	"log"
 	"net/http"
@@ -23,12 +23,12 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "port",
 			Value: "8080",
 			Usage: "Port to run the website on",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "verbose",
 			Usage: "output debug info on the CLI",
 		},
@@ -41,11 +41,11 @@ func main() {
 	}
 }
 
-func runHttpServer(c *cli.Context) {
+func runHttpServer(c *cli.Context) error {
 	var htdocsPath string
 	var err error
 	var files fs.FS
-	if len(c.Args()) == 0 {
+	if c.NArg() == 0 {
 		println("Using our embedded filesystem")
 		files, err = fs.Sub(embeddedHtdocs, "htdocs")
 		if nil != err {
@@ -53,7 +53,7 @@ func runHttpServer(c *cli.Context) {
 		}
 	} else {
 		println("Using the files in dir:", htdocsPath)
-		htdocsPath = path.Clean(c.Args()[0])
+		htdocsPath = path.Clean(c.Args().First())
 		files = os.DirFS(htdocsPath)
 	}
 
@@ -120,4 +120,5 @@ func runHttpServer(c *cli.Context) {
 	port := ":" + c.String("port")
 	log.Printf("Listening on %s...\n", port)
 	log.Fatal(http.ListenAndServe(port, nil))
+	return nil
 }

@@ -7,6 +7,7 @@ import (
 
 const LogEventType = "log-event"
 const PlaneLocationEventType = "plane-location-event"
+const InfoEventType = "info-event"
 
 type (
 	// an Event is something that we want to know about. This is the base of our sending of data
@@ -42,8 +43,8 @@ type (
 	// InfoEvent periodically sends out some interesting stats
 	InfoEvent struct {
 		receivedFrames uint64
-		numReceivers uint
-		uptime uint64
+		numReceivers int
+		uptime float64
 	}
 
 )
@@ -109,6 +110,23 @@ func (p *PlaneLocationEvent) Removed() bool {
 func (f *FrameEvent) Type() string {
 	return PlaneLocationEventType
 }
+
 func (f *FrameEvent) String() string {
 	return f.frame.IcaoStr()
+}
+
+func (f *FrameEvent) Frame() Frame {
+	return f.frame
+}
+
+func (f *FrameEvent) Source() Source {
+	return f.source
+}
+
+func (i *InfoEvent) Type() string {
+	return InfoEventType
+}
+
+func (i *InfoEvent) String() string {
+	return fmt.Sprintf("Info: #feeders=%d, #frames=%d. update=%0.2f", i.numReceivers, i.receivedFrames, i.uptime)
 }

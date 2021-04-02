@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"plane.watch/lib/producer"
 	"plane.watch/lib/tracker"
 )
 
 func parseSbs1(c *cli.Context) error {
 	opts := make([]tracker.Option,0)
-	if c.GlobalBool("verbose") {
+	if c.Bool("verbose") {
 		opts = append(opts, tracker.WithVerboseOutput())
 	} else {
 		opts = append(opts, tracker.WithInfoOutput())

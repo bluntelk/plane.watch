@@ -173,6 +173,6 @@ func (f *Frame) Decode() (bool, error) {
 	return true, f.Parse()
 }
 
-func (f *Frame) Raw() string {
-	return f.original
+func (f *Frame) Raw() []byte {
+	return []byte(f.original)
 }

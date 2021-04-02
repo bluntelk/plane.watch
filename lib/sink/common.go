@@ -10,7 +10,10 @@ type (
 	Config struct {
 		host, port string
 		secure bool
-		queue string
+
+		vhost string
+		user, pass string
+		queue map[string]string
 
 		out io.WriteCloser
 		waiter sync.WaitGroup
@@ -24,10 +27,10 @@ func WithHost(host, port string) Option {
 		conf.port = port
 	}
 }
-
-func WithQueue(queue string) Option {
+func WithUserPass(user, pass string) Option {
 	return func(conf *Config) {
-		conf.queue = queue
+		conf.user = user
+		conf.pass = pass
 	}
 }
 

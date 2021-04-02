@@ -246,3 +246,18 @@ func Test_calcSurfaceSpeed(t *testing.T) {
 		})
 	}
 }
+
+
+func TestAltitudeDecode(t *testing.T) {
+	frame, err := DecodeString("*8D7C7DAA582886FB218A9AFB0420;", time.Now())
+	if nil != err {
+		t.Error(err)
+	}
+	a, err := frame.Altitude()
+	if nil != err {
+		t.Error(err)
+	}
+	if 600 != a {
+		t.Errorf("Expected an altitude of 600 feet, got %d", a)
+	}
+}

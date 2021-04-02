@@ -1,77 +1,169 @@
 package sink
 
 import (
+	"encoding/json"
+	"fmt"
+	"github.com/streadway/amqp"
+	"plane.watch/lib/sink/rabbitmq"
 	"plane.watch/lib/tracker"
+	"plane.watch/lib/tracker/beast"
+	"plane.watch/lib/tracker/mode_s"
+	"plane.watch/lib/tracker/sbs1"
+	"time"
+)
+
+const (
+	QueueTypeBeastAll    = "beast-all"
+	QueueTypeBeastReduce = "beast-reduce"
+	QueueTypeAvrAll      = "avr-all"
+	QueueTypeAvrReduce   = "avr-reduce"
+	QueueTypeSbs1All     = "sbs1-all"
+	QueueTypeSbs1Reduce  = "sbs1-reduce"
+	QueueTypeDecodedJson = "decoded-json"
+	QueueTypeLogs        = "logs"
 )
 
 type (
 	RabbitMqSink struct {
 		Config
+		mq       *rabbitmq.RabbitMQ
+		exchange string
+	}
+
+	frame struct {
+		Type, RouteKey string
+		Body           []byte
 	}
 )
 
-func NewRabbitMqSink(opts ...Option) *RabbitMqSink {
-	r := &RabbitMqSink{}
+func NewRabbitMqSink(opts ...Option) (*RabbitMqSink, error) {
+	r := &RabbitMqSink{
+		exchange: "plane.watch.data",
+	}
+	r.queue = map[string]string{}
+
 	for _, opt := range opts {
 		opt(&r.Config)
 	}
-	return r
+
+	var err error
+	if r.mq, err = r.connect(time.Second * 5); nil != err {
+		return nil, err
+	}
+
+	if err = r.setup(); nil != err {
+		return nil, err
+	}
+	return r, nil
+}
+
+func WithRabbitVhost(vhost string) Option {
+	return func(config *Config) {
+		config.vhost = vhost
+	}
+}
+
+func WithAllRabbitQueues() Option {
+	return func(conf *Config) {
+		conf.queue[QueueTypeAvrAll] = QueueTypeAvrAll
+		conf.queue[QueueTypeAvrReduce] = QueueTypeAvrReduce
+		conf.queue[QueueTypeBeastAll] = QueueTypeBeastAll
+		conf.queue[QueueTypeBeastReduce] = QueueTypeBeastReduce
+		conf.queue[QueueTypeSbs1All] = QueueTypeSbs1All
+		conf.queue[QueueTypeSbs1Reduce] = QueueTypeSbs1Reduce
+		conf.queue[QueueTypeDecodedJson] = QueueTypeDecodedJson
+		conf.queue[QueueTypeLogs] = QueueTypeLogs
+	}
+}
+func WithRabbitQueue(msgType, queue string) Option {
+	return func(conf *Config) {
+		conf.queue[msgType] = queue
+	}
 }
 
 func (r *RabbitMqSink) OnEvent(e tracker.Event) {
+	var err error
+	var body []byte
+	switch e.(type) {
+	case *tracker.LogEvent:
+		err = r.mq.Publish(r.exchange, QueueTypeLogs, amqp.Publishing{
+			ContentType:     "text/plain",
+			ContentEncoding: "utf-8",
+			Timestamp:       time.Now(),
+			Body:            []byte(e.String()),
+		})
+	case *tracker.PlaneLocationEvent:
+	case *tracker.FrameEvent:
+		ourFrame := e.(*tracker.FrameEvent).Frame()
+		if nil == ourFrame {
+			return
+		}
 
+		sendMessage := func(info frame) error {
+			body, err = json.Marshal(info)
+			if nil != err {
+				return err
+			}
+			return r.mq.Publish(r.exchange, info.RouteKey, amqp.Publishing{
+				ContentType:     "text/plain",
+				ContentEncoding: "utf-8",
+				Timestamp:       time.Now(),
+				Body:            body,
+			})
+		}
+
+		switch ourFrame.(type) {
+		case *mode_s.Frame:
+			err = sendMessage(frame{Type: "avr", Body: ourFrame.Raw(), RouteKey: QueueTypeAvrAll})
+		case *beast.Frame:
+			err = sendMessage(frame{Type: "beast", Body: ourFrame.Raw(), RouteKey: QueueTypeBeastAll})
+			err = sendMessage(frame{Type: "avr", Body: ourFrame.(*beast.Frame).AvrFrame().Raw(), RouteKey: QueueTypeAvrAll})
+		case *sbs1.Frame:
+			err = sendMessage(frame{Type: "sbs1", Body: ourFrame.Raw(), RouteKey: QueueTypeSbs1All})
+		}
+	}
+
+	if nil != err {
+		fmt.Println(err)
+	}
 }
 
+func (r *RabbitMqSink) connect(timeout time.Duration) (*rabbitmq.RabbitMQ, error) {
+	var rabbitConfig rabbitmq.Config
+	rabbitConfig.Host = r.host
+	rabbitConfig.Port = r.port
+	rabbitConfig.User = r.user
+	rabbitConfig.Password = r.pass
+	rabbitConfig.Vhost = r.vhost
 
+	//log.Printf("Connecting to RabbitMQ @ %s", rabbitConfig)
+	rabbit := rabbitmq.New(rabbitConfig)
+	connected := make(chan bool)
+	go rabbit.Connect(connected)
+	select {
+	case <-connected:
+		return rabbit, nil
+	case <-time.After(timeout):
+		return nil, fmt.Errorf("failed to connect to rabbit in a timely manner")
+	}
+}
 
-//func getRabbitConnection(timeout int64) (*RabbitMQ, error) {
-//	if "" == pwUser {
-//		log.Fatalln("No User Specified For Plane.Watch Rabbit Config")
-//	}
-//	if "" == pwPass {
-//		log.Fatalln("No Password Specified For Plane.Watch Rabbit Config")
-//	}
-//
-//	var rabbitConfig RabbitMQConfig
-//	rabbitConfig.Host = pwHost
-//	rabbitConfig.Port = pwPort
-//	rabbitConfig.User = pwUser
-//	rabbitConfig.Password = pwPass
-//	rabbitConfig.Vhost = pwVhost
-//
-//	log.Printf("Connecting to plane.watch RabbitMQ @ %s", rabbitConfig)
-//	rabbit := NewRabbitMQ(rabbitConfig)
-//	connected := make(chan bool)
-//	go rabbit.Connect(connected)
-//	select {
-//	case <-connected:
-//		return rabbit, nil
-//	case <-time.After(time.Duration(timeout) * time.Second):
-//		return nil, fmt.Errorf("failed to connect to rabbit in a timely manner")
-//	}
-//}
-//
-//func failOnError(err error, msg string) {
-//	if err != nil {
-//		log.Fatalf("%s: %s", msg, err)
-//		//panic(fmt.Sprintf("%s: %s", msg, err))
-//	}
-//}
-//
-//// test makes sure that our setup is working
-//func test(c *cli.Context) {
-//	log.Printf("Testing connection to dump1090 @ %s:%s", dump1090Host, dump1090Port)
-//	d1090 := NewDump1090Reader(dump1090Host, dump1090Port)
-//	var err error
-//	if err = d1090.Connect(); err != nil {
-//		log.Fatalf("Unable to connect to Dump 1090 %s", err)
-//	} else {
-//		d1090.Stop()
-//	}
-//
-//	rabbit, err := getRabbitConnection(10)
-//	failOnError(err, "Unable to connect to rabbit")
-//	defer rabbit.Disconnect()
-//
-//	log.Printf("Success. You are ready to go")
-//}
+func (r *RabbitMqSink) setup() error {
+	var err error
+
+	// let's make sure all of our queues and exchanges are setup
+	if err = r.mq.ExchangeDeclare(r.exchange, amqp.ExchangeDirect); nil != err {
+		return err
+	}
+	for t, q := range r.queue {
+		if _, err = r.mq.QueueDeclare(q); nil != err {
+			return err
+		}
+
+		if err = r.mq.QueueBind(q, t, r.exchange); nil != err {
+			return err
+		}
+	}
+
+	return nil
+}

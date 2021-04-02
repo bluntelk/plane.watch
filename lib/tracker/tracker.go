@@ -5,6 +5,7 @@ import (
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -45,6 +46,9 @@ type (
 		pruneExitChan chan bool
 
 		refLat, refLon float64
+
+		startTime time.Time
+		numFrames uint64
 	}
 )
 
@@ -70,6 +74,8 @@ func NewTracker(opts ...Option) *Tracker {
 		events:            make(chan Event, 10000),
 		eventsOpen:        true,
 		pruneExitChan:     make(chan bool),
+
+		startTime: time.Now(),
 	}
 
 	for _, opt := range opts {
@@ -434,8 +440,17 @@ func (t *Tracker) prunePlanes() {
 				return true
 			})
 
+			t.AddEvent(t.newInfoEvent())
 		case <-t.pruneExitChan:
 			return
 		}
+	}
+}
+
+func (t *Tracker) newInfoEvent() *InfoEvent {
+	return &InfoEvent{
+		receivedFrames: atomic.LoadUint64(&t.numFrames),
+		numReceivers:   len(t.producers),
+		uptime:         time.Now().Sub(t.startTime).Seconds(),
 	}
 }

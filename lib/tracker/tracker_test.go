@@ -1,6 +1,7 @@
 package tracker
 
 import (
+	"plane.watch/lib/tracker/mode_s"
 	"testing"
 	"time"
 	"fmt"
@@ -93,4 +94,75 @@ func TestCprDecode(t *testing.T) {
 		}
 
 	}
+}
+
+
+func TestTracking(t *testing.T) {
+	frames := []string{
+		"*8D40621D58C382D690C8AC2863A7;",
+		"*8D40621D58C386435CC412692AD6;",
+	}
+	trk := performTrackingTest(frames, t)
+
+	plane := trk.GetPlane(4219421)
+	if alt := plane.Altitude(); alt != 38000 {
+		t.Errorf("Plane should be at 38000 feet, was %d", alt)
+	}
+
+	lat := "+52.2572021484375"
+	lon := "+3.9193725585938";
+	if lon != fmt.Sprintf("%+03.13f", plane.Lon()) {
+		t.Errorf("longitude Calculation was incorrect: expected %s, got %+0.13f", lon, plane.Lon())
+	}
+	if lat != fmt.Sprintf("%+03.13f", plane.Lat()) {
+		t.Errorf("latitude Calculation was incorrect: expected %s, got %+0.13f", lat, plane.Lat())
+	}
+}
+
+func TestTracking2(t *testing.T) {
+	frames := []string{
+		"*8D7C7DAA99146D0980080D6131A1;",
+		"*5D7C7DAACD3CE9;",
+		"*0005050870B303;",
+		"*8D7C7DAA99146C0980040D2A616F;",
+		"*8D7C7DAAF80020060049B06CA244;",
+		"*8D7C7DAA582886FA618B21ADB377;",
+		"*5D7C7DAACD3CE9;",
+		"*8D7C7DAA5828829F322FE81F6DD1;",
+		"*8D7C7DAA99146C0980040D2A616F;",
+		"*8D7C7DAA99146C0980040D2A616F;",
+		"*8D7C7DAA99146C0960080D47BBB9;",
+		"*8D7C7DAA582886FA778B115D2F89;",
+		"*000005084A3646;",
+		"*000005084A3646;",
+		"*28000A00307264;",
+		"*8D7C7DAA99146A09280C0D91E947;",
+		"*8D7C7DAA9914690920080DC2621D;",
+		"*8D7C7DAA9914690928040DE49A15;",
+		"*8D7C7DAA210DA1E0820820472D63;",
+		"*5D7C7DAACD3CE9;",
+		"*8D7C7DAA582886FB218A9AFB0420;",
+		"*5D7C7DAACD3CE9;",
+		"*8D7C7DAA5828829FF42F5E556B2D;",
+		"*8D7C7DAA9914680920080DC168D3;",
+		"*000005084A3646;",
+		"*5D7C7DAACD3CE9;",
+		"*8D7C7DAA582886FB318A8FD96CD7;",
+		"*8D7C7DAA9914670900080D9576E0;",
+		"*000005084A3646;",
+	}
+	performTrackingTest(frames, t).Finish()
+
+}
+
+func performTrackingTest(frames []string, t *testing.T) *Tracker{
+	trk := NewTracker()
+	for _, msg := range frames {
+		frame, err := mode_s.DecodeString(msg, time.Now())
+		if nil != err {
+			t.Errorf("%s", err)
+		}
+		trk.HandleModeSFrame(frame)
+	}
+	return trk
 }

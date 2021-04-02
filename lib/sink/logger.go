@@ -33,5 +33,8 @@ func (l *LoggerSink) OnEvent(e tracker.Event) {
 		_, _ = fmt.Fprintln(l.bufOut, e.String())
 	case *tracker.PlaneLocationEvent:
 		_, _ = fmt.Fprintln(l.bufOut, e.String())
+	case *tracker.InfoEvent:
+		_, _ = fmt.Fprintln(l.bufOut, e.String())
+		_ = l.bufOut.Flush()
 	}
 }

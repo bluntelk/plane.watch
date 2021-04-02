@@ -1,11 +1,12 @@
-package main
+package rabbitmq
 
 import (
 	"fmt"
 	"github.com/streadway/amqp"
 	"log"
+	"net"
 	"net/url"
-	"strconv"
+	"strings"
 	"time"
 )
 
@@ -21,25 +22,25 @@ type RabbitMQ struct {
 	connected    bool
 }
 
-type RabbitmqConfigSSL struct {
+type ConfigSSL struct {
 	PrivateKeyFile string `json:"private_key_file"`
 	CertChainFile  string `json:"cert_chain_file"`
 }
 
-type RabbitMQConfig struct {
-	Host     string            `json:"host"`
-	Port     int               `json:"port"`
-	Vhost    string            `json:"vhost"`
-	User     string            `json:"user"`
-	Password string            `json:"password"`
-	Ssl      RabbitmqConfigSSL `json:"ssl"`
+type Config struct {
+	Host     string    `json:"host"`
+	Port     string    `json:"port"`
+	Vhost    string    `json:"vhost"`
+	User     string    `json:"user"`
+	Password string    `json:"password"`
+	Ssl      ConfigSSL `json:"ssl"`
 }
 
-func (c RabbitMQConfig) String() string {
+func (c Config) String() string {
 	return createRabbitmqUri(c)
 }
 
-func NewRabbitMQ(cfg RabbitMQConfig) *RabbitMQ {
+func New(cfg Config) *RabbitMQ {
 	uri := createRabbitmqUri(cfg)
 	return &RabbitMQ{uri: uri}
 }
@@ -86,7 +87,7 @@ func (r *RabbitMQ) Connect(connected chan bool) {
 
 func (r *RabbitMQ) Disconnect() {
 	if r.connected {
-		r.conn.Close()
+		_ = r.conn.Close()
 	}
 	r.connected = false
 }
@@ -118,11 +119,11 @@ func (r *RabbitMQ) QueueDeclare(name string) (amqp.Queue, error) {
 	)
 }
 
-func (r *RabbitMQ) QueueBind(name, key, source string) error {
+func (r *RabbitMQ) QueueBind(name, routingKey, sourceExchange string) error {
 	return r.channel.QueueBind(
 		name,
-		key,
-		source,
+		routingKey,
+		sourceExchange,
 		false,
 		nil,
 	)
@@ -174,11 +175,11 @@ func (r *RabbitMQ) connect(uri string, done chan bool) {
 	done <- true
 }
 
-func createRabbitmqUri(cfg RabbitMQConfig) string {
+func createRabbitmqUri(cfg Config) string {
 	u := url.URL{
 		Scheme: "amqp",
-		Host:   fmt.Sprintf("%s:%s", cfg.Host, strconv.FormatInt(int64(cfg.Port), 10)),
-		Path:   fmt.Sprintf("/%s", cfg.Vhost),
+		Host:   net.JoinHostPort(cfg.Host, cfg.Port),
+		Path:   strings.TrimLeft(fmt.Sprintf("/%s", cfg.Vhost), "/"),
 		User:   url.UserPassword(cfg.User, cfg.Password),
 	}
 	return u.String()

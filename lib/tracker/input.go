@@ -2,8 +2,10 @@ package tracker
 
 import (
 	"errors"
+	"plane.watch/lib/tracker/beast"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
+	"sync/atomic"
 	"time"
 )
 
@@ -17,6 +19,7 @@ type (
 		IcaoStr() string
 		Decode() (bool, error)
 		TimeStamp() time.Time
+		Raw() []byte
 	}
 	// A Producer can listen for or generate Frames, it provides the output via a channel that the handler can then
 	// processes further.
@@ -167,6 +170,8 @@ func (t *Tracker) decodeQueue() {
 		if nil == f {
 			continue
 		}
+		atomic.AddUint64(&t.numFrames, 1)
+		t.numFrames++
 		ok, err := f.Decode()
 		if nil != err {
 			// the decode operation failed to produce valid output, and we tell someone about it
@@ -184,6 +189,9 @@ func (t *Tracker) decodeQueue() {
 		}
 
 		switch f.(type) {
+		case *beast.Frame:
+			t.HandleModeSFrame(f.(*beast.Frame).AvrFrame())
+			// todo: include signal strength
 		case *mode_s.Frame:
 			t.HandleModeSFrame(f.(*mode_s.Frame))
 		case *sbs1.Frame:

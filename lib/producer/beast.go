@@ -7,7 +7,6 @@ import (
 	"net"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/beast"
-	"plane.watch/lib/tracker/mode_s"
 	"time"
 )
 
@@ -22,7 +21,7 @@ func NewBeastFetcher(host, port string) tracker.Producer {
 
 		for scan.Scan() {
 			msg := scan.Bytes()
-			p.addFrame(beast.NewFrame(msg), source)
+			p.addFrame(beast.NewFrame(msg, false), source)
 		}
 
 		return scan.Err()
@@ -51,12 +50,12 @@ func NewBeastFile(filePaths[] string, delay bool) tracker.Producer {
 		scanner.Split(ScanBeast)
 		for scanner.Scan() {
 			count++
-			frame := beast.NewFrame(scanner.Bytes())
+			frame := beast.NewFrame(scanner.Bytes(), false)
 			if nil == frame {
 				continue
 			}
 			if delay {
-				currentTs := frame.(*mode_s.Frame).BeastTicksNs()
+				currentTs := frame.BeastTicksNs()
 				if lastTimeStamp > 0 && lastTimeStamp < currentTs {
 					time.Sleep(currentTs - lastTimeStamp)
 				}

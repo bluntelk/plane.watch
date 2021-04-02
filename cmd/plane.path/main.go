@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/kpawlik/geojson"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"io"
 	"os"
 	"plane.watch/lib/tracker"
@@ -18,12 +18,12 @@ func main() {
 	app.Version = "v0.1.0"
 	app.Name = "Plane Watch flight Path Renderer"
 	app.Usage = "Reads AVR frames or SBS1 data from a file and generates a GeoJSON file"
-	app.Authors = []cli.Author{
+	app.Authors = []*cli.Author{
 		{Name: "Jason Playne", Email: "jason@jasonplayne.com"},
 	}
-	cli.VersionFlag = cli.BoolFlag{Name: "version, V"}
+	cli.VersionFlag = &cli.BoolFlag{Name: "version, V"}
 
-	app.Commands = []cli.Command{
+	app.Commands = []*cli.Command{
 		{
 			Name:      "avr",
 			Usage:     "Renders all the plane paths found in an AVR file",
@@ -41,15 +41,15 @@ func main() {
 		},
 	}
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "verbose, v",
 			Usage: "verbose debugging output",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "stdout",
 			Usage: "Output to stdout instead of to a file (disables any other output)",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "profile",
 			Usage: "creates a CPU Profile of the code",
 		},
@@ -85,7 +85,7 @@ func main() {
 }
 
 func validateParams(c *cli.Context) error {
-	stdOut := c.GlobalBool("stdout")
+	stdOut := c.Bool("stdout")
 	if c.NArg() == 0 {
 		return fmt.Errorf("you need to specify some files")
 	}
@@ -98,20 +98,23 @@ func validateParams(c *cli.Context) error {
 }
 
 func getFilePaths(c *cli.Context) []string {
-	stdOut := c.GlobalBool("stdout")
+	stdOut := c.Bool("stdout")
 	if c.NArg() == 0 {
 		return []string{}
 	}
 
-	if stdOut {
-		return c.Args()
-	} else {
-		return c.Args()[1:]
+	var files []string
+	for i :=0; i < c.NArg(); i++ {
+		if !stdOut && i == 0 {
+			continue
+		}
+		files = append(files, c.Args().Get(i))
 	}
+	return files
 }
 
 func getOutput(c *cli.Context) (io.WriteCloser, error) {
-	stdOut := c.GlobalBool("stdout")
+	stdOut := c.Bool("stdout")
 	if c.NArg() == 0 || stdOut {
 		return os.Stdout, nil
 	} else {

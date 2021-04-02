@@ -417,6 +417,10 @@ func (f *Frame) Icao() uint32 {
 	return f.icao
 }
 
+func (f *Frame) Raw() []byte {
+	return []byte(f.raw)
+}
+
 func (f *Frame) IcaoStr() string {
 	return fmt.Sprintf("%06X", f.icao)
 }
