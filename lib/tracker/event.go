@@ -32,6 +32,11 @@ type (
 	// FrameEvent is for whenever we get a frame of data from our producers
 	FrameEvent struct {
 		frame Frame
+		source Source
+	}
+	Source struct {
+		OriginIdentifier string
+		Name string
 	}
 
 	// InfoEvent periodically sends out some interesting stats

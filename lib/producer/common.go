@@ -1,7 +1,6 @@
 package producer
 
 import (
-	"bufio"
 	"compress/bzip2"
 	"compress/gzip"
 	"fmt"
@@ -10,7 +9,6 @@ import (
 	"net"
 	"os"
 	"plane.watch/lib/tracker"
-	"plane.watch/lib/tracker/mode_s"
 	"strings"
 	"sync"
 	"time"
@@ -21,7 +19,7 @@ const (
 )
 
 type producer struct {
-	label string
+	label, ident string
 	out   chan tracker.Event
 	outClosed bool
 	outLocker sync.Mutex
@@ -38,6 +36,13 @@ func NewProducer(label string) *producer {
 	}
 }
 
+func newSource(label, ident string) tracker.Source{
+	return tracker.Source{
+		OriginIdentifier: ident,
+		Name:             label,
+	}
+}
+
 func (p *producer) String() string {
 	return p.label
 }
@@ -46,8 +51,8 @@ func (p *producer) Listen() chan tracker.Event {
 	return p.out
 }
 
-func (p *producer) addFrame(f tracker.Frame) {
-	p.AddEvent(tracker.NewFrameEvent(f))
+func (p *producer) addFrame(f tracker.Frame, s tracker.Source) {
+	p.AddEvent(tracker.NewFrameEvent(f, s))
 }
 
 func (p *producer) addDebug(sfmt string, v ...interface{}) {
@@ -84,7 +89,7 @@ func (p *producer) Cleanup() {
 	close(p.out)
 }
 
-func (p *producer) readFiles(dataFiles []string, read func(io.Reader) error) {
+func (p *producer) readFiles(dataFiles []string, read func(io.Reader, string) error) {
 	var err error
 	var inFile *os.File
 	var gzipFile *gzip.Reader
@@ -104,14 +109,14 @@ func (p *producer) readFiles(dataFiles []string, read func(io.Reader) error) {
 			if isGzip {
 				gzipFile, err = gzip.NewReader(inFile)
 				if nil != err {
-					err = read(gzipFile)
+					err = read(gzipFile, inFileName)
 				}
-				err = read(gzipFile)
+				err = read(gzipFile, inFileName)
 			} else if isBzip2 {
 				bzip2File := bzip2.NewReader(inFile)
-				err = read(bzip2File)
+				err = read(bzip2File, inFileName)
 			} else {
-				err = read(inFile)
+				err = read(inFile, inFileName)
 			}
 			if nil != err {
 				p.addError(err)
@@ -165,14 +170,7 @@ func (p *producer) fetcher(host, port string, read func(net.Conn) error) {
 			p.addDebug("Connected!")
 			backOff = time.Second
 
-			err = read(conn)
-			scan := bufio.NewScanner(conn)
-			for scan.Scan() {
-				line := scan.Text()
-				p.addFrame(mode_s.NewFrame(line, time.Now()))
-				p.addDebug("AVR Frame: %s", line)
-			}
-			if err = scan.Err(); nil != err {
+			if err = read(conn); nil != err {
 				p.addError(err)
 			}
 		}

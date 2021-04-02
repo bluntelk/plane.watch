@@ -13,16 +13,17 @@ import (
 func NewBeastFetcher(host, port string) tracker.Producer {
 	p := NewProducer("Beast Fetcher for: " + net.JoinHostPort(host, port))
 
+	source := newSource(p.String(), "beast://" + net.JoinHostPort(host, port))
 	p.fetcher(host, port, func(conn net.Conn) error {
 		scan := bufio.NewScanner(conn)
 		scan.Split(ScanBeast)
 
 		for scan.Scan() {
 			msg := scan.Bytes()
-			p.addFrame(beast.NewFrame(msg))
+			p.addFrame(beast.NewFrame(msg), source)
 		}
 
-		return nil
+		return scan.Err()
 	})
 
 	return p
@@ -41,13 +42,16 @@ func NewBeastListener(host, port string) tracker.Producer {
 func NewBeastFile(filePaths[] string) tracker.Producer {
 	p := NewProducer("Beast File")
 
-	p.readFiles(filePaths, func(reader io.Reader) error {
+	p.readFiles(filePaths, func(reader io.Reader, fileName string) error {
 		var count uint64
 		scanner := bufio.NewScanner(reader)
 		scanner.Split(ScanBeast)
 		for scanner.Scan() {
 			count++
-			p.AddEvent(tracker.NewFrameEvent(beast.NewFrame(scanner.Bytes())))
+			frame := beast.NewFrame(scanner.Bytes())
+			// todo: add delay between events based on the timestamp
+
+			p.AddEvent(tracker.NewFrameEvent(frame, newSource(p.String(), "file://" + fileName)))
 		}
 		p.addInfo("We processed %d lines", count)
 		return scanner.Err()

@@ -195,6 +195,6 @@ func (t *Tracker) decodeQueue() {
 	t.decodingQueueWaiter.Done()
 }
 
-func NewFrameEvent(f Frame) *FrameEvent {
-	return &FrameEvent{frame: f}
+func NewFrameEvent(f Frame, s Source) *FrameEvent {
+	return &FrameEvent{frame: f, source: s}
 }

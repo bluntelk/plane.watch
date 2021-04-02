@@ -39,8 +39,11 @@ func newBeastMsg(rawBytes []byte) *beastMsg {
 		body:          rawBytes[9:],
 	}
 }
+
 func NewFrame(rawBytes []byte) tracker.Frame {
 	if msg := newBeastMsg(rawBytes); nil != msg {
+		//if (mm->signalLevel > 0)
+		//        printf("RSSI: %.1f dBFS\n", 10 * log10(mm->signalLevel));
 		return msg.decode()
 	}
 
@@ -72,18 +75,20 @@ func (bm *beastMsg) decodeModeAc() tracker.Frame {
 }
 
 func (bm *beastMsg) decodeModeSShort() tracker.Frame {
-	avr := fmt.Sprintf("%X", bm.body)
-	return mode_s.NewFrame(avr, time.Now())
+	return mode_s.NewFrame(bm.avr(), time.Now())
 }
 
 func (bm *beastMsg) decodeModeSLong() tracker.Frame {
-	avr := fmt.Sprintf("%X", bm.body)
-	return mode_s.NewFrame(avr, time.Now())
+	return mode_s.NewFrame(bm.avr(), time.Now())
 }
 
 func (bm *beastMsg) decodeConfig() tracker.Frame {
 	// TODO: handle 0x34 style messages
 	return nil
+}
+
+func (bm *beastMsg) avr() string {
+	return fmt.Sprintf("@%X%X;", bm.mlatTimestamp, bm.body)
 }
 
 func (bm *beastMsg) String() string {
