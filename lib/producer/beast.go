@@ -7,6 +7,8 @@ import (
 	"net"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/beast"
+	"plane.watch/lib/tracker/mode_s"
+	"time"
 )
 
 
@@ -39,9 +41,10 @@ func NewBeastListener(host, port string) tracker.Producer {
 	return p
 }
 
-func NewBeastFile(filePaths[] string) tracker.Producer {
+func NewBeastFile(filePaths[] string, delay bool) tracker.Producer {
 	p := NewProducer("Beast File")
 
+	lastTimeStamp := time.Duration(0)
 	p.readFiles(filePaths, func(reader io.Reader, fileName string) error {
 		var count uint64
 		scanner := bufio.NewScanner(reader)
@@ -49,7 +52,16 @@ func NewBeastFile(filePaths[] string) tracker.Producer {
 		for scanner.Scan() {
 			count++
 			frame := beast.NewFrame(scanner.Bytes())
-			// todo: add delay between events based on the timestamp
+			if nil == frame {
+				continue
+			}
+			if delay {
+				currentTs := frame.(*mode_s.Frame).BeastTicksNs()
+				if lastTimeStamp > 0 && lastTimeStamp < currentTs {
+					time.Sleep(currentTs - lastTimeStamp)
+				}
+				lastTimeStamp = currentTs
+			}
 
 			p.AddEvent(tracker.NewFrameEvent(frame, newSource(p.String(), "file://" + fileName)))
 		}
@@ -124,4 +136,3 @@ func ScanBeast(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	// we want more data!
 	return 0, nil, nil
 }
-

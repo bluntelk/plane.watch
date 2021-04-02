@@ -166,7 +166,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		trk.AddProducer(producer.NewAvrFile([]string{file}))
 	}
 	if file := c.GlobalString("beast-file"); "" != file {
-		trk.AddProducer(producer.NewBeastFile([]string{file}))
+		trk.AddProducer(producer.NewBeastFile([]string{file}, true))
 	}
 	return trk, nil
 }

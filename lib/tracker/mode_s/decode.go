@@ -3,7 +3,6 @@ package mode_s
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -47,21 +46,32 @@ func NewFrame(rawFrame string, t time.Time) *Frame {
 		full:      rawFrame,
 		timeStamp: t,
 	}
+	if err := f.parseIntoRaw(); nil != err {
+		return nil
+	}
+
 	return &f
 }
 
 func (f *Frame) Decode() (bool, error) {
+	if err := f.parseIntoRaw(); nil != err {
+		return false, err
+	}
+	return !f.isNoOp(), f.Parse()
+}
+
+func (f *Frame) parseIntoRaw() error {
 	encodedFrame := strings.TrimFunc(f.full, func(r rune) bool {
 		return unicode.IsSpace(r) || ';' == r
 	})
 
 	// let's ensure that we have some correct data...
 	if "" == encodedFrame {
-		return false, errors.New("cannot decode empty string")
+		return errors.New("cannot decode empty string")
 	}
 
 	if len(encodedFrame) < 14 {
-		return false, fmt.Errorf("frame (%s) too short to be a Mode S frame", f.full)
+		return fmt.Errorf("frame (%s) too short to be a Mode S frame", f.full)
 	}
 
 	// determine what type of frame we are dealing with
@@ -78,11 +88,15 @@ func (f *Frame) Decode() (bool, error) {
 		frameStart = 13
 		// try and use the provided timestamp
 		f.beastTimeStamp = encodedFrame[1:12]
+		if err := f.parseBeastTimeStamp(); nil != err {
+			return err
+		}
 	} else if "*" == encodedFrame[0:1] {
 		frameStart = 1
 	}
 	f.raw = encodedFrame[frameStart:]
-	return !f.isNoOp(), f.Parse()
+
+	return nil
 }
 
 
@@ -92,8 +106,6 @@ func (f *Frame) Parse() error {
 	if f.isNoOp() {
 		return nil
 	}
-
-	f.parseBeastTimeStamp()
 
 	err = f.parseRawToMessage()
 	if nil != err {
@@ -177,9 +189,9 @@ func (f *Frame) parseRadarcapeTimeStamp() {
 	// TODO: Decode Radarcape Ticks
 }
 
-func (f *Frame) parseBeastTimeStamp() {
+func (f *Frame) parseBeastTimeStamp() error {
 	if "" == f.beastTimeStamp || "00000000000" == f.beastTimeStamp {
-		return
+		return nil
 	}
 	// MLAT timestamps from Beast AVR are dependent on when the device started ( 500ns intervals / 12mhz)
 	// calculated from power on.
@@ -190,11 +202,17 @@ func (f *Frame) parseBeastTimeStamp() {
 	var err error
 	f.beastTicks, err = strconv.ParseUint(f.beastTimeStamp, 16, 64)
 	if err != nil {
-		log.Printf("Failed to decode beast avr timestamp: %s", err)
-		return
+		return fmt.Errorf("failed to decode beast avr timestamp: %s", err)
 	}
 	f.beastTicksNs = f.beastTicks * 500
+	return nil
 }
+
+// BeastTicksNs returns a time.Duration timestamp for this frame
+func (f *Frame) BeastTicksNs() time.Duration {
+	return time.Duration(f.beastTicksNs)
+}
+
 
 func (f *Frame) TimeStamp() time.Time {
 	return f.timeStamp

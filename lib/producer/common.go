@@ -18,25 +18,29 @@ const (
 	cmdExit = 1
 )
 
-type producer struct {
-	label, ident string
-	out   chan tracker.Event
-	outClosed bool
-	outLocker sync.Mutex
+type (
+	producer struct {
+		label, ident string
+		out          chan tracker.Event
+		outClosed    bool
+		outLocker    sync.Mutex
 
-	cmdChan chan int
-}
+		cmdChan chan int
+	}
+)
 
 func NewProducer(label string) *producer {
-	return &producer{
-		label:   label,
-		out:     make(chan tracker.Event, 100),
+	p := &producer{
+		label:     label,
+		out:       make(chan tracker.Event, 100),
 		outClosed: false,
-		cmdChan: make(chan int),
+		cmdChan:   make(chan int),
 	}
+
+	return p
 }
 
-func newSource(label, ident string) tracker.Source{
+func newSource(label, ident string) tracker.Source {
 	return tracker.Source{
 		OriginIdentifier: ident,
 		Name:             label,
@@ -85,7 +89,7 @@ func (p *producer) Cleanup() {
 	if p.outClosed {
 		return
 	}
-	p.outClosed=true
+	p.outClosed = true
 	close(p.out)
 }
 
@@ -128,7 +132,6 @@ func (p *producer) readFiles(dataFiles []string, read func(io.Reader, string) er
 		p.Cleanup()
 	}()
 
-
 	go func() {
 		for cmd := range p.cmdChan {
 			switch cmd {
@@ -144,7 +147,7 @@ func (p *producer) fetcher(host, port string, read func(net.Conn) error) {
 	var wLock sync.RWMutex
 	working := true
 
-	isWorking := func () bool {
+	isWorking := func() bool {
 		wLock.RLock()
 		defer wLock.RUnlock()
 		return working
@@ -161,7 +164,7 @@ func (p *producer) fetcher(host, port string, read func(net.Conn) error) {
 			if nil != err {
 				p.addError(err)
 				time.Sleep(backOff)
-				backOff = backOff * 2 + ((time.Duration(rand.Intn(20)) * time.Millisecond * 100) - time.Second)
+				backOff = backOff*2 + ((time.Duration(rand.Intn(20)) * time.Millisecond * 100) - time.Second)
 				if backOff > time.Minute {
 					backOff = time.Minute
 				}

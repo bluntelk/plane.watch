@@ -87,6 +87,8 @@ func newAppDisplay() (*display, error) {
 		return event
 	})
 
+	d.drawTable()
+
 	return &d, nil
 }
 
