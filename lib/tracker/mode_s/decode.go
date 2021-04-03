@@ -30,6 +30,9 @@ type (
 
 func DecodeString(rawFrame string, t time.Time) (*Frame, error) {
 	frame := NewFrame(rawFrame, t)
+	if nil == frame {
+		return nil, errors.New("unable to parse frame")
+	}
 	if ok, err := frame.Decode(); !ok || nil != err {
 		return nil, err
 	}
@@ -54,6 +57,9 @@ func NewFrame(rawFrame string, t time.Time) *Frame {
 }
 
 func (f *Frame) Decode() (bool, error) {
+	if nil == f {
+		return false, nil
+	}
 	if err := f.parseIntoRaw(); nil != err {
 		return false, err
 	}
