@@ -51,15 +51,15 @@ func (f *Frame) Raw() []byte {
 var magicTimestampMLAT = []byte{0xFF, 0x00, 0x4D, 0x4C, 0x41, 0x54}
 
 func newBeastMsg(rawBytes []byte) *Frame {
+	if len(rawBytes) <= 8 {
+		return nil
+	}
 	// decode beast into AVR
 	if rawBytes[0] != 0x1A {
 		// invalid frame
 		return nil
 	}
 	if rawBytes[1] < 0x31 || rawBytes[1] > 0x34 {
-		return nil
-	}
-	if len(rawBytes) <= 8 {
 		return nil
 	}
 	return &Frame{

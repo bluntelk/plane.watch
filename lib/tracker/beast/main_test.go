@@ -2,6 +2,7 @@ package beast
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 )
 
@@ -81,5 +82,34 @@ func TestNewBeastMsgModeSLong(t *testing.T) {
 	// make sure we decode into a mode_s.Frame
 	if 14 != len(f.body) {
 		t.Errorf("Incorrect body len. expected 7, got %d", len(f.body))
+	}
+}
+
+func Test_newBeastMsg(t *testing.T) {
+	type args struct {
+		rawBytes []byte
+	}
+	tests := []struct {
+		name string
+		args args
+		want *Frame
+	}{
+		{name: "empty", args: args{rawBytes: []byte{}}, want: nil},
+		{name: "1", args: args{rawBytes: []byte{0}}, want: nil},
+		{name: "2", args: args{rawBytes: []byte{0, 0}}, want: nil},
+		{name: "3", args: args{rawBytes: []byte{0, 0, 0}}, want: nil},
+		{name: "4", args: args{rawBytes: []byte{0, 0, 0, 0}}, want: nil},
+		{name: "5", args: args{rawBytes: []byte{0, 0, 0, 0, 0}}, want: nil},
+		{name: "6", args: args{rawBytes: []byte{0, 0, 0, 0, 0, 0}}, want: nil},
+		{name: "7", args: args{rawBytes: []byte{0, 0, 0, 0, 0, 0, 0}}, want: nil},
+		{name: "8", args: args{rawBytes: []byte{0, 0, 0, 0, 0, 0, 0, 0}}, want: nil},
+		{name: "9", args: args{rawBytes: []byte{0, 0, 0, 0, 0, 0, 0, 0, 0}}, want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := newBeastMsg(tt.args.rawBytes); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("newBeastMsg() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
