@@ -3,7 +3,12 @@ package mode_s
 // extended squitter decoding
 
 import (
+	"errors"
+	"fmt"
 	"math"
+	"reflect"
+	"strconv"
+	"strings"
 )
 
 func (f *Frame) decodeAdsbLatLon() {
@@ -16,7 +21,7 @@ func (f *Frame) decodeAdsbLatLon() {
 	// CPR LAT/LON
 	f.rawLatitude = ((msg6 & 0x03) << 15) | (msg7 << 7) | (msg8 >> 1)
 	f.rawLongitude = ((msg8 & 0x01) << 16) | (msg9 << 8) | msg10
-	f.cprFlagOddEven = int(msg6 & 0x04) >> 2
+	f.cprFlagOddEven = int(msg6&0x04) >> 2
 }
 
 func (f *Frame) decodeAdsb() {
@@ -43,7 +48,7 @@ func (f *Frame) decodeAdsb() {
 		f.decodeAdsbLatLon()
 		f.decodeSurfaceMovementField()
 
-		if f.message[5] & 0x08 != 0 {
+		if f.message[5]&0x08 != 0 {
 			f.heading = float64(((((f.message[5] << 4) | (f.message[6] >> 4)) & 0x007F) * 45) >> 4)
 			f.validHeading = true
 		}
@@ -84,7 +89,7 @@ func (f *Frame) decodeAdsb() {
 		f.nacV = (f.message[5] & 0x38) >> 3
 
 		var verticalRateSign = int((f.message[8] & 0x8) >> 3)
-		f.verticalRate = (int(f.message[8] & 7) << 6) | (int(f.message[9] & 0xfc) >> 2)
+		f.verticalRate = (int(f.message[8]&7) << 6) | (int(f.message[9]&0xfc) >> 2)
 		if f.verticalRate != 0 {
 			f.verticalRate--
 			if verticalRateSign != 0 {
@@ -96,10 +101,10 @@ func (f *Frame) decodeAdsb() {
 
 		if f.messageSubType == 1 || f.messageSubType == 2 {
 			// Ground Speed Message
-			f.eastWestDirection = int(f.message[5] & 4) >> 2
-			f.eastWestVelocity = int(((f.message[5] & 3) << 8) | f.message[6])
+			f.eastWestDirection = int(f.message[5]&4) >> 2
+			f.eastWestVelocity = (int(f.message[5]&3) << 8) | int(f.message[6])
 			f.northSouthDirection = int((f.message[7] & 0x80) >> 7)
-			f.northSouthVelocity = (int(f.message[7] & 0x7f) << 3) | (int(f.message[8] & 0xe0) >> 5)
+			f.northSouthVelocity = (int(f.message[7]&0x7f) << 3) | (int(f.message[8]&0xe0) >> 5)
 			f.verticalRateSource = int((f.message[8] & 0x10) >> 4)
 			/* Compute velocity and angle from the two speed components. */
 
@@ -150,8 +155,8 @@ func (f *Frame) decodeAdsb() {
 				f.validVelocity = true
 			}
 
-			if f.message[5] & 4 != 0 {
-				f.heading = (360.0 / 128.0) * float64(((f.message[5] & 3) << 5) | (f.message[6] >> 3))
+			if f.message[5]&4 != 0 {
+				f.heading = (360.0 / 128.0) * float64(((f.message[5]&3)<<5)|(f.message[6]>>3))
 				f.validHeading = true
 			}
 		}
@@ -163,7 +168,7 @@ func (f *Frame) decodeAdsb() {
 			if f.haeDirection == 0 {
 				multiplier = 25
 			}
-			f.haeDelta = multiplier * int((f.message[10] & 0x7f) - 1)
+			f.haeDelta = multiplier * int((f.message[10]&0x7f)-1)
 		}
 	case 23:
 		if f.messageSubType == 7 {
@@ -173,12 +178,17 @@ func (f *Frame) decodeAdsb() {
 			//??
 		}
 
-	case 24, 25, 26, 27:
+	case 24:
+	// Surface System Status Messages
 	//NoOp
+	// subType=1 is for Multilateration System Status (Allocated for national use)
+	// this is a per system manufacturer message
+	case 25, 26, 27:
+		// RESERVED
+		// ADS-B Messages with TYPE Code=27 are Reserved for future expansion of these MOPS to specify Trajectory Change Message formats.
 	case 28:
 		if f.messageSubType == 1 {
 			// EMERGENCY (or priority), EMERGENCY, THERE'S AN EMERGENCY GOING ON
-			f.decodeSquawkIdentity(5, 6)
 			var emergencyId = int((f.message[5] & 0xe0) >> 5)
 			f.alert = emergencyId != 0
 			f.emergency = emergencyStateTable[emergencyId]
@@ -190,6 +200,33 @@ func (f *Frame) decodeAdsb() {
 			// TCAS Resolution Advisory
 		}
 	case 29:
+		// Target State and Status Message
+		// DO-260 - unused
+		// DO-260A = Target State and Status Information Message
+		// DO-260B =
+		if f.messageSubType == 0 {
+			// DO-260A
+		} else if f.messageSubType == 1 {
+			// DO-260B
+			// bit 40    SIL supplement (SIL Per Hour or Per Sample)
+			// bit 41    Selected Alt Type
+			// bit 42-52 MCP/FCU Selected Altitude OR FMS Selected Altitude
+			// bit 53-61 Barometric Pressure Setting (minus 800 millibars)
+			// bit 62    Selected Heading Status
+			// bit 63    Selected Heading Sign
+			// bit 64-71 Selected Heading
+			// bit 72-75 NACp (Navigation Accuracy Category_Position)
+			// bit 76    NICbaro (Navigation Integrity Category_Baro)
+			// bit 77-78 SIL (Source Integrity Level)
+			// bit 79    MCP/FPU Status
+			// bit 80    Autopilot Engaged
+			// bit 81    VNAV Mode Engaged
+			// bit 82    Altitude Hold Mode
+			// bit 83    Reserved for ADS-R Flag
+			// bit 84    Approach Mode
+			// bit 85    TCAS Operational
+			// bit 86-88 Reserved
+		}
 	case 30:
 	// NoOp
 	case 31:
@@ -197,15 +234,15 @@ func (f *Frame) decodeAdsb() {
 		// TODO: Finish this off - it is not in a good working state
 
 		// bool pointer helper
-		bp := func(b bool) *bool {return &b}
+		bp := func(b bool) *bool { return &b }
 
 		if f.messageSubType == 0 {
 			// on the ground!
 			f.validVerticalStatus = true
 			f.onGround = false
 
-			f.compatibilityClass = int(f.message[5]) << 8 | int(f.message[6])
-			if f.compatibilityClass & 0xC000 == 0 {
+			f.compatibilityClass = int(f.message[5])<<8 | int(f.message[6])
+			if f.compatibilityClass&0xC000 == 0 {
 				f.cccHasOperationalTcas = bp((f.compatibilityClass & 0x2000) != 0)
 				f.cccHasAirRefVel = bp((f.compatibilityClass & 0x200) != 0)
 				f.cccHasTargetStateRpt = bp((f.compatibilityClass & 0x100) != 0)
@@ -218,10 +255,10 @@ func (f *Frame) decodeAdsb() {
 		} else if f.messageSubType == 1 {
 			f.validVerticalStatus = true
 			f.onGround = true
-			f.compatibilityClass = int(f.message[5]) << 4 | int(f.message[6] & 0xF0) >> 4
+			f.compatibilityClass = int(f.message[5])<<4 | int(f.message[6]&0xF0)>>4
 			f.airframeWidthLen = f.message[6] & 0x0F
 
-			if f.compatibilityClass & 0xC000 == 0 {
+			if f.compatibilityClass&0xC000 == 0 {
 				f.cccHasLowTxPower = bp((f.compatibilityClass & 0x200) != 0)
 				f.cccHasUATReceiver = (f.compatibilityClass & 0x100) != 0
 				f.validNacV = true
@@ -229,12 +266,12 @@ func (f *Frame) decodeAdsb() {
 				f.nicSupplementC = byte((f.compatibilityClass & 0x10) >> 4)
 			}
 		}
-		if f.compatibilityClass & 0xC000 == 0 {
+		if f.compatibilityClass&0xC000 == 0 {
 			f.validCompatibilityClass = true
 			f.cccHas1090EsIn = (f.compatibilityClass & 0x1000) != 0
 		}
 
-		f.operationalModeCode = int(f.message[7]) << 8 | int(f.message[8])
+		f.operationalModeCode = int(f.message[7])<<8 | int(f.message[8])
 		f.adsbVersion = (f.message[9] & 0xe0) >> 5
 		f.nicSupplementA = f.message[9] & 0x10 >> 4
 
@@ -246,6 +283,108 @@ func (f *Frame) decodeAdsb() {
 	}
 }
 
+func (f *Frame) bitString() string {
+	var bits string
+	for _, msg := range f.message {
+		bits += fmt.Sprintf("%08b", msg)
+	}
+	return bits
+}
+
+func (f *Frame) decodeInto(bitStream string, t interface{}) error {
+	valParentPtr := reflect.ValueOf(t)
+	if reflect.Ptr != valParentPtr.Kind() || valParentPtr.IsNil() {
+		return errors.New("you need to pass in a pointer to your struct")
+	}
+	valParent := valParentPtr.Elem()
+	if !valParent.CanAddr() || !valParent.IsValid() || !valParent.CanSet() {
+		return errors.New("cannot edit struct")
+	}
+	tType := reflect.TypeOf(t).Elem()
+	if tType.Kind() != reflect.Struct {
+		return errors.New("you need to pass in a struct with all the struct tags (bits,name,desc)")
+	}
+
+	for i := 0; i < tType.NumField(); i++ {
+		field := tType.Field(i)
+
+		bits := field.Tag.Get("bits")
+
+		splitBits := strings.SplitN(bits, "-", 2)
+		if 2 != len(splitBits) {
+			println("Incorrect Struct Tag `bits`")
+		}
+		low, err := strconv.ParseUint(splitBits[0], 10, 8)
+		if nil != err {
+			return fmt.Errorf("incorrect Struct Tag `bits` low (%s) needs to be a number", splitBits[0])
+		}
+		high, err := strconv.ParseUint(splitBits[1], 10, 8)
+		if nil != err {
+			return fmt.Errorf("incorrect Struct Tag `bits` high (%s) needs to be a number", splitBits[1])
+		}
+		fieldBits := bitStream[low:high]
+		ii, err := strconv.ParseUint(fieldBits, 2, 64)
+
+		valField := valParent.Field(i)
+		if !valField.IsValid() || !valField.CanSet() {
+			err = fmt.Errorf("cannot Set Field %s", field.Name)
+		}
+		valField.SetUint(ii)
+	}
+	return nil
+}
+
+func (f *Frame) decodeAdsb2() (*extendedSquitter, error) {
+
+	// Down Link Format 17 Message Types
+	f.messageType = f.message[4] >> 3
+	f.messageSubType = f.message[4] & 7
+	bitStream := f.bitString()
+
+	var err error
+	var es extendedSquitter
+
+	err = f.decodeInto(bitStream, &es)
+
+	switch f.messageType {
+	case 1, 2, 3, 4:
+		err = f.decodeInto(bitStream, &es.df17me1)
+	case 19:
+		switch f.messageSubType {
+		case 1, 2:
+			err = f.decodeInto(bitStream, &es.df17me19t1)
+		case 3, 4:
+			err = f.decodeInto(bitStream, &es.df17me19t3)
+		}
+	case 28:
+		switch f.messageSubType {
+		case 1:
+			err = f.decodeInto(bitStream, &es.df17me28t1)
+		case 2:
+			err = f.decodeInto(bitStream, &es.df17me28t2)
+		}
+	case 29:
+		switch f.messageSubType {
+		case 0:
+			// DO-260A
+			err = f.decodeInto(bitStream, &es.df17me29t0)
+		case 1:
+			// DO-260B
+			err = f.decodeInto(bitStream, &es.df17me29t1)
+		default:
+			err = f.decodeInto(bitStream, &es.df17me29t2)
+		}
+	case 31:
+		switch f.messageSubType {
+		case 0:
+			err = f.decodeInto(bitStream, &es.df17me31t0)
+		case 1:
+			err = f.decodeInto(bitStream, &es.df17me31t1)
+		}
+	default:
+	}
+	return &es, err
+}
 
 //
 //=========================================================================
@@ -266,19 +405,19 @@ func calcSurfaceSpeed(value uint64) (float64, bool) {
 		if value > 123 {
 			gSpeed = 175 // > 175kt
 		} else if value > 108 { // 109-123 - 5 kt steps
-			gSpeed = float64((value - 109) * 5) + 100.0
+			gSpeed = float64((value-109)*5) + 100.0
 
 		} else if value > 93 { // 94 - 108 | 70kt - <100kt
-			gSpeed = float64((value - 94) * 2) + 70
+			gSpeed = float64((value-94)*2) + 70
 
 		} else if value > 38 { // 39 - 93 | 15kt - <70kt | 1kt step
-			gSpeed = float64(value - 39) + 15
+			gSpeed = float64(value-39) + 15
 
 		} else if value > 12 { //13-38 |  2 kt - <15kt | 0.5 kt steps
-			gSpeed = float64(value - 13) *0.5 + 2
+			gSpeed = float64(value-13)*0.5 + 2
 
 		} else if value > 8 { // 9-12 | 1kt - < 2kt | 0.25 kt steps
-			gSpeed = float64(value - 9) * 0.25 + 1
+			gSpeed = float64(value-9)*0.25 + 1
 
 		} else if value > 1 {
 			gSpeed = float64(value-1) * 0.125

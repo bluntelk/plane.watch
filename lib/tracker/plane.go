@@ -71,7 +71,7 @@ type (
 )
 
 var (
-	MaxLocationHistory = 10
+	MaxLocationHistory = 1000
 	headingLookup      = headingInfo{
 		{from: 348.75, to: 360, label: "N"},
 		{from: 0, to: 11.25, label: "N"},

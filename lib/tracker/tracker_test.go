@@ -1,10 +1,10 @@
 package tracker
 
 import (
+	"fmt"
 	"plane.watch/lib/tracker/mode_s"
 	"testing"
 	"time"
-	"fmt"
 )
 
 func TestNLFunc(t *testing.T) {
@@ -20,7 +20,6 @@ func TestCprDecode(t *testing.T) {
 		evenLat, evenLon float64
 		oddLat, oddLon   float64
 
-
 		evenRlatCheck1, evenRlonCheck1 string
 
 		evenRlat, evenRlon string
@@ -28,13 +27,13 @@ func TestCprDecode(t *testing.T) {
 	}
 	testData := []testDataType{
 		//odd *8d7c4516581f76e48d95e8ab20ca; even *8d7c4516581f6288f83ade534ae1;
-		{evenLat: 83068, evenLon:15070, oddLat:94790, oddLon:103912, oddRlat:"-32.197483", oddRlon:"+116.028629", evenRlat:"-32.197449", evenRlon:"+116.027820"},
+		{evenLat: 83068, evenLon: 15070, oddLat: 94790, oddLon: 103912, oddRlat: "-32.197483", oddRlon: "+116.028629", evenRlat: "-32.197449", evenRlon: "+116.027820"},
 
 		// odd *8d7c4516580f06fc6d8f25d8669d; even *8d7c4516580df2a168340b32212a;
-		{evenLat: 86196, evenLon:13323, oddLat:97846, oddLon:102181, oddRlat:"-32.055219", oddRlon:"+115.931602", evenRlat:"-32.054260", evenRlon:"+115.931854"},
+		{evenLat: 86196, evenLon: 13323, oddLat: 97846, oddLon: 102181, oddRlat: "-32.055219", oddRlon: "+115.931602", evenRlat: "-32.054260", evenRlon: "+115.931854"},
 
 		// test data from cprtest.c from mutability dump1090
-		{evenLat: 80536, evenLon:9432, oddLat:61720, oddLon:9192, evenRlat:"+51.686646", evenRlon:"+0.700156", oddRlat:"+51.686763", oddRlon:"+0.701294"},
+		{evenLat: 80536, evenLon: 9432, oddLat: 61720, oddLon: 9192, evenRlat: "+51.686646", evenRlon: "+0.700156", oddRlat: "+51.686763", oddRlon: "+0.701294"},
 	}
 	airDlat0 := "+6.000000"
 	airDlat1 := "+6.101695"
@@ -51,8 +50,8 @@ func TestCprDecode(t *testing.T) {
 			t.Error(err)
 		}
 
-		lat := fmt.Sprintf("%+0.6f", loc.latitude);
-		lon := fmt.Sprintf("%+0.6f", loc.longitude);
+		lat := fmt.Sprintf("%+0.6f", loc.latitude)
+		lon := fmt.Sprintf("%+0.6f", loc.longitude)
 
 		if lat != d.oddRlat {
 			t.Errorf("Plane latitude is wrong for packet %d: should be %s, was %s", i, d.oddRlat, lat)
@@ -76,8 +75,8 @@ func TestCprDecode(t *testing.T) {
 			t.Error(err)
 		}
 
-		lat = fmt.Sprintf("%+0.6f", loc.latitude);
-		lon = fmt.Sprintf("%+0.6f", loc.longitude);
+		lat = fmt.Sprintf("%+0.6f", loc.latitude)
+		lon = fmt.Sprintf("%+0.6f", loc.longitude)
 
 		if lat != d.evenRlat {
 			t.Errorf("Plane latitude is wrong for packet %d: should be %s, was %s", i, d.evenRlat, lat)
@@ -96,7 +95,6 @@ func TestCprDecode(t *testing.T) {
 	}
 }
 
-
 func TestTracking(t *testing.T) {
 	frames := []string{
 		"*8D40621D58C382D690C8AC2863A7;",
@@ -110,7 +108,7 @@ func TestTracking(t *testing.T) {
 	}
 
 	lat := "+52.2572021484375"
-	lon := "+3.9193725585938";
+	lon := "+3.9193725585938"
 	if lon != fmt.Sprintf("%+03.13f", plane.Lon()) {
 		t.Errorf("longitude Calculation was incorrect: expected %s, got %+0.13f", lon, plane.Lon())
 	}
@@ -155,7 +153,7 @@ func TestTracking2(t *testing.T) {
 
 }
 
-func performTrackingTest(frames []string, t *testing.T) *Tracker{
+func performTrackingTest(frames []string, t *testing.T) *Tracker {
 	trk := NewTracker()
 	for _, msg := range frames {
 		frame, err := mode_s.DecodeString(msg, time.Now())
@@ -165,4 +163,39 @@ func performTrackingTest(frames []string, t *testing.T) *Tracker{
 		trk.HandleModeSFrame(frame)
 	}
 	return trk
+}
+
+// Makes sure that we get a location update only when we need one
+func TestTrackingLocationHistory(t *testing.T) {
+	tests := []struct {
+		name         string
+		frame        string
+		numLocations int
+	}{
+		{name: "DF17/MT31/ST00 Airborne Status Frame", frame: "8D7C4A0CF80300030049B8BA7984", numLocations: 0},
+		{name: "DF17/MT31/ST00 Airborne Status Frame", frame: "8D7C4A0CF80300030049B8BA7984", numLocations: 0},
+		{name: "DF17/MT31/ST01 Ground Status Frame", frame: "8C7C4A0CF9004103834938E42BD4", numLocations: 1},
+		{name: "DF17/MT31/ST01 Ground Status Frame", frame: "8C7C4A0CF9004103834938E42BD4", numLocations: 1},
+	}
+	trk := NewTracker()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			frame, err := mode_s.DecodeString(tt.frame, time.Now())
+			if nil != err {
+				t.Error(err)
+				return
+			}
+			if nil == frame {
+				t.Errorf("nil frame from avr frame %s", tt.frame)
+				return
+			}
+			trk.HandleModeSFrame(frame)
+			plane := trk.GetPlane(frame.Icao())
+			numHistory := len(plane.locationHistory)
+			if tt.numLocations != numHistory {
+				t.Errorf("Expected plane to have %d history items, actually has %d", tt.numLocations, numHistory)
+			}
+		})
+	}
+
 }

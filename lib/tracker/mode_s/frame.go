@@ -29,120 +29,282 @@ const (
 	DF17FrameAircraftOperational      = "Aircraft Operational status Message"
 )
 
-type Position struct {
-	validAltitude bool
-	altitude      int32
-	isGnssAlt     bool
-	unit          int
+type (
+	Position struct {
+		validAltitude bool
+		altitude      int32
+		isGnssAlt     bool
+		unit          int
 
-	rawLatitude  int /* Non decoded latitude */
-	rawLongitude int /* Non decoded longitude */
+		rawLatitude  int /* Non decoded latitude */
+		rawLongitude int /* Non decoded longitude */
 
-	eastWestDirection   int /* 0 = East, 1 = West. */
-	eastWestVelocity    int /* E/W velocity. */
-	northSouthDirection int /* 0 = North, 1 = South. */
-	northSouthVelocity  int /* N/S velocity. */
-	validVelocity       bool
-	velocity            float64 /* Computed from EW and NS velocity. */
-	superSonic          bool
+		eastWestDirection   int /* 0 = East, 1 = West. */
+		eastWestVelocity    int /* E/W velocity. */
+		northSouthDirection int /* 0 = North, 1 = South. */
+		northSouthVelocity  int /* N/S velocity. */
+		validVelocity       bool
+		velocity            float64 /* Computed from EW and NS velocity. */
+		superSonic          bool
 
-	verticalRateSource int /* Vertical rate source. */
-	verticalRate       int /* Vertical rate. */
-	validVerticalRate  bool
+		verticalRateSource int /* Vertical rate source. */
+		verticalRate       int /* Vertical rate. */
+		validVerticalRate  bool
 
-	onGround            bool /* VS Bit */
-	validVerticalStatus bool
+		onGround            bool /* VS Bit */
+		validVerticalStatus bool
 
-	heading      float64
-	validHeading bool
+		heading      float64
+		validHeading bool
 
-	haeDirection byte //up or down increments of 25
-	haeDelta     int
-	validHae     bool
-}
+		haeDirection byte //up or down increments of 25
+		haeDelta     int
+		validHae     bool
+	}
 
-type df17 struct {
-	messageType    byte // DF17 Extended Squitter Message Type
-	messageSubType byte // DF17 Extended Squitter Message Sub Type
+	df17 struct {
+		messageType    byte // DF17 Extended Squitter Message Type
+		messageSubType byte // DF17 Extended Squitter Message Sub Type
 
-	cprFlagOddEven int    /* 1 = Odd, 0 = Even CPR message. */
-	timeFlag       int    /* UTC synchronized? */
-	flight         []byte /* 8 chars flight number. */
+		cprFlagOddEven int    /* 1 = Odd, 0 = Even CPR message. */
+		timeFlag       int    /* UTC synchronized? */
+		flight         []byte /* 8 chars flight number. */
 
-	validCompatibilityClass bool
-	compatibilityClass      int
-	cccHasOperationalTcas   *bool
-	cccHas1090EsIn          bool
-	cccHasAirRefVel         *bool // supports Air Referenced velocity
-	cccHasLowTxPower        *bool
-	cccHasTargetStateRpt    *bool // supports Target State Report
-	cccHasTargetChangeRpt   *bool // supports Target Change Report
-	cccHasUATReceiver       bool
-	validNacV               bool
+		validCompatibilityClass bool
+		compatibilityClass      int
+		cccHasOperationalTcas   *bool
+		cccHas1090EsIn          bool
+		cccHasAirRefVel         *bool // supports Air Referenced velocity
+		cccHasLowTxPower        *bool
+		cccHasTargetStateRpt    *bool // supports Target State Report
+		cccHasTargetChangeRpt   *bool // supports Target Change Report
+		cccHasUATReceiver       bool
+		validNacV               bool
 
-	operationalModeCode int
-	adsbVersion         byte
-	nacP                byte // Navigation accuracy category - position
-	geoVertAccuracy     byte // geometric vertical accuracy
-	sil                 byte
-	airframeWidthLen    byte
-	nicCrossCheck       byte // whether or not the alt or heading is cross checked
-	northReference      byte // 0=true north, 1 = magnetic north
+		operationalModeCode int
+		adsbVersion         byte
+		nacP                byte // Navigation accuracy category - position
+		geoVertAccuracy     byte // geometric vertical accuracy
+		sil                 byte
+		airframeWidthLen    byte
+		nicCrossCheck       byte // whether or not the alt or heading is cross checked
+		northReference      byte // 0=true north, 1 = magnetic north
 
-	surveillanceStatus byte
-	nicSupplementA     byte
-	nicSupplementB     byte
-	nicSupplementC     byte
-	containmentRadius  int
+		surveillanceStatus byte
+		nicSupplementA     byte
+		nicSupplementB     byte
+		nicSupplementC     byte
+		containmentRadius  int
 
-	intentChange  byte
-	ifrCapability byte
-	nacV          byte
-}
+		intentChange  byte
+		ifrCapability byte
+		nacV          byte
+	}
 
-type rawFields struct {
-	// fields named what they are. see describe.go for what they mean
+	extendedSquitter struct {
+		Df byte   `bits:"0-5" name:"DF" desc:"Downlink Format"`
+		Ca byte   `bits:"5-8" name:"CA" desc:"Aircraft System Capability"`
+		Aa uint32 `bits:"8-32" name:"AA" desc:"Address Announce, ICAO Identification"`
+		Me uint64 `bits:"32-88" name:"ME" desc:"ADSB Message"`
+		Pi uint32 `bits:"88-111" name:"PI" desc:"Parity/Interr.Identity: reports source of interrogation. Contains the parity overlaid on the interrogator identity code"`
 
-	df, vs, ca, cc, sl, ri, dr, um, fs byte
-	ac, ap, id, aa, pi                 uint32
-	mv, me, mb                         uint64
-	md                                 [10]byte
+		df17me1
 
-	// altitude decoding
-	acQ, acM bool
+		df17me19t1
+		df17me19t3
 
-	// adsb decoding
-	catType, catSubType byte
-	catValid            bool
-}
+		df17me28t1
+		df17me28t2
 
-type Frame struct {
-	rawFields
-	bds
-	df17
-	Position
-	mode string
-	// the timestamp we are processing this message at
-	timeStamp      time.Time
-	beastTimeStamp string
-	// beastTicks is the number of ticks since the beast was turned on
-	beastTicks uint64
-	// beastTicksNs is the number of nanoseconds since the beast was turned on
-	beastTicksNs   uint64
-	beastAvrUptime time.Duration
-	// raw is our semi processed string, full is the original string
-	raw, full      string
-	message        []byte
-	downLinkFormat byte // Down link Format (DF)
-	icao           uint32
-	crc, checkSum  uint32
-	identity       uint32
-	special        string
-	emergency      string
-	alert          bool
-	// if we have trouble decoding our frame, the message ends up here
-	err error
-}
+		df17me29t0
+		df17me29t1
+		df17me29t2
+
+		df17me31t0
+		df17me31t1
+	}
+
+	// df17me1 is Aircraft Identification and Category
+	df17me1 struct {
+		CategoryType    byte `bits:"33-38" name:"CAT" desc:"Aircraft Category"`
+		CategorySubType byte `bits:"38-41" name:"CAT" desc:"Aircraft Category Sub Type"`
+		IdentChar1      byte `bits:"41-47" name:"ident char"`
+		IdentChar2      byte `bits:"47-53" name:"ident char"`
+		IdentChar3      byte `bits:"53-59" name:"ident char"`
+		IdentChar4      byte `bits:"59-65" name:"ident char"`
+		IdentChar5      byte `bits:"65-71" name:"ident char"`
+		IdentChar6      byte `bits:"71-77" name:"ident char"`
+		IdentChar7      byte `bits:"77-83" name:"ident char"`
+		IdentChar8      byte `bits:"83-89" name:"ident char"`
+	}
+
+	// df17me19t1 Airborne Velocity Message Subtype=1 and 2
+	df17me19t1 struct {
+		CategoryType    byte   `bits:"33-38"`
+		CategorySubType byte   `bits:"38-41"`
+		IntentChange    byte   `bits:"41-42" name:"Intent" desc:"Intent Change"`
+		ReservedA       byte   `bits:"42-43" name:"Res" desc:"Reserved-A"`
+		NacV            byte   `bits:"43-46"`
+		EWDir           byte   `bits:"46-47" name:"EW" desc:"(0)East/(1)West Direction"`
+		EWVelocity      uint16 `bits:"47-57" name:"EWV" desc:"East/West Velocity"`
+		NSDir           byte   `bits:"57-58" name:"NS" desc:"(0)North/(1)South Direction"`
+		NSVelocity      uint16 `bits:"58-68" name:"NSV" desc:"North/South Velocity"`
+		VertRateSource  byte   `bits:"68-69" name:"VRS" desc:"Vertical Rate Source"`
+		VertRateSign    byte   `bits:"69-70" name:"VRS+" desc:"Vertical Rate Sign"`
+		VertRate        uint16 `bits:"70-79" name:"VR" desc:"Vertical Rate"`
+		ReservedB       byte   `bits:"79-81" name:"Res" desc:"Reserved-B"`
+		DiffBaroSign    byte   `bits:"81-82" name:"DB+" desc:"Diff from Baro Altitude Sign. 0=up, 1=down"`
+		DiffBaroAlt     byte   `bits:"82-89" name:"DB+" desc:"Diff from Baro Altitude"`
+	}
+
+	// df17me19t3 Airborne Velocity Message Subtype=3 and 4
+	df17me19t3 struct {
+		CategoryType    byte   `bits:"33-38"`
+		CategorySubType byte   `bits:"38-41"`
+		IntentChange    byte   `bits:"41-42" name:"Intent" desc:"Intent Change"`
+		ReservedA       byte   `bits:"42-43" name:"Res" desc:"Reserved-A"`
+		NacV            byte   `bits:"43-46"`
+		HeadingStatus   byte   `bits:"46-47" name:"HDS" desc:"Heading Status"`
+		Heading         uint16 `bits:"47-57" name:"HD" desc:"Heading Status"`
+		AirSpeedType    byte   `bits:"57-58" name:"AST" desc:"Air Speed Type"`
+		AirSpeed        uint16 `bits:"58-68" name:"AS" desc:"Air Speed"`
+		VertRateSource  byte   `bits:"68-69" name:"VRS" desc:"Vertical Rate Source"`
+		VertRateSign    byte   `bits:"69-70" name:"VRS+" desc:"Vertical Rate Sign"`
+		VertRate        uint16 `bits:"70-79" name:"VR" desc:"Vertical Rate"`
+		ReservedB       byte   `bits:"79-81" name:"Res" desc:"Reserved-B"`
+		DiffBaroSign    byte   `bits:"81-82" name:"DB+" desc:"Diff from Baro Altitude Sign. 0=up, 1=down"`
+		DiffBaroAlt     byte   `bits:"82-89" name:"DB+" desc:"Diff from Baro Altitude"`
+	}
+	// df17me28t1 is a Emergency / Priority Status and Mode A Code(Subtype=1)
+	df17me28t1 struct {
+		Type     byte `bits:"33-38" name:"Type" desc:"ADS-B Message Type"`
+		SubType  byte `bits:"38-41" name:"Sub" desc:"ADS-B Message Sub Type"`
+		Status   byte `bits:"41-44" name:"Status" desc:"Emergency/Priority Status"`
+		ModeA    byte `bits:"44-57" name:"ModeA" desc:"Mode A Code"`
+		Reserved byte `bits:"57-89" name:"Res" desc:"Reserved"`
+	}
+	// df17me28t2 is a 1090ES TCAS Resolution Advisory (RA) Broadcast Message (Subtype=2
+	df17me28t2 struct {
+		Type    byte   `bits:"33-38" name:"Type" desc:"ADS-B Message Type"`
+		SubType byte   `bits:"38-41" name:"Sub" desc:"ADS-B Message Sub Type"`
+		Ara     uint16 `bits:"41-55" name:"ARA" desc:"Active Resolution Advisories"`
+		Racs    byte   `bits:"55-59" name:"RACs" desc:"RACs Record"`
+		Rat     byte   `bits:"59-60" name:"RAT" desc:"RA Terminated"`
+		Mte     byte   `bits:"60-61" name:"MTE" desc:"Multiple Threat Encounter"`
+		Tti     byte   `bits:"61-63" name:"TTI" desc:"Threat Type Indicator"`
+		Tid     byte   `bits:"63-89" name:"TID" desc:"Threat Identity Data"`
+	}
+	df17me29t0 struct {
+		// DO-260A
+		Type    byte   `bits:"33-38" name:"Type" desc:"ADS-B Message Type"`
+		SubType byte   `bits:"38-41" name:"Sub" desc:"ADS-B Message Sub Type"`
+		unknown uint64 `bit:"40-89" name:"Unknown"`
+	}
+	df17me29t1 struct {
+		// DO-260B - http://www.anteni.net/adsb/Doc/1090-WP30-18-DRAFT_DO-260B-V42.pdf
+		Type            byte `bits:"33-38" name:"Type" desc:"ADS-B Message Type"`
+		SubType         byte `bits:"38-41" name:"Sub" desc:"ADS-B Message Sub Type"`
+		SilSupplement   byte `bits:"40-41" name:"SIL sup" desc:"SIL Supplement: SIL Per Hour (0) or Per Sample (1)"`
+		AltType         byte `bits:"41-42" name:"Sel Alt Type" desc:"Selected Altitude Type 0 = Mode Control Panel/Flight Control Unit, 1=Flight Management System"`
+		SelectedAlt     uint `bits:"42-53" name:"Sel Alt" desc:"MCP/FCU Selected Altitude OR FMS Selected Altitude"`
+		BaroSetting     uint `bits:"53-62" name:"Baro Set" desc:"Barometric Pressure Setting (minus 800 millibars)"`
+		SelHeadingStat  byte `bits:"62-63" name:"Sel Hd Stat" desc:"Selected Heading Status"`
+		SelHeadingSign  byte `bits:"63-64" name:"Sign" desc:"Selected Heading Sign"`
+		SelHeading      byte `bits:"64-72" name:"Sel Hd" desc:"Selected Heading"`
+		NacP            byte `bits:"72-76" name:"NACp" desc:"Navigation Accuracy Category_Position"`
+		NicBaro         byte `bits:"76-77" name:"NICbaro" desc:"Navigation Integrity Category_Baro"`
+		Sil             byte `bits:"77-79" name:"SIL" desc:"Source Integrity Level"`
+		McuFpuStatus    byte `bits:"79-80" name:"MCU/FPU" desc:"MCU/FPU Status"`
+		AutoPilot       byte `bits:"80-81" name:"Autopilot" desc:"Autopilot Engaged"`
+		VNav            byte `bits:"81-82" name:"VNAV" desc:"VNav Mode Engaged"`
+		AltHoldMode     byte `bits:"82-83" name:"Alt Hold" desc:"Altitude Hold Mode"`
+		ResAdsR         byte `bits:"83-84" name:"ads-r" desc:"Reserved for ADS-R"`
+		ApproachMode    byte `bits:"84-85" name:"Approach Mode" desc:"Approach Mode"`
+		TcasOperational byte `bits:"85-86" name:"TCAS" desc:"TCAS Operational"`
+		Reserved        byte `bits:"86-89" name:"Res" desc:"Reserved"`
+	}
+	df17me29t2 struct {
+		// DO-260A
+		Type     byte   `bits:"33-38" name:"Type" desc:"ADS-B Message Type"`
+		SubType  byte   `bits:"38-41" name:"Sub" desc:"ADS-B Message Sub Type"`
+		reserved uint64 `bits:"40-89" name:"Unknown"`
+	}
+	df17me31t0 struct {
+		Type            byte   `bits:"33-38" name:"Type" desc:"ADS-B Message Type"`
+		SubType         byte   `bits:"38-41" name:"Sub" desc:"ADS-B Message Sub Type"`
+		CapClass        uint16 `bits:"41-57" name:"CC" desc:"Capability Class"`
+		OperationalMode uint16 `bits:"57-73" name:"OM" desc:"Operational Mode Codes"`
+		MopsVer         byte   `bits:"73-76" name:"MOPS" desc:"MOPS Version"`
+		NicSuppA        byte   `bits:"76-77" name:"NicA" desc:"NIC Supp-A"`
+		NACp            byte   `bits:"77-81" name:"NicA" desc:"NIC Supp-A"`
+		Gva             byte   `bits:"81-83" name:"GVA" desc:"Geometric  Vertical  Accuracy"`
+		Sil             byte   `bits:"83-85" name:"SIL" desc:"Source Integrity Level"`
+		NicBaro         byte   `bits:"85-86" name:"NICbaro" desc:"NICbaro"`
+		Hrd             byte   `bits:"86-87" name:"HRD" desc:"Horizontal Reference Direction. 0=True North, 1=Magnetic"`
+		SilSup          byte   `bits:"87-88" name:"Sil Sup" desc:"SIL Supp"`
+		Reserved        byte   `bits:"88-89" name:"Res" desc:"Reserved"`
+	}
+	df17me31t1 struct {
+		Type            byte   `bits:"33-38" name:"Type" desc:"ADS-B Message Type"`
+		SubType         byte   `bits:"38-41" name:"Sub" desc:"ADS-B Message Sub Type"`
+		CapClassCodes   uint16 `bits:"41-53" name:"CCC" desc:"Capability Class Codes"`
+		LWCodes         byte   `bits:"53-57" name:"L/W C" desc:"L/W Codes"`
+		OperationalMode uint16 `bits:"57-73" name:"OM" desc:"Operational Mode Codes"`
+		MopsVer         byte   `bits:"73-76" name:"VN" desc:"ADS-B MOPS Compliant Version"`
+		NicSuppA        byte   `bits:"76-77" name:"NicA" desc:"NIC Supp-A"`
+		NACp            byte   `bits:"77-81" name:"NicA" desc:"NIC Supp-A"`
+		ReservedA       byte   `bits:"81-83" name:"Res" desc:"ReservedA"`
+		Sil             byte   `bits:"83-85" name:"SIL" desc:"Source Integrity Level"`
+		NicBaro         byte   `bits:"85-86" name:"NICbaro" desc:"NICbaro"`
+		Hrd             byte   `bits:"86-87" name:"HRD" desc:"Horizontal Reference Direction.  0=True North, 1=Magnetic"`
+		SilSup          byte   `bits:"87-88" name:"Sil Sup" desc:"SIL Supp"`
+		ReservedB       byte   `bits:"88-89" name:"Res" desc:"ReservedB"`
+	}
+
+	rawFields struct {
+		// fields named what they are. see describe.go for what they mean
+
+		df, vs, ca, cc, sl, ri, dr, um, fs byte
+		ac, ap, id, aa, pi                 uint32
+		mv, me, mb                         uint64
+		md                                 [10]byte
+
+		// altitude decoding
+		acQ, acM bool
+
+		// adsb decoding
+		catType, catSubType byte
+		catValid            bool
+	}
+
+	Frame struct {
+		rawFields
+		bds
+		df17
+		Position
+		mode string
+		// the timestamp we are processing this message at
+		timeStamp      time.Time
+		beastTimeStamp string
+		// beastTicks is the number of ticks since the beast was turned on
+		beastTicks uint64
+		// beastTicksNs is the number of nanoseconds since the beast was turned on
+		beastTicksNs   uint64
+		beastAvrUptime time.Duration
+		// raw is our semi processed string, full is the original string
+		raw, full      string
+		message        []byte
+		downLinkFormat byte // Down link Format (DF)
+		icao           uint32
+		crc, checkSum  uint32
+		identity       uint32
+		special        string
+		emergency      string
+		alert          bool
+		// if we have trouble decoding our frame, the message ends up here
+		err error
+	}
+)
 
 var (
 	downlinkFormatTable = map[byte]string{
@@ -548,10 +710,10 @@ func (f *Frame) Emergency() string {
 	return f.emergency
 }
 
-
 // the first character can be * or @ (or left out)
 // if the entire string is then 0's, it's a noop
 var noopRw = regexp.MustCompile("^[*@]?0+$")
+
 func (f *Frame) isNoOp() bool {
 	if "" == f.raw {
 		return true

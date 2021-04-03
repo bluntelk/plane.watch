@@ -375,7 +375,11 @@ func (t *Tracker) HandleModeSFrame(frame *mode_s.Frame) *Plane {
 			}
 		case mode_s.DF17FrameAircraftOperational: //, "Aircraft Operational status Message":
 			{
-				debugMessage("\033[2m Ignoring: DF%d %s\033[0m", frame.DownLinkType(), messageType)
+				if frame.VerticalStatusValid() {
+					down, _ := frame.OnGround()
+					plane.setGroundStatus(down)
+				}
+
 				break
 			}
 		}

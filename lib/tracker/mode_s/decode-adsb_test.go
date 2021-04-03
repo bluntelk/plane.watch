@@ -63,7 +63,10 @@ func TestDecodeDF17BaroAlt3(t *testing.T) {
 func TestDecodeDF17MT19ST1(t *testing.T) {
 	frame, err := DecodeString("8D7C451C99C4182CA0A4164A8C70", time.Now())
 	if nil != err {
-		t.Error(err.Error())
+		t.Error(err)
+	}
+	if nil == frame {
+		t.Error("Failed to decode frame")
 	}
 
 	if 17 != frame.DownLinkType() {
@@ -79,7 +82,7 @@ func TestDecodeDF17MT19ST1(t *testing.T) {
 	}
 
 	if 19 != frame.messageType || 1 != frame.messageSubType {
-		t.Errorf("Expected ADS-B Frame 19, subtype 1. Got: %d:%d",frame.messageType, frame.messageSubType)
+		t.Errorf("Expected ADS-B Frame 19, subtype 1. Got: %d:%d", frame.messageType, frame.messageSubType)
 	}
 
 	if 1 != frame.eastWestDirection {
@@ -247,7 +250,6 @@ func Test_calcSurfaceSpeed(t *testing.T) {
 	}
 }
 
-
 func TestAltitudeDecode(t *testing.T) {
 	frame, err := DecodeString("*8D7C7DAA582886FB218A9AFB0420;", time.Now())
 	if nil != err {
@@ -259,5 +261,113 @@ func TestAltitudeDecode(t *testing.T) {
 	}
 	if 600 != a {
 		t.Errorf("Expected an altitude of 600 feet, got %d", a)
+	}
+}
+
+// frame type decode test
+
+func TestDecodeDF17MT28(t *testing.T) {
+	tests := []struct {
+		name      string
+		frame     string
+		emergency bool
+		cap int
+	}{
+		{name: fmt.Sprintf("DF17/MT28/ST01 %s", DF17FrameEmergencyPriority), frame: "8C7C4A0CE104BC0000000069DE1A", cap: 4},
+		{name: fmt.Sprintf("DF17/MT28/ST01 %s", DF17FrameEmergencyPriority), frame: "8D7C4A0CE101950000000095FC54", cap: 5},
+		{name: fmt.Sprintf("DF17/MT28/ST01 %s", DF17FrameEmergencyPriority), frame: "8D7C4A0CE104BC0000000031AF62", cap: 5},
+		{name: fmt.Sprintf("DF17/MT28/ST01 %s", DF17FrameEmergencyPriority), frame: "8F7C4A0CE104BC00000000814D92", cap: 7},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			frame, err := DecodeString(tt.frame, time.Now())
+			if frame == nil || nil != err {
+				t.Error(err, "failed to decode")
+				return
+			}
+			if 17 != frame.DownLinkType() {
+				t.Error("Should have been DF17")
+			}
+			if 28 != frame.MessageType() {
+				t.Error("Should have been Message Type 28")
+			}
+			if 1 != frame.MessageSubType() {
+				t.Error("Should have been Message Type 28")
+			}
+
+			if "7C4A0C" != frame.IcaoStr() {
+				t.Errorf("Invalid ICAO. 7C4A0C != %s", frame.IcaoStr())
+			}
+
+			// todo: determine more tests
+		})
+	}
+}
+
+func TestDecodeDF17MT29(t *testing.T) {
+	tests := []struct {
+		name     string
+		frame    string
+		onGround bool
+	}{
+		{name: fmt.Sprintf("DF17/MT29/ST02 %s", DF17FrameTargetStateStatus), frame: "8D7C4A0CEA0000000000005D4CDC", onGround: false},
+		{name: fmt.Sprintf("DF17/MT29/ST02 %s", DF17FrameTargetStateStatus), frame: "8D7C4A0CEA00085FBD3F04D4F47E", onGround: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			frame, err := DecodeString(tt.frame, time.Now())
+			if frame == nil || nil != err {
+				t.Error(err, "failed to decode")
+				return
+			}
+			if 17 != frame.DownLinkType() {
+				t.Error("Should have been DF17")
+			}
+			if 29 != frame.MessageType() {
+				t.Error("Should have been Message Type 29")
+			}
+			if "7C4A0C" != frame.IcaoStr() {
+				t.Errorf("Invalid ICAO. 7C4A0C != %s", frame.IcaoStr())
+			}
+
+			// todo: determine more tests
+		})
+	}
+}
+
+func TestDecodeDF17MT31(t *testing.T) {
+	tests := []struct {
+		name     string
+		frame    string
+		onGround bool
+	}{
+		{name: fmt.Sprintf("DF17/MT31/ST00 Airborne %s", DF17FrameAircraftOperational), frame: "8D7C4A0CF80300030049B8BA7984", onGround: false},
+		{name: fmt.Sprintf("DF17/MT31/ST01 Ground %s", DF17FrameAircraftOperational), frame: "8C7C4A0CF9004103834938E42BD4", onGround: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			frame, err := DecodeString(tt.frame, time.Now())
+			if frame == nil || nil != err {
+				t.Error(err, "failed to decode")
+				return
+			}
+			if 17 != frame.DownLinkType() {
+				t.Error("Should have been DF17")
+			}
+			if 31 != frame.MessageType() {
+				t.Error("Should have been Message Type 31")
+			}
+			if "7C4A0C" != frame.IcaoStr() {
+				t.Errorf("Invalid ICAO. 7C4A0C != %s", frame.IcaoStr())
+			}
+			if !frame.VerticalStatusValid() {
+				t.Error("Failed to decode vertical status")
+			}
+			if frame.onGround != tt.onGround {
+				t.Errorf("Ground Status should be %t, but was %t", tt.onGround, frame.onGround)
+			}
+
+			// todo: determine more tests
+		})
 	}
 }
