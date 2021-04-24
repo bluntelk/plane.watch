@@ -13,7 +13,7 @@ const (
 
 type (
 	headingInfo []heading
-	heading struct {
+	heading     struct {
 		from, to float64
 		label    string
 	}
@@ -43,6 +43,7 @@ type (
 	}
 
 	Plane struct {
+		tracker          *Tracker
 		trackedSince     time.Time
 		lastSeen         time.Time
 		icaoIdentifier   uint32
@@ -67,7 +68,6 @@ type (
 		metres   float64
 		duration float64
 	}
-
 )
 
 var (
@@ -229,6 +229,7 @@ func (p *Plane) setAltitude(altitude int32, altitudeUnits string) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	// set the current altitude
+
 	p.location.altitude = altitude
 	p.location.altitudeUnits = altitudeUnits
 }
@@ -476,7 +477,6 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 	return
 }
 
-
 // zeroCpr is called once we have successfully decoded our CPR pair
 func (p *Plane) zeroCpr() {
 	p.cprLocation.zero(true)
@@ -497,7 +497,7 @@ func (p *Plane) decodeCpr(refLat, refLon float64, ts time.Time) error {
 	p.cprLocation.refLat = refLat
 	p.cprLocation.refLon = refLon
 	loc, err := p.cprLocation.decode(p.OnGround())
-	if nil != err || loc == nil{
+	if nil != err || loc == nil {
 		return err
 	}
 
@@ -568,18 +568,18 @@ func (pl *PlaneLocation) Copy() *PlaneLocation {
 	pl.rwlock.RLock()
 	defer pl.rwlock.RUnlock()
 	return &PlaneLocation{
-		latitude:        pl.latitude,
-		longitude:       pl.longitude,
-		altitude:        pl.altitude,
-		hasVerticalRate: pl.hasVerticalRate,
-		verticalRate:    pl.verticalRate,
-		altitudeUnits:   pl.altitudeUnits,
-		heading:         pl.heading,
-		velocity:        pl.velocity,
-		timeStamp:       pl.timeStamp,
-		onGround:        pl.onGround,
-		hasHeading:      pl.hasHeading,
-		hasLatLon:       pl.hasLatLon,
+		latitude:          pl.latitude,
+		longitude:         pl.longitude,
+		altitude:          pl.altitude,
+		hasVerticalRate:   pl.hasVerticalRate,
+		verticalRate:      pl.verticalRate,
+		altitudeUnits:     pl.altitudeUnits,
+		heading:           pl.heading,
+		velocity:          pl.velocity,
+		timeStamp:         pl.timeStamp,
+		onGround:          pl.onGround,
+		hasHeading:        pl.hasHeading,
+		hasLatLon:         pl.hasLatLon,
 		distanceTravelled: pl.distanceTravelled,
 		durationTravelled: pl.durationTravelled,
 		TrackFinished:     pl.TrackFinished,

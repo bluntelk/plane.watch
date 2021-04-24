@@ -31,7 +31,7 @@ func parseAvr(c *cli.Context) error {
 	if verbose {
 		trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stderr)))
 	}
-	trk.AddProducer(producer.NewAvrFile(getFilePaths(c)))
+	trk.AddProducer(producer.New(producer.WithType(producer.Avr), producer.WithFiles(getFilePaths(c))))
 	trk.Wait()
 	return writeResult(trk, out)
 }

@@ -24,7 +24,7 @@ type (
 		Message string
 	}
 
-	// a PlaneLocationEvent is send whenever a planes information has been updated
+	//PlaneLocationEvent is send whenever a planes information has been updated
 	PlaneLocationEvent struct {
 		new, removed bool
 		p *Plane
@@ -32,12 +32,13 @@ type (
 
 	// FrameEvent is for whenever we get a frame of data from our producers
 	FrameEvent struct {
-		frame Frame
-		source Source
+		frame  Frame
+		source *FrameSource
 	}
-	Source struct {
+	FrameSource struct {
 		OriginIdentifier string
 		Name string
+		RefLat, RefLon *float64
 	}
 
 	// InfoEvent periodically sends out some interesting stats
@@ -119,7 +120,7 @@ func (f *FrameEvent) Frame() Frame {
 	return f.frame
 }
 
-func (f *FrameEvent) Source() Source {
+func (f *FrameEvent) Source() *FrameSource {
 	return f.source
 }
 

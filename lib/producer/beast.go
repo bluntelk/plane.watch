@@ -3,73 +3,34 @@ package producer
 import (
 	"bufio"
 	"bytes"
-	"io"
-	"net"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/beast"
 	"time"
 )
 
-
-func NewBeastFetcher(host, port string) tracker.Producer {
-	p := NewProducer("Beast Fetcher for: " + net.JoinHostPort(host, port))
-
-	source := newSource(p.String(), "beast://" + net.JoinHostPort(host, port))
-	p.fetcher(host, port, func(conn net.Conn) error {
-		scan := bufio.NewScanner(conn)
-		scan.Split(ScanBeast)
-
-		for scan.Scan() {
-			msg := scan.Bytes()
-			p.addFrame(beast.NewFrame(msg, false), source)
-		}
-
-		return scan.Err()
-	})
-
-	return p
-}
-
-func NewBeastListener(host, port string) tracker.Producer {
-	p := NewProducer("Beast Listener for: " + net.JoinHostPort(host, port))
-
-	go func() {
-		// todo: Listen for incoming connection
-	}()
-
-	return p
-}
-
-func NewBeastFile(filePaths[] string, delay bool) tracker.Producer {
-	p := NewProducer("Beast File")
-
+func (p *producer) beastScanner(scan *bufio.Scanner) error {
 	lastTimeStamp := time.Duration(0)
-	p.readFiles(filePaths, func(reader io.Reader, fileName string) error {
-		var count uint64
-		scanner := bufio.NewScanner(reader)
-		scanner.Split(ScanBeast)
-		for scanner.Scan() {
-			count++
-			frame := beast.NewFrame(scanner.Bytes(), false)
-			if nil == frame {
-				continue
-			}
-			if delay {
-				currentTs := frame.BeastTicksNs()
-				if lastTimeStamp > 0 && lastTimeStamp < currentTs {
-					time.Sleep(currentTs - lastTimeStamp)
-				}
-				lastTimeStamp = currentTs
-			}
+	for scan.Scan() {
+		msg := scan.Bytes()
+		p.addFrame(beast.NewFrame(msg, false), &p.FrameSource)
 
-			p.AddEvent(tracker.NewFrameEvent(frame, newSource(p.String(), "file://" + fileName)))
+		frame := beast.NewFrame(msg, false)
+		if nil == frame {
+			continue
 		}
-		p.addInfo("We processed %d lines", count)
-		return scanner.Err()
-	})
+		if p.beastDelay {
+			currentTs := frame.BeastTicksNs()
+			if lastTimeStamp > 0 && lastTimeStamp < currentTs {
+				time.Sleep(currentTs - lastTimeStamp)
+			}
+			lastTimeStamp = currentTs
+		}
 
-	return p
+		p.AddEvent(tracker.NewFrameEvent(frame, &p.FrameSource))
+	}
+	return scan.Err()
 }
+
 
 func ScanBeast(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
@@ -99,11 +60,11 @@ func ScanBeast(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		msgLen = 11
 	default:
 		// unknown? assume we got an out of sequence and skip
-		return i+1, nil, nil
+		return i + 1, nil, nil
 	}
 	bufLen := len(data)
 	//println("type", data[i+1], "input len", bufLen, "msg len",msgLen)
-	if bufLen >= i + msgLen {
+	if bufLen >= i+msgLen {
 		// we have enough in our buffer
 		// account for double escapes
 		advance = msgLen

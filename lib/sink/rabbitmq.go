@@ -33,7 +33,7 @@ type (
 	frame struct {
 		Type, RouteKey string
 		Body           []byte
-		Source         tracker.Source
+		Source         *tracker.FrameSource
 	}
 )
 

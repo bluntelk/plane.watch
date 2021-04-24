@@ -29,13 +29,12 @@ type (
 		Listen() chan Event
 		Stop()
 	}
-
 	Sink interface {
 		OnEvent(Event)
 		Finish()
 	}
 
-	// a Middleware has a chance to modify a frame before we send it to the plane Tracker
+	// Middleware has a chance to modify a frame before we send it to the plane Tracker
 	Middleware func(Frame) Frame
 )
 
@@ -70,14 +69,6 @@ func WithPruneTiming(pruneTick, pruneAfter time.Duration) Option {
 	}
 }
 
-// WithReferenceLatLon sets up the reference lat/lon for decoding surface position messages
-func WithReferenceLatLon(lat, lon float64) Option {
-	return func(t *Tracker) {
-		t.refLat = lat
-		t.refLon = lon
-	}
-}
-
 // Finish begins the ending of the tracking by closing our decoding queue
 func (t *Tracker) Finish() {
 	for _, p := range t.producers {
@@ -109,11 +100,11 @@ func (t *Tracker) AddProducer(p Producer) {
 		for e := range p.Listen() {
 			switch e.(type) {
 			case *FrameEvent:
-				t.decodingQueue <- e.(*FrameEvent).frame
+				t.decodingQueue <- e.(*FrameEvent)
 				// send this event on!
 				t.AddEvent(e)
 			case *LogEvent:
-				if t.logLevel >= e.(*LogEvent).Level  {
+				if t.logLevel >= e.(*LogEvent).Level {
 					t.AddEvent(e)
 				}
 			}
@@ -153,7 +144,7 @@ func (t *Tracker) Stop() {
 // use this method if you are processing a file
 func (t *Tracker) Wait() {
 	t.producerWaiter.Wait()
-	time.Sleep(time.Millisecond*50)
+	time.Sleep(time.Millisecond * 50)
 	t.Finish()
 	t.decodingQueueWaiter.Wait()
 	t.eventsWaiter.Wait()
@@ -171,8 +162,8 @@ func (t *Tracker) decodeQueue() {
 			continue
 		}
 		atomic.AddUint64(&t.numFrames, 1)
-		t.numFrames++
-		ok, err := f.Decode()
+		frame := f.Frame()
+		ok, err := frame.Decode()
 		if nil != err {
 			// the decode operation failed to produce valid output, and we tell someone about it
 			t.handleError(err)
@@ -185,17 +176,19 @@ func (t *Tracker) decodeQueue() {
 		}
 
 		for _, m := range t.middlewares {
-			f = m(f)
+			frame = m(frame)
 		}
 
-		switch f.(type) {
+		plane := t.GetPlane(frame.Icao())
+
+		switch frame.(type) {
 		case *beast.Frame:
-			t.HandleModeSFrame(f.(*beast.Frame).AvrFrame())
+			plane.HandleModeSFrame(frame.(*beast.Frame).AvrFrame(), f.Source().RefLat, f.Source().RefLon)
 			// todo: include signal strength
 		case *mode_s.Frame:
-			t.HandleModeSFrame(f.(*mode_s.Frame))
+			plane.HandleModeSFrame(frame.(*mode_s.Frame), f.Source().RefLat, f.Source().RefLon)
 		case *sbs1.Frame:
-			t.HandleSbs1Frame(f.(*sbs1.Frame))
+			plane.HandleSbs1Frame(frame.(*sbs1.Frame))
 		default:
 			t.handleError(errors.New("unknown frame type, cannot track"))
 		}
@@ -203,6 +196,6 @@ func (t *Tracker) decodeQueue() {
 	t.decodingQueueWaiter.Done()
 }
 
-func NewFrameEvent(f Frame, s Source) *FrameEvent {
+func NewFrameEvent(f Frame, s *FrameSource) *FrameEvent {
 	return &FrameEvent{frame: f, source: s}
 }

@@ -322,7 +322,8 @@ func TestCprDecode2(t *testing.T) {
 			if nil != err {
 				t.Error(err)
 			}
-			plane := trk.HandleModeSFrame(frame)
+			plane := trk.GetPlane(frame.Icao())
+			plane.HandleModeSFrame(frame, nil, nil)
 
 			if nil == plane {
 				t.Errorf("Plane data should have been updated")

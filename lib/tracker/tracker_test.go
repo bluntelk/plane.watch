@@ -160,12 +160,23 @@ func performTrackingTest(frames []string, t *testing.T) *Tracker {
 		if nil != err {
 			t.Errorf("%s", err)
 		}
-		trk.HandleModeSFrame(frame)
+		trk.GetPlane(frame.Icao()).HandleModeSFrame(frame, nil, nil)
 	}
 	return trk
 }
 
 // Makes sure that we get a location update only when we need one
+// The logic we want:
+//   Only add something to history if was previously valid and it has now changed
+//   example:
+//    first frame has Alt, no history
+//    second frame has half a location, no history
+//    third frame has other half location, no history (alt and location are now valid)
+//    forth frame has same alt, no history
+//    fifth frame has new alt, 1 history with old alt and location)
+//    six frame has heading, 1 history
+// Things that change that give us a history
+//   Lat, Long, Alt, GroundStatus, Heading
 func TestTrackingLocationHistory(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -189,8 +200,8 @@ func TestTrackingLocationHistory(t *testing.T) {
 				t.Errorf("nil frame from avr frame %s", tt.frame)
 				return
 			}
-			trk.HandleModeSFrame(frame)
 			plane := trk.GetPlane(frame.Icao())
+			plane.HandleModeSFrame(frame, nil, nil)
 			numHistory := len(plane.locationHistory)
 			if tt.numLocations != numHistory {
 				t.Errorf("Expected plane to have %d history items, actually has %d", tt.numLocations, numHistory)

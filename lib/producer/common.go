@@ -1,8 +1,10 @@
 package producer
 
 import (
+	"bufio"
 	"compress/bzip2"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -16,59 +18,154 @@ import (
 
 const (
 	cmdExit = 1
+
+	Avr = iota
+	Beast
+	Sbs1
 )
 
 type (
 	producer struct {
-		label, ident string
-		out          chan tracker.Event
-		outClosed    bool
-		outLocker    sync.Mutex
+		tracker.FrameSource
+		producerType int
+
+		out       chan tracker.Event
+		outClosed bool
+		outLocker sync.Mutex
 
 		cmdChan chan int
+
+		splitter   bufio.SplitFunc
+		beastDelay bool
+
+		run func()
 	}
+
+	Option func(*producer)
 )
 
-func NewProducer(label string) *producer {
+func New(opts ...Option) *producer {
 	p := &producer{
-		label:     label,
+		FrameSource: tracker.FrameSource{
+			OriginIdentifier: "",
+			Name:             "",
+			RefLat:           nil,
+			RefLon:           nil,
+		},
 		out:       make(chan tracker.Event, 100),
 		outClosed: false,
 		cmdChan:   make(chan int),
+		run: func() {
+			println("You did not specify any sources")
+			os.Exit(1)
+		},
+	}
+
+	for _, opt := range opts {
+		opt(p)
 	}
 
 	return p
 }
 
-func newSource(label, ident string) tracker.Source {
-	return tracker.Source{
-		OriginIdentifier: ident,
-		Name:             label,
+// producer.New(WithFetcher(host, port), WithType(producer.Avr), WithRefLatLon(lat, lon))
+
+func WithListener(host, port string) Option {
+	return func(p *producer) {
+		// TODO: implement a listener
+	}
+}
+
+func WithFetcher(host, port string) Option {
+	hp := net.JoinHostPort(host, port)
+	return func(p *producer) {
+		p.FrameSource.OriginIdentifier = hp
+		p.run = func() {
+			p.addDebug("Fetching From Host: %s:%s", host, port)
+			p.fetcher(host, port, func(conn net.Conn) error {
+				scan := bufio.NewScanner(conn)
+				scan.Split(p.splitter)
+				return p.readFromScanner(scan)
+			})
+		}
+	}
+}
+
+func WithFiles(filePaths []string) Option {
+	return func(p *producer) {
+		p.run = func() {
+			p.readFiles(filePaths, func(reader io.Reader, fileName string) error {
+				scanner := bufio.NewScanner(reader)
+				p.FrameSource.OriginIdentifier = "file://"+fileName
+				return p.readFromScanner(scanner)
+			})
+		}
+	}
+}
+
+func WithBeastDelay(beastDelay bool) Option {
+	return func(p *producer) {
+		p.beastDelay = beastDelay
+	}
+}
+
+func WithType(producerType int) Option {
+	return func(p *producer) {
+		p.producerType = producerType
+		if producerType == Beast {
+			p.splitter = ScanBeast
+		} else {
+			p.splitter = bufio.ScanLines
+		}
+	}
+}
+
+func (p *producer) readFromScanner(scan *bufio.Scanner) error {
+	scan.Split(p.splitter)
+
+	switch p.producerType {
+	case Avr:
+		return p.avrScanner(scan)
+	case Sbs1:
+		return p.sbsScanner(scan)
+	case Beast:
+		return p.beastScanner(scan)
+	default:
+		return errors.New("unknown producer type")
+	}
+}
+
+// WithReferenceLatLon sets up the reference lat/lon for decoding surface position messages
+func WithReferenceLatLon(lat, lon float64) Option {
+	return func(p *producer) {
+		p.RefLat = &lat
+		p.RefLon = &lon
 	}
 }
 
 func (p *producer) String() string {
-	return p.label
+	return p.Name
 }
 
 func (p *producer) Listen() chan tracker.Event {
+	go p.run()
 	return p.out
 }
 
-func (p *producer) addFrame(f tracker.Frame, s tracker.Source) {
+func (p *producer) addFrame(f tracker.Frame, s *tracker.FrameSource) {
 	p.AddEvent(tracker.NewFrameEvent(f, s))
 }
 
 func (p *producer) addDebug(sfmt string, v ...interface{}) {
-	p.AddEvent(tracker.NewLogEvent(tracker.LogLevelDebug, p.label, fmt.Sprintf(sfmt, v...)))
+	p.AddEvent(tracker.NewLogEvent(tracker.LogLevelDebug, p.Name, fmt.Sprintf(sfmt, v...)))
 }
 
 func (p *producer) addInfo(sfmt string, v ...interface{}) {
-	p.AddEvent(tracker.NewLogEvent(tracker.LogLevelInfo, p.label, fmt.Sprintf(sfmt, v...)))
+	p.AddEvent(tracker.NewLogEvent(tracker.LogLevelInfo, p.Name, fmt.Sprintf(sfmt, v...)))
 }
 
 func (p *producer) addError(err error) {
-	p.AddEvent(tracker.NewLogEvent(tracker.LogLevelError, p.label, fmt.Sprint(err)))
+	p.AddEvent(tracker.NewLogEvent(tracker.LogLevelError, p.Name, fmt.Sprint(err)))
 }
 
 func (p *producer) Stop() {
@@ -100,6 +197,7 @@ func (p *producer) readFiles(dataFiles []string, read func(io.Reader, string) er
 	go func() {
 		for _, inFileName := range dataFiles {
 			p.addDebug("Loading lines from %s", inFileName)
+			p.FrameSource.OriginIdentifier = "file://" + inFileName
 			inFile, err = os.Open(inFileName)
 			if err != nil {
 				p.addError(fmt.Errorf("failed to open file {%s}: %s", inFileName, err))

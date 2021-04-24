@@ -11,10 +11,11 @@ import (
 )
 
 var (
-	pwPort                          int
-	showDebug                       bool
-	dump1090Host                    string
-	dump1090Port                    string
+	pwPort         int
+	showDebug      bool
+	dump1090Host   string
+	dump1090Port   string
+	dump1090Format string
 )
 
 func main() {
@@ -26,9 +27,9 @@ func main() {
 
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
-			Name:        "rabbit-host",
-			Value:       "localhost",
-			Usage:       "the rabbitmq host to talk to",
+			Name:  "rabbit-host",
+			Value: "localhost",
+			Usage: "the rabbitmq host to talk to",
 		},
 		&cli.IntFlag{
 			Name:        "rabbit-port",
@@ -37,19 +38,19 @@ func main() {
 			Destination: &pwPort,
 		},
 		&cli.StringFlag{
-			Name:        "rabbit-user",
-			Value:       "",
-			Usage:       "user for rabbitmq",
+			Name:  "rabbit-user",
+			Value: "plane.watch",
+			Usage: "user for rabbitmq",
 		},
 		&cli.StringFlag{
-			Name:        "rabbit-pass",
-			Value:       "",
-			Usage:       "rabbitmq password",
+			Name:  "rabbit-pass",
+			Value: "",
+			Usage: "rabbitmq password",
 		},
 		&cli.StringFlag{
-			Name:        "rabbit-vhost",
-			Value:       "plane.watch",
-			Usage:       "the virtual host on the rabbit server to use",
+			Name:  "rabbit-vhost",
+			Value: "plane.watch",
+			Usage: "the virtual host on the rabbit server to use",
 		},
 		&cli.StringFlag{
 			Name:        "dump1090_host",
@@ -111,19 +112,20 @@ func main() {
 }
 
 func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
-	opts := make([]tracker.Option, 0)
+	trackerOpts := make([]tracker.Option, 0)
 	if c.Bool("debug") {
-		opts = append(opts, tracker.WithVerboseOutput())
+		trackerOpts = append(trackerOpts, tracker.WithVerboseOutput())
 	} else {
-		opts = append(opts, tracker.WithInfoOutput())
+		trackerOpts = append(trackerOpts, tracker.WithInfoOutput())
 	}
+	trk := tracker.NewTracker(trackerOpts...)
+
+	producerOpts := make([]producer.Option, 0)
 	refLat := c.Float64("refLat")
 	refLon := c.Float64("refLon")
 	if refLat != 0 && refLon != 0 {
-		opts = append(opts, tracker.WithReferenceLatLon(refLat, refLon))
+		producerOpts = append(producerOpts, producer.WithReferenceLatLon(refLat, refLon))
 	}
-
-	trk := tracker.NewTracker(opts...)
 
 	if "" != c.String("redis-host") {
 		trk.AddSink(
@@ -147,23 +149,40 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	}
 
 	if "" != dump1090Host {
+		producerOpts = append(producerOpts, producer.WithFetcher(dump1090Host, dump1090Port))
+		if "" == dump1090Format {
+
+		} else {
+
+		}
 		switch dump1090Port {
 		case "30002":
-			trk.AddProducer(producer.NewAvrFetcher(dump1090Host, dump1090Port))
+			producerOpts = append(producerOpts, producer.WithType(producer.Avr))
 		case "30003":
-			trk.AddProducer(producer.NewSbs1Fetcher(dump1090Host, dump1090Port))
+			producerOpts = append(producerOpts, producer.WithType(producer.Sbs1))
 		case "30005":
-			trk.AddProducer(producer.NewBeastFetcher(dump1090Host, dump1090Port))
+			producerOpts = append(producerOpts, producer.WithType(producer.Beast))
 		default:
 			return nil, errors.New("don't know how to handle port:" + dump1090Port)
 		}
+	} else {
+		if file := c.String("avr-file"); "" != file {
+			producerOpts = append(
+				producerOpts,
+				producer.WithType(producer.Avr),
+				producer.WithFiles([]string{file}),
+			)
+		}
+		if file := c.String("beast-file"); "" != file {
+			producerOpts = append(
+				producerOpts,
+				producer.WithType(producer.Beast),
+				producer.WithFiles([]string{file}),
+			)
+		}
 	}
-	if file := c.String("avr-file"); "" != file {
-		trk.AddProducer(producer.NewAvrFile([]string{file}))
-	}
-	if file := c.String("beast-file"); "" != file {
-		trk.AddProducer(producer.NewBeastFile([]string{file}, true))
-	}
+
+	trk.AddProducer(producer.New(producerOpts...))
 	return trk, nil
 }
 
