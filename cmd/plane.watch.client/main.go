@@ -23,48 +23,59 @@ func main() {
 
 	app.Version = "1.0.0"
 	app.Name = "Plane Watch Client"
-	app.Usage = "Reads from dump1090 and sends it to http://plane.watch/"
+	app.Usage = "Reads from dump1090 and sends it to https://plane.watch/"
 
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:  "rabbit-host",
 			Value: "localhost",
 			Usage: "the rabbitmq host to talk to",
+			EnvVars: []string{"RABBITMQ_HOST"},
 		},
 		&cli.IntFlag{
 			Name:        "rabbit-port",
 			Value:       5672,
 			Usage:       "The rabbitmq port to talk to",
 			Destination: &pwPort,
+			EnvVars: []string{"RABBITMQ_PORT"},
 		},
 		&cli.StringFlag{
 			Name:  "rabbit-user",
-			Value: "plane.watch",
+			Value: "guest",
 			Usage: "user for rabbitmq",
+			EnvVars: []string{"RABBITMQ_USER"},
 		},
 		&cli.StringFlag{
 			Name:  "rabbit-pass",
-			Value: "",
+			Value: "guest",
 			Usage: "rabbitmq password",
+			EnvVars: []string{"RABBITMQ_PASS"},
 		},
 		&cli.StringFlag{
 			Name:  "rabbit-vhost",
 			Value: "plane.watch",
 			Usage: "the virtual host on the rabbit server to use",
+			EnvVars: []string{"RABBITMQ_VHOST"},
 		},
 		&cli.StringFlag{
-			Name:        "dump1090_host",
+			Name:        "dump1090-host",
 			Value:       "",
 			Usage:       "The host to read dump1090 from",
 			Destination: &dump1090Host,
 			EnvVars:     []string{"DUMP1090_HOST"},
 		},
 		&cli.StringFlag{
-			Name:        "dump1090_port",
-			Value:       "30002",
-			Usage:       "The port to read dump1090 from",
+			Name:        "dump1090-port",
+			Value:       "30005",
+			Usage:       "The port on the dump 1090 host to read from",
 			Destination: &dump1090Port,
 			EnvVars:     []string{"DUMP1090_PORT"},
+		},
+		&cli.StringFlag{
+			Name:        "feed-type",
+			Value:       "",
+			Usage:       "if not on a standard port, specify the type of feed (avr, sbs1, beast)",
+			Destination: &dump1090Format,
 		},
 		&cli.StringFlag{
 			Name:  "avr-file",
@@ -150,20 +161,29 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 
 	if "" != dump1090Host {
 		producerOpts = append(producerOpts, producer.WithFetcher(dump1090Host, dump1090Port))
-		if "" == dump1090Format {
+		if "" != dump1090Format {
+			switch dump1090Format {
+			case "avr":
+				producerOpts = append(producerOpts, producer.WithType(producer.Avr))
+			case "sbs1":
+				producerOpts = append(producerOpts, producer.WithType(producer.Sbs1))
+			case "beast":
+				producerOpts = append(producerOpts, producer.WithType(producer.Beast))
+			default:
+				return nil, errors.New("don't know how to handle type:" + dump1090Format)
 
+			}
 		} else {
-
-		}
-		switch dump1090Port {
-		case "30002":
-			producerOpts = append(producerOpts, producer.WithType(producer.Avr))
-		case "30003":
-			producerOpts = append(producerOpts, producer.WithType(producer.Sbs1))
-		case "30005":
-			producerOpts = append(producerOpts, producer.WithType(producer.Beast))
-		default:
-			return nil, errors.New("don't know how to handle port:" + dump1090Port)
+			switch dump1090Port {
+			case "30002":
+				producerOpts = append(producerOpts, producer.WithType(producer.Avr))
+			case "30003":
+				producerOpts = append(producerOpts, producer.WithType(producer.Sbs1))
+			case "30005":
+				producerOpts = append(producerOpts, producer.WithType(producer.Beast))
+			default:
+				return nil, errors.New("don't know how to handle port:" + dump1090Port)
+			}
 		}
 	} else {
 		if file := c.String("avr-file"); "" != file {

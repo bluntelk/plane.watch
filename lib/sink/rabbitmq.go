@@ -21,6 +21,7 @@ const (
 	QueueTypeSbs1Reduce  = "sbs1-reduce"
 	QueueTypeDecodedJson = "decoded-json"
 	QueueTypeLogs        = "logs"
+	QueueLocationUpdates = "location-updates"
 )
 
 type (
@@ -34,6 +35,21 @@ type (
 		Type, RouteKey string
 		Body           []byte
 		Source         *tracker.FrameSource
+	}
+
+	planeLocation struct {
+		New, Removed      bool
+		Icao              string
+		Lat, Lon, Heading float64
+		Altitude          int
+		VerticalRate      int
+		AltitudeUnits     string
+		FlightNumber      string
+		FlightStatus      string
+		Airframe          string
+		HasLocation       bool
+		HasHeading        bool
+		HasVerticalRate   bool
 	}
 )
 
@@ -74,6 +90,7 @@ func WithAllRabbitQueues() Option {
 		conf.queue[QueueTypeSbs1Reduce] = QueueTypeSbs1Reduce
 		conf.queue[QueueTypeDecodedJson] = QueueTypeDecodedJson
 		conf.queue[QueueTypeLogs] = QueueTypeLogs
+		conf.queue[QueueLocationUpdates] = QueueLocationUpdates
 	}
 }
 func WithRabbitQueue(msgType, queue string) Option {
@@ -94,6 +111,40 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 			Body:            []byte(e.String()),
 		})
 	case *tracker.PlaneLocationEvent:
+		le := e.(*tracker.PlaneLocationEvent)
+		plane := le.Plane()
+		if nil != plane {
+			eventStruct := planeLocation{
+				New:           le.New(),
+				Removed:       le.Removed(),
+				Icao:          plane.IcaoIdentifierStr(),
+				Lat:           plane.Lat(),
+				Lon:           plane.Lon(),
+				Heading:       plane.Heading(),
+				Altitude:      int(plane.Altitude()),
+				VerticalRate:  plane.VerticalRate(),
+				AltitudeUnits: plane.AltitudeUnits(),
+				FlightNumber:  plane.FlightNumber(),
+				FlightStatus:  plane.FlightStatus(),
+
+				HasLocation:     plane.HasLocation(),
+				HasHeading:      plane.HasHeading(),
+				HasVerticalRate: plane.HasVerticalRate(),
+			}
+
+			var jsonBuf []byte
+			jsonBuf, err = json.MarshalIndent(&eventStruct, "", "  ")
+			if nil == err {
+				err = r.mq.Publish(r.exchange, QueueLocationUpdates, amqp.Publishing{
+					ContentType:     "text/plain",
+					ContentEncoding: "utf-8",
+					Timestamp:       time.Now(),
+					Body:            jsonBuf,
+				})
+			}
+
+		}
+
 	case *tracker.FrameEvent:
 		ourFrame := e.(*tracker.FrameEvent).Frame()
 		if nil == ourFrame {
