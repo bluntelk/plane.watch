@@ -39,6 +39,10 @@ func ScanBeast(data []byte, atEOF bool) (advance int, token []byte, err error) {
 
 	// skip until we get our first 0x1A (message start)
 	i := bytes.IndexByte(data, 0x1A)
+	if len(data) < i+11 {
+		// we do not even have the smallest message, let's get some more data
+		return 0, nil, nil
+	}
 	// byte 2 is our message type, so it tells us how long this message is
 	msgLen := 0
 	switch data[i+1] {
@@ -77,7 +81,7 @@ func ScanBeast(data []byte, atEOF bool) (advance int, token []byte, err error) {
 			dataIndex++ // first inc skips past the first 0x1a
 			tokenIndex++
 			// can we get to the next byte?
-			if dataIndex+1 > bufLen {
+			if dataIndex+1 >= bufLen {
 				// run out of buffer, want more
 				return 0, nil, nil
 			}

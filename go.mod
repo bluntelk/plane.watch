@@ -9,5 +9,5 @@ require (
 	github.com/rivo/tview v0.0.0-20210312174852-ae9464cc3598
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/streadway/amqp v1.0.0
-	github.com/urfave/cli/v2 v2.3.0 // indirect
+	github.com/urfave/cli/v2 v2.3.0
 )
