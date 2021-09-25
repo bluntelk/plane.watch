@@ -19,6 +19,11 @@ func main() {
 	app.Name = "Plane Watch Client"
 	app.Usage = "Reads from dump1090 and sends it to https://plane.watch/"
 
+	app.Description = `This program takes a stream of plane tracking info (beast/avr/sbs1), tracks the planes and ` +
+		`outputs all sorts if interesting information to the configured sink, including decoded and tracked planes in JSON format.` +
+		"\n\n" +
+		`example: plane.watch.client --source=beast://crawled.mapwithlove.com:3004 --sink=amqp://guest:guest@localhost:5672/pw --tag="cool-stuff" --quiet simple`
+
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:    "source",
@@ -97,6 +102,7 @@ func main() {
 		},
 		&cli.StringFlag{
 			Name:    "tag",
+			Usage:   "A value that is included in the payloads output to the Sinks. Useful for knowing where something came from",
 			EnvVars: []string{"TAG"},
 		},
 		&cli.BoolFlag{
@@ -114,12 +120,12 @@ func main() {
 	app.Commands = []*cli.Command{
 		{
 			Name:   "run",
-			Usage:  "Gather ADSB data and sends it to plane.watch",
+			Usage:  "Gather ADSB data and sends it to the configured output. has a simple TUI",
 			Action: run,
 		},
 		{
 			Name:      "simple",
-			Usage:     "Gather ADSB data and sends it to plane.watch",
+			Usage:     "Gather ADSB data and sends it to the configured output. just a log of info",
 			Action:    runSimple,
 			ArgsUsage: "[app.log - A file name to output to or stdout if not specified]",
 		},
@@ -154,7 +160,6 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	urlSource := c.String("source")
 	urlSink := c.String("sink")
 	tag := c.String("tag")
-
 
 	if "" != urlSource {
 		parsedUrl, err := url.Parse(urlSource)
