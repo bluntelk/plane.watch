@@ -4,17 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
+	"net/url"
 	"os"
 	"plane.watch/lib/producer"
 	"plane.watch/lib/sink"
 	"plane.watch/lib/tracker"
-)
-
-var (
-	pwPort         int
-	dump1090Host   string
-	dump1090Port   string
-	dump1090Format string
+	"strings"
 )
 
 func main() {
@@ -26,17 +21,26 @@ func main() {
 
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
+			Name:    "source",
+			Usage:   "The Source in URL Form. [avr|beast|sbs1]://host:port",
+			EnvVars: []string{"SOURCE"},
+		},
+		&cli.StringFlag{
+			Name:    "sink",
+			Usage:   "The place to send decoded JSON in URL Form. [redis|amqp]://user:pass@host:port/vhost",
+			EnvVars: []string{"SINK"},
+		},
+
+		&cli.StringFlag{
 			Name:    "rabbit-host",
-			Value:   "localhost",
 			Usage:   "the rabbitmq host to talk to",
 			EnvVars: []string{"RABBITMQ_HOST"},
 		},
 		&cli.IntFlag{
-			Name:        "rabbit-port",
-			Value:       5672,
-			Usage:       "The rabbitmq port to talk to",
-			Destination: &pwPort,
-			EnvVars:     []string{"RABBITMQ_PORT"},
+			Name:    "rabbit-port",
+			Value:   5672,
+			Usage:   "The rabbitmq port to talk to",
+			EnvVars: []string{"RABBITMQ_PORT"},
 		},
 		&cli.StringFlag{
 			Name:    "rabbit-user",
@@ -57,24 +61,21 @@ func main() {
 			EnvVars: []string{"RABBITMQ_VHOST"},
 		},
 		&cli.StringFlag{
-			Name:        "dump1090-host",
-			Value:       "",
-			Usage:       "The host to read dump1090 from",
-			Destination: &dump1090Host,
-			EnvVars:     []string{"DUMP1090_HOST"},
+			Name:    "dump1090-host",
+			Value:   "",
+			Usage:   "The host to read dump1090 from",
+			EnvVars: []string{"DUMP1090_HOST"},
 		},
 		&cli.StringFlag{
-			Name:        "dump1090-port",
-			Value:       "30005",
-			Usage:       "The port on the dump 1090 host to read from",
-			Destination: &dump1090Port,
-			EnvVars:     []string{"DUMP1090_PORT"},
+			Name:    "dump1090-port",
+			Value:   "30005",
+			Usage:   "The port on the dump 1090 host to read from",
+			EnvVars: []string{"DUMP1090_PORT"},
 		},
 		&cli.StringFlag{
-			Name:        "feed-type",
-			Value:       "",
-			Usage:       "if not on a standard port, specify the type of feed (avr, sbs1, beast)",
-			Destination: &dump1090Format,
+			Name:  "feed-type",
+			Value: "",
+			Usage: "if not on a standard port, specify the type of feed (avr, sbs1, beast)",
 		},
 		&cli.StringFlag{
 			Name:  "avr-file",
@@ -94,19 +95,19 @@ func main() {
 			Name:  "ref-lon",
 			Usage: "The reference longitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
 		},
-		&cli.StringSliceFlag{
+		&cli.StringFlag{
 			Name:    "tag",
-			EnvVars: []string{"TAG", "SOURCE"},
+			EnvVars: []string{"TAG"},
 		},
 		&cli.BoolFlag{
-			Name:        "debug",
-			Usage:       "Show Extra Debug Information",
-			EnvVars:     []string{"DEBUG"},
+			Name:    "debug",
+			Usage:   "Show Extra Debug Information",
+			EnvVars: []string{"DEBUG"},
 		},
 		&cli.BoolFlag{
-			Name:        "quiet",
-			Usage:       "Only show important messages",
-			EnvVars:     []string{"QUIET"},
+			Name:    "quiet",
+			Usage:   "Only show important messages",
+			EnvVars: []string{"QUIET"},
 		},
 	}
 
@@ -130,10 +131,72 @@ func main() {
 }
 
 func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
+	isDebug := c.Bool("debug")
+	isQuiet := c.Bool("quiet")
+	refLat := c.Float64("refLat")
+	refLon := c.Float64("refLon")
+	redisHost := c.String("redis-host")
+	redisPort := c.String("redis-port")
+	rabbitHost := c.String("rabbit-host")
+	rabbitPort := c.String("rabbit-port")
+	rabbitUser := c.String("rabbit-user")
+	rabbitPass := c.String("rabbit-pass")
+	rabbitVHost := c.String("rabbit-vhost")
+
+	sourceHost := c.String("dump1090-host")
+	sourcePort := c.String("dump1090-port")
+	sourceFormat := c.String("feed-type")
+
+	sourceFileAvr := c.String("avr-file")
+	sourceFileBeast := c.String("beast-file")
+
+	// let's parse our URL forms
+	urlSource := c.String("source")
+	urlSink := c.String("sink")
+	tag := c.String("tag")
+
+
+	if "" != urlSource {
+		parsedUrl, err := url.Parse(urlSource)
+		if nil != err {
+			return nil, err
+		}
+
+		switch strings.ToLower(parsedUrl.Scheme) {
+		case "avr", "beast", "sbs1":
+			sourceFormat = strings.ToLower(parsedUrl.Scheme)
+		default:
+			return nil, fmt.Errorf("unknown scheme: %s, expected one of [avr|beast|sbs1]", parsedUrl.Scheme)
+		}
+		sourceHost = parsedUrl.Hostname()
+		sourcePort = parsedUrl.Port()
+	}
+
+	if "" != urlSink {
+		parsedUrl, err := url.Parse(urlSink)
+		if nil != err {
+			return nil, err
+		}
+		switch strings.ToLower(parsedUrl.Scheme) {
+		case "redis":
+			redisHost = parsedUrl.Hostname()
+			redisPort = parsedUrl.Port()
+		case "amqp", "rabbitmq":
+			rabbitHost = parsedUrl.Hostname()
+			rabbitPort = parsedUrl.Port()
+			rabbitUser = parsedUrl.User.Username()
+			rabbitPass, _ = parsedUrl.User.Password()
+			rabbitVHost = parsedUrl.Path
+		default:
+			return nil, fmt.Errorf("unknown scheme: %s, expected one of [redis|amqp|rabbitmq]", parsedUrl.Scheme)
+		}
+
+	}
+
 	trackerOpts := make([]tracker.Option, 0)
-	if c.Bool("debug") {
+	if isDebug {
 		trackerOpts = append(trackerOpts, tracker.WithVerboseOutput())
-	} else if c.Bool("quiet") {
+	} else if isQuiet {
 		trackerOpts = append(trackerOpts, tracker.WithQuietOutput())
 	} else {
 		trackerOpts = append(trackerOpts, tracker.WithInfoOutput())
@@ -141,25 +204,23 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	trk := tracker.NewTracker(trackerOpts...)
 
 	producerOpts := make([]producer.Option, 0)
-	refLat := c.Float64("refLat")
-	refLon := c.Float64("refLon")
 	if refLat != 0 && refLon != 0 {
 		producerOpts = append(producerOpts, producer.WithReferenceLatLon(refLat, refLon))
 	}
-
-	if "" != c.String("redis-host") {
-		trk.AddSink(
-			sink.NewRedisSink(
-				sink.WithHost(c.String("redis-host"), c.String("redis-port")),
-			),
-		)
+	if "" != tag {
+		producerOpts = append(producerOpts, producer.WithOriginName(tag))
 	}
-	if "" != c.String("rabbit-host") {
+
+	if "" != redisHost {
+		trk.AddSink(sink.NewRedisSink(sink.WithHost(redisHost, redisPort), sink.WithSourceTag(tag)))
+	}
+	if "" != rabbitHost {
 		rabbitSink, err := sink.NewRabbitMqSink(
-			sink.WithHost(c.String("rabbit-host"), c.String("rabbit-port")),
-			sink.WithUserPass(c.String("rabbit-user"), c.String("rabbit-pass")),
-			sink.WithRabbitVhost(c.String("rabbit-vhost")),
+			sink.WithHost(rabbitHost, rabbitPort),
+			sink.WithUserPass(rabbitUser, rabbitPass),
+			sink.WithRabbitVhost(rabbitVHost),
 			sink.WithAllRabbitQueues(),
+			sink.WithSourceTag(tag),
 		)
 		if nil != err {
 			return nil, err
@@ -168,10 +229,10 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		trk.AddSink(rabbitSink)
 	}
 
-	if "" != dump1090Host {
-		producerOpts = append(producerOpts, producer.WithFetcher(dump1090Host, dump1090Port))
-		if "" != dump1090Format {
-			switch dump1090Format {
+	if "" != sourceHost {
+		producerOpts = append(producerOpts, producer.WithFetcher(sourceHost, sourcePort))
+		if "" != sourceFormat {
+			switch sourceFormat {
 			case "avr":
 				producerOpts = append(producerOpts, producer.WithType(producer.Avr))
 			case "sbs1":
@@ -179,11 +240,11 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 			case "beast":
 				producerOpts = append(producerOpts, producer.WithType(producer.Beast))
 			default:
-				return nil, errors.New("don't know how to handle type:" + dump1090Format)
+				return nil, errors.New("don't know how to handle type:" + sourceFormat)
 
 			}
 		} else {
-			switch dump1090Port {
+			switch sourcePort {
 			case "30002":
 				producerOpts = append(producerOpts, producer.WithType(producer.Avr))
 			case "30003":
@@ -191,22 +252,22 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 			case "30005":
 				producerOpts = append(producerOpts, producer.WithType(producer.Beast))
 			default:
-				return nil, errors.New("don't know how to handle port:" + dump1090Port)
+				return nil, errors.New("don't know how to handle port:" + sourcePort)
 			}
 		}
 	} else {
-		if file := c.String("avr-file"); "" != file {
+		if "" != sourceFileAvr {
 			producerOpts = append(
 				producerOpts,
 				producer.WithType(producer.Avr),
-				producer.WithFiles([]string{file}),
+				producer.WithFiles([]string{sourceFileAvr}),
 			)
 		}
-		if file := c.String("beast-file"); "" != file {
+		if "" != sourceFileBeast {
 			producerOpts = append(
 				producerOpts,
 				producer.WithType(producer.Beast),
-				producer.WithFiles([]string{file}),
+				producer.WithFiles([]string{sourceFileBeast}),
 			)
 		}
 	}

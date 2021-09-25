@@ -50,6 +50,7 @@ type (
 		HasLocation       bool
 		HasHeading        bool
 		HasVerticalRate   bool
+		SourceTag         string
 	}
 )
 
@@ -130,6 +131,7 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 				HasLocation:     plane.HasLocation(),
 				HasHeading:      plane.HasHeading(),
 				HasVerticalRate: plane.HasVerticalRate(),
+				SourceTag:       r.Config.sourceTag,
 			}
 
 			var jsonBuf []byte

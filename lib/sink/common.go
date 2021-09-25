@@ -19,7 +19,7 @@ type (
 		waiter sync.WaitGroup
 
 		logLocation bool
-
+		sourceTag string
 	}
 	Option func(*Config)
 )
@@ -46,6 +46,12 @@ func WithLogOutput(out io.WriteCloser) Option {
 func WithoutLoggingLocation() Option {
 	return func(config *Config) {
 		config.logLocation = false
+	}
+}
+
+func WithSourceTag(tag string) Option {
+	return func(config *Config) {
+		config.sourceTag = tag
 	}
 }
 

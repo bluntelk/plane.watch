@@ -580,6 +580,9 @@ func (f *Frame) Icao() uint32 {
 }
 
 func (f *Frame) Raw() []byte {
+	if nil == f {
+		return []byte{}
+	}
 	return []byte(f.raw)
 }
 

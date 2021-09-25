@@ -81,13 +81,19 @@ func WithFetcher(host, port string) Option {
 	return func(p *producer) {
 		p.FrameSource.OriginIdentifier = hp
 		p.run = func() {
-			p.addDebug("Fetching From Host: %s:%s", host, port)
+			p.addInfo("Fetching From Host: %s:%s", host, port)
 			p.fetcher(host, port, func(conn net.Conn) error {
 				scan := bufio.NewScanner(conn)
 				scan.Split(p.splitter)
 				return p.readFromScanner(scan)
 			})
 		}
+	}
+}
+
+func WithOriginName(name string) Option {
+	return func(p *producer) {
+		p.FrameSource.Name = name
 	}
 }
 
