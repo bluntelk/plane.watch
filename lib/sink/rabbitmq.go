@@ -53,6 +53,8 @@ type (
 		HasHeading        bool
 		HasVerticalRate   bool
 		SourceTag         string
+		TrackedSince      time.Time
+		LastMsg           time.Time
 	}
 )
 
@@ -136,6 +138,8 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 				HasHeading:      plane.HasHeading(),
 				HasVerticalRate: plane.HasVerticalRate(),
 				SourceTag:       r.Config.sourceTag,
+				LastMsg:         plane.LastSeen(),
+				TrackedSince:    plane.TrackedSince(),
 			}
 
 			var jsonBuf []byte
