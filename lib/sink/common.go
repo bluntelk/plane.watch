@@ -17,6 +17,9 @@ type (
 
 		out io.WriteCloser
 		waiter sync.WaitGroup
+
+		logLocation bool
+
 	}
 	Option func(*Config)
 )
@@ -37,6 +40,12 @@ func WithUserPass(user, pass string) Option {
 func WithLogOutput(out io.WriteCloser) Option {
 	return func(config *Config) {
 		config.out = out
+	}
+}
+
+func WithoutLoggingLocation() Option {
+	return func(config *Config) {
+		config.logLocation = false
 	}
 }
 

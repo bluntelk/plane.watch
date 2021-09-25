@@ -122,7 +122,7 @@ func (f *Frame) Parse() error {
 
 	// now see if the message we got matches up with the DF format we decoded
 	if int(f.getMessageLengthBytes()) != len(f.message) {
-		return fmt.Errorf("f has incorrect length %d != %d", f.getMessageLengthBytes(), len(f.message))
+		return fmt.Errorf("cannot Parse AVR Frame (%X). Incorrect length %d != %d", f.message, f.getMessageLengthBytes(), len(f.message))
 	}
 
 	err = f.checkCrc()

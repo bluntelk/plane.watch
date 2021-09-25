@@ -15,6 +15,8 @@ type (
 
 func NewLoggerSink(opts ...Option) *LoggerSink {
 	l := &LoggerSink{}
+	l.logLocation = true
+
 	for _, opt := range opts {
 		opt(&l.Config)
 	}
@@ -32,7 +34,9 @@ func (l *LoggerSink) OnEvent(e tracker.Event) {
 	case *tracker.LogEvent:
 		_, _ = fmt.Fprintln(l.bufOut, e.String())
 	case *tracker.PlaneLocationEvent:
-		_, _ = fmt.Fprintln(l.bufOut, e.String())
+		if l.logLocation {
+			_, _ = fmt.Fprintln(l.bufOut, e.String())
+		}
 	case *tracker.InfoEvent:
 		_, _ = fmt.Fprintln(l.bufOut, e.String())
 		_ = l.bufOut.Flush()

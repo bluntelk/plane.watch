@@ -12,7 +12,6 @@ import (
 
 var (
 	pwPort         int
-	showDebug      bool
 	dump1090Host   string
 	dump1090Port   string
 	dump1090Format string
@@ -27,9 +26,9 @@ func main() {
 
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
-			Name:  "rabbit-host",
-			Value: "localhost",
-			Usage: "the rabbitmq host to talk to",
+			Name:    "rabbit-host",
+			Value:   "localhost",
+			Usage:   "the rabbitmq host to talk to",
 			EnvVars: []string{"RABBITMQ_HOST"},
 		},
 		&cli.IntFlag{
@@ -37,24 +36,24 @@ func main() {
 			Value:       5672,
 			Usage:       "The rabbitmq port to talk to",
 			Destination: &pwPort,
-			EnvVars: []string{"RABBITMQ_PORT"},
+			EnvVars:     []string{"RABBITMQ_PORT"},
 		},
 		&cli.StringFlag{
-			Name:  "rabbit-user",
-			Value: "guest",
-			Usage: "user for rabbitmq",
+			Name:    "rabbit-user",
+			Value:   "guest",
+			Usage:   "user for rabbitmq",
 			EnvVars: []string{"RABBITMQ_USER"},
 		},
 		&cli.StringFlag{
-			Name:  "rabbit-pass",
-			Value: "guest",
-			Usage: "rabbitmq password",
+			Name:    "rabbit-pass",
+			Value:   "guest",
+			Usage:   "rabbitmq password",
 			EnvVars: []string{"RABBITMQ_PASS"},
 		},
 		&cli.StringFlag{
-			Name:  "rabbit-vhost",
-			Value: "plane.watch",
-			Usage: "the virtual host on the rabbit server to use",
+			Name:    "rabbit-vhost",
+			Value:   "plane.watch",
+			Usage:   "the virtual host on the rabbit server to use",
 			EnvVars: []string{"RABBITMQ_VHOST"},
 		},
 		&cli.StringFlag{
@@ -95,11 +94,19 @@ func main() {
 			Name:  "ref-lon",
 			Usage: "The reference longitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
 		},
+		&cli.StringSliceFlag{
+			Name:    "tag",
+			EnvVars: []string{"TAG", "SOURCE"},
+		},
 		&cli.BoolFlag{
 			Name:        "debug",
 			Usage:       "Show Extra Debug Information",
-			Destination: &showDebug,
 			EnvVars:     []string{"DEBUG"},
+		},
+		&cli.BoolFlag{
+			Name:        "quiet",
+			Usage:       "Only show important messages",
+			EnvVars:     []string{"QUIET"},
 		},
 	}
 
@@ -126,6 +133,8 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	trackerOpts := make([]tracker.Option, 0)
 	if c.Bool("debug") {
 		trackerOpts = append(trackerOpts, tracker.WithVerboseOutput())
+	} else if c.Bool("quiet") {
+		trackerOpts = append(trackerOpts, tracker.WithQuietOutput())
 	} else {
 		trackerOpts = append(trackerOpts, tracker.WithInfoOutput())
 	}
@@ -211,7 +220,11 @@ func runSimple(c *cli.Context) error {
 	if nil != err {
 		return err
 	}
-	trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
+	opts := []sink.Option{sink.WithLogOutput(os.Stdout)}
+	if c.Bool("quiet") {
+		opts = append(opts, sink.WithoutLoggingLocation())
+	}
+	trk.AddSink(sink.NewLoggerSink(opts...))
 
 	trk.Wait()
 	return nil
