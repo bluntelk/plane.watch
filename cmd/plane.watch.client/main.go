@@ -24,6 +24,7 @@ func main() {
 		"\n\n" +
 		`example: plane.watch.client --source=beast://crawled.mapwithlove.com:3004 --sink=amqp://guest:guest@localhost:5672/pw --tag="cool-stuff" --quiet simple`
 
+
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:    "source",
@@ -34,6 +35,16 @@ func main() {
 			Name:    "sink",
 			Usage:   "The place to send decoded JSON in URL Form. [redis|amqp]://user:pass@host:port/vhost",
 			EnvVars: []string{"SINK"},
+		},
+		&cli.StringFlag{
+			Name:    "tag",
+			Usage:   "A value that is included in the payloads output to the Sinks. Useful for knowing where something came from",
+			EnvVars: []string{"TAG"},
+		},
+		&cli.StringSliceFlag{
+			Name:    "rabbit-queue",
+			Usage:   fmt.Sprintf("The types of output we want from this binary. Valid options are %v", sink.AllQueues),
+			EnvVars: []string{"QUEUES"},
 		},
 
 		&cli.StringFlag{
@@ -100,11 +111,6 @@ func main() {
 			Name:  "ref-lon",
 			Usage: "The reference longitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
 		},
-		&cli.StringFlag{
-			Name:    "tag",
-			Usage:   "A value that is included in the payloads output to the Sinks. Useful for knowing where something came from",
-			EnvVars: []string{"TAG"},
-		},
 		&cli.BoolFlag{
 			Name:    "debug",
 			Usage:   "Show Extra Debug Information",
@@ -131,6 +137,11 @@ func main() {
 		},
 	}
 
+	app.Before = func(c *cli.Context) error {
+		fmt.Printf("%+v\n", c.StringSlice("rabbit-queue"))
+		return nil
+	}
+
 	if err := app.Run(os.Args); nil != err {
 		fmt.Println(err)
 	}
@@ -148,6 +159,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	rabbitUser := c.String("rabbit-user")
 	rabbitPass := c.String("rabbit-pass")
 	rabbitVHost := c.String("rabbit-vhost")
+	rabbitQueues := c.StringSlice("rabbit-queue")
 
 	sourceHost := c.String("dump1090-host")
 	sourcePort := c.String("dump1090-port")
@@ -224,7 +236,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 			sink.WithHost(rabbitHost, rabbitPort),
 			sink.WithUserPass(rabbitUser, rabbitPass),
 			sink.WithRabbitVhost(rabbitVHost),
-			sink.WithAllRabbitQueues(),
+			sink.WithRabbitQueues(rabbitQueues),
 			sink.WithSourceTag(tag),
 		)
 		if nil != err {

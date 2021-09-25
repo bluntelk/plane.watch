@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/streadway/amqp"
+	"log"
 	"plane.watch/lib/sink/rabbitmq"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/beast"
@@ -58,6 +59,18 @@ type (
 	}
 )
 
+var AllQueues = [...]string{
+	QueueTypeBeastAll,
+	QueueTypeBeastReduce,
+	QueueTypeAvrAll,
+	QueueTypeAvrReduce,
+	QueueTypeSbs1All,
+	QueueTypeSbs1Reduce,
+	QueueTypeDecodedJson,
+	QueueTypeLogs,
+	QueueLocationUpdates,
+}
+
 func NewRabbitMqSink(opts ...Option) (*RabbitMqSink, error) {
 	r := &RabbitMqSink{
 		exchange: "plane.watch.data",
@@ -85,6 +98,28 @@ func WithRabbitVhost(vhost string) Option {
 	}
 }
 
+func WithRabbitQueues(queues []string) Option {
+	return func(conf *Config) {
+		if 0 == len(queues) {
+			WithAllRabbitQueues()(conf)
+			return
+		}
+
+		for _, requestedQueue := range queues {
+			found := false
+			for _, validQueue := range AllQueues {
+				if requestedQueue == validQueue {
+					conf.queue[validQueue] = validQueue
+					found = true
+					break
+				}
+			}
+			if !found {
+				log.Printf("Error: Unknown Queue Type: %s", requestedQueue)
+			}
+		}
+	}
+}
 func WithAllRabbitQueues() Option {
 	return func(conf *Config) {
 		conf.queue[QueueTypeAvrAll] = QueueTypeAvrAll
