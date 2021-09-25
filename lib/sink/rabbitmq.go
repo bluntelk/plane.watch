@@ -138,8 +138,8 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 				HasHeading:      plane.HasHeading(),
 				HasVerticalRate: plane.HasVerticalRate(),
 				SourceTag:       r.Config.sourceTag,
-				LastMsg:         plane.LastSeen(),
-				TrackedSince:    plane.TrackedSince(),
+				LastMsg:         plane.LastSeen().UTC(),
+				TrackedSince:    plane.TrackedSince().UTC(),
 			}
 
 			var jsonBuf []byte
