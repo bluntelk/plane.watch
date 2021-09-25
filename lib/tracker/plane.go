@@ -58,6 +58,7 @@ type (
 		recentFrameCount int
 		msgCount         uint64
 		airframeCategory string
+		airframeType string
 
 		rwLock sync.RWMutex
 	}
@@ -322,6 +323,21 @@ func (p *Plane) setAirFrameCategory(category string) {
 	p.airframeCategory = category
 }
 
+func (p *Plane) AirFrame() string {
+	return p.airframeCategory
+}
+
+// setAirFrameCategory is the type of airframe for this aircraft
+func (p *Plane) setAirFrameCategoryType(categoryType string) {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	p.airframeType = categoryType
+}
+
+func (p *Plane) AirFrameType() string {
+	return p.airframeType
+}
+
 // setHeading gives our plane some direction in life
 func (p *Plane) setHeading(heading float64) {
 	p.rwLock.Lock()
@@ -432,6 +448,7 @@ func (p *Plane) Lon() float64 {
 	defer p.rwLock.RUnlock()
 	return p.location.longitude
 }
+
 
 // addLatLong Adds a Lat/Long pair to our location tracking and sets it as the current plane location
 func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {

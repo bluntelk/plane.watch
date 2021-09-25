@@ -241,6 +241,7 @@ func (p *Plane) HandleModeSFrame(frame *mode_s.Frame, refLat, refLon *float64) {
 				p.setFlightNumber(frame.FlightNumber())
 				if frame.ValidCategory() {
 					p.setAirFrameCategory(frame.Category())
+					p.setAirFrameCategoryType(frame.CategoryType())
 				}
 				hasChanged = true
 				break

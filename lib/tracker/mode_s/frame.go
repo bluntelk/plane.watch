@@ -689,6 +689,9 @@ func (f *Frame) ValidCategory() bool {
 func (f *Frame) Category() string {
 	return aircraftCategory[f.catType][f.catSubType]
 }
+func (f *Frame) CategoryType() string {
+	return fmt.Sprintf("%d/%d",f.catType,f.catSubType)
+}
 
 func (f *Frame) MessageType() byte {
 	return f.messageType

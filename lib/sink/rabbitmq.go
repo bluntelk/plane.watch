@@ -9,6 +9,7 @@ import (
 	"plane.watch/lib/tracker/beast"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
+	"strings"
 	"time"
 )
 
@@ -47,6 +48,7 @@ type (
 		FlightNumber      string
 		FlightStatus      string
 		Airframe          string
+		AirframeType      string
 		HasLocation       bool
 		HasHeading        bool
 		HasVerticalRate   bool
@@ -125,8 +127,10 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 				Altitude:      int(plane.Altitude()),
 				VerticalRate:  plane.VerticalRate(),
 				AltitudeUnits: plane.AltitudeUnits(),
-				FlightNumber:  plane.FlightNumber(),
+				FlightNumber:  strings.TrimSpace(plane.FlightNumber()),
 				FlightStatus:  plane.FlightStatus(),
+				Airframe:      plane.AirFrame(),
+				AirframeType:  plane.AirFrameType(),
 
 				HasLocation:     plane.HasLocation(),
 				HasHeading:      plane.HasHeading(),
