@@ -291,7 +291,11 @@ func (f *Frame) decodeFlightStatus() {
 		// special pos
 		f.validVerticalStatus = true
 		f.onGround = false // assume in the air
-		f.special += flightStatusTable[f.fs]
+		if f.fs <= 7 {
+			f.special += flightStatusTable[f.fs]
+		} else {
+			f.special += fmt.Sprintf("Unknown Flight Status: %d", f.fs)
+		}
 	}
 	if f.fs == 2 || f.fs == 3 || f.fs == 4 {
 		// ALERT!
