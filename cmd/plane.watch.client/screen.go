@@ -21,7 +21,6 @@ type (
 		planes sync.Map
 	}
 	pacerEvent struct {
-
 	}
 )
 
@@ -37,7 +36,7 @@ func newPacer() *pacerEvent {
 	return &pacerEvent{}
 }
 
-func (d *display) App()  *tview.Application {
+func (d *display) App() *tview.Application {
 	d.appLock.Lock()
 	defer d.appLock.Unlock()
 	return d.app
@@ -49,7 +48,7 @@ func (d *display) Run() error {
 		defer c.Stop()
 		for {
 			select {
-			case <- c.C:
+			case <-c.C:
 				d.OnEvent(newPacer())
 			}
 		}
@@ -93,9 +92,9 @@ func newAppDisplay() (*display, error) {
 }
 
 func (d *display) sortedPlaneIdSlice() []uint32 {
-	icaos := make([]uint32,0)
+	icaos := make([]uint32, 0)
 	d.planes.Range(func(key, value interface{}) bool {
-		icaos  = append(icaos, key.(uint32))
+		icaos = append(icaos, key.(uint32))
 		return true
 	})
 	sort.Slice(icaos, func(i, j int) bool {
@@ -107,7 +106,7 @@ func (d *display) getPlaneRow(icao uint32) int {
 	list := d.sortedPlaneIdSlice()
 	for i, id := range list {
 		if id == icao {
-			return i+1
+			return i + 1
 		}
 	}
 	return -1
@@ -124,7 +123,7 @@ func (d *display) drawTable() {
 			MaxWidth:      width,
 			Color:         tcell.ColorYellowGreen,
 			NotSelectable: true,
-			Expansion: 1,
+			Expansion:     1,
 		}
 	}
 
@@ -167,12 +166,12 @@ func (d *display) drawRow(icao uint32, row int) {
 	}
 	d.top.SetCellSimple(row, 3, latLon)
 	d.top.SetCellSimple(row, 4, fmt.Sprint(plane.Altitude()))
-	d.top.SetCellSimple(row, 5, fmt.Sprintf("%0.2f",plane.Velocity()))
+	d.top.SetCellSimple(row, 5, fmt.Sprintf("%0.2f", plane.Velocity()))
 	d.top.SetCellSimple(row, 6, plane.HeadingStr())
 	d.top.SetCellSimple(row, 7, fmt.Sprint(plane.MsgCount()))
 
 	since := time.Now().Sub(plane.LastSeen()).Seconds()
-	d.top.SetCellSimple(row, 8, fmt.Sprintf("%0.0f",since))
+	d.top.SetCellSimple(row, 8, fmt.Sprintf("%0.0f", since))
 	d.top.SetCellSimple(row, 9, plane.Special())
 }
 
@@ -189,7 +188,7 @@ func (d *display) updateAgeColumn() {
 		}
 		plane := item.(*tracker.Plane)
 		since := time.Now().Sub(plane.LastSeen()).Seconds()
-		d.top.SetCellSimple(row, 8, fmt.Sprintf("%0.0f",since))
+		d.top.SetCellSimple(row, 8, fmt.Sprintf("%0.0f", since))
 	}
 }
 

@@ -15,14 +15,14 @@ import (
 This package provides a way to deduplicate mode_s messages.
 
 Consider a message a duplicate if we have seen it in the last minute
- */
+*/
 
 type (
 	ForgetfulSynMap struct {
-		lookup *sync.Map
-		sweeper  *time.Timer
+		lookup        *sync.Map
+		sweeper       *time.Timer
 		sweepInterval time.Duration
-		oldAfter time.Duration
+		oldAfter      time.Duration
 	}
 
 	Filter struct {
@@ -38,9 +38,9 @@ func NewFilter() *Filter {
 
 func NewForgetfulSyncMap() *ForgetfulSynMap {
 	f := ForgetfulSynMap{
-		lookup: &sync.Map{},
+		lookup:        &sync.Map{},
 		sweepInterval: time.Second * 10,
-		oldAfter: time.Minute,
+		oldAfter:      time.Minute,
 	}
 	f.sweeper = time.AfterFunc(f.oldAfter, func() {
 		f.sweep()
@@ -75,7 +75,7 @@ func (f *ForgetfulSynMap) sweep() {
 }
 
 func (f *ForgetfulSynMap) HasKey(key interface{}) bool {
-	if _, ok :=f.lookup.Load(key); ok {
+	if _, ok := f.lookup.Load(key); ok {
 		return true
 	}
 	return false
@@ -83,7 +83,9 @@ func (f *ForgetfulSynMap) HasKey(key interface{}) bool {
 
 func (f *ForgetfulSynMap) AddKey(key interface{}) {
 	// avoid storing empty things
-	if nil == key {return}
+	if nil == key {
+		return
+	}
 	if kb, ok := key.([]byte); ok {
 		if 0 == len(kb) {
 			return

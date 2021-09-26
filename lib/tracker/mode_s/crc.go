@@ -16,7 +16,7 @@ func init() {
 		var c = i << 16
 
 		for j = 0; j < 8; j++ {
-			if c & 0x800000 != 0 {
+			if c&0x800000 != 0 {
 				c = (c << 1) ^ modesGeneratorPoly
 			} else {
 				c = c << 1
@@ -32,13 +32,13 @@ func (f *Frame) decodeModeSChecksum() bool {
 	var i, index uint32
 
 	f.checkSum = 0
-	for i = 0; i < n - 3; i++ {
+	for i = 0; i < n-3; i++ {
 		index = uint32(f.message[i]) ^ ((f.checkSum & 0xff0000) >> 16)
 		f.checkSum = (f.checkSum << 8) ^ modesChecksumTable[index]
 		f.checkSum = f.checkSum & 0xffffff
 	}
 
-	f.checkSum = f.checkSum ^ (uint32(f.message[n - 3]) << 16) ^ (uint32(f.message[n - 2]) << 8) ^ uint32(f.message[n - 1])
+	f.checkSum = f.checkSum ^ (uint32(f.message[n-3]) << 16) ^ (uint32(f.message[n-2]) << 8) ^ uint32(f.message[n-1])
 
 	return f.checkSum == 0
 }
@@ -49,10 +49,10 @@ func (f *Frame) checkCrc() error {
 		return nil
 	}
 	switch f.downLinkFormat {
-	case 0,4,5,16,20,21,24:
+	case 0, 4, 5, 16, 20, 21, 24:
 		// decoding/checking CRC here is tricky. Field Type AP
 		return nil
-	case 11,17,18:// Field Type PI
+	case 11, 17, 18: // Field Type PI
 		if f.decodeModeSChecksum() {
 			return nil
 		}

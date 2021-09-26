@@ -58,7 +58,7 @@ type (
 		recentFrameCount int
 		msgCount         uint64
 		airframeCategory string
-		airframeType string
+		airframeType     string
 
 		rwLock sync.RWMutex
 	}
@@ -448,7 +448,6 @@ func (p *Plane) Lon() float64 {
 	defer p.rwLock.RUnlock()
 	return p.location.longitude
 }
-
 
 // addLatLong Adds a Lat/Long pair to our location tracking and sets it as the current plane location
 func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {

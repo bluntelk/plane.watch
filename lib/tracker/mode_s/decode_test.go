@@ -206,22 +206,22 @@ type tIcaoMessage struct {
 
 func TestCprDecode(t *testing.T) {
 	type testDataType struct {
-		raw    string
-		icoa   string
-		isEven bool
-		alt    int32
+		raw              string
+		icoa             string
+		isEven           bool
+		alt              int32
 		raw_lat, raw_lon int
 	}
 	testData := []testDataType{
-		{raw: "*8d7c4516581f76e48d95e8ab20ca;", icoa:"7c4516", isEven: false, alt:5175, raw_lat:94790, raw_lon:103912},
-		{raw: "*8d7c4516581f6288f83ade534ae1;", icoa:"7c4516", isEven: true, alt:5150, raw_lat:83068, raw_lon:15070},
+		{raw: "*8d7c4516581f76e48d95e8ab20ca;", icoa: "7c4516", isEven: false, alt: 5175, raw_lat: 94790, raw_lon: 103912},
+		{raw: "*8d7c4516581f6288f83ade534ae1;", icoa: "7c4516", isEven: true, alt: 5150, raw_lat: 83068, raw_lon: 15070},
 
-		{raw: "*8d7c4516580f06fc6d8f25d8669d;", icoa:"7c4516", isEven: false, alt:1800, raw_lat:97846, raw_lon:102181},
-		{raw: "*8d7c4516580df2a168340b32212a;", icoa:"7c4516", isEven: true, alt:1775, raw_lat:86196, raw_lon:13323},
+		{raw: "*8d7c4516580f06fc6d8f25d8669d;", icoa: "7c4516", isEven: false, alt: 1800, raw_lat: 97846, raw_lon: 102181},
+		{raw: "*8d7c4516580df2a168340b32212a;", icoa: "7c4516", isEven: true, alt: 1775, raw_lat: 86196, raw_lon: 13323},
 	}
 
 	for i, d := range testData {
-		frame, err := DecodeString(d.raw, time.Now());
+		frame, err := DecodeString(d.raw, time.Now())
 		if nil != err {
 			t.Error(err)
 		}

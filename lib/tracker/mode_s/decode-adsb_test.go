@@ -271,7 +271,7 @@ func TestDecodeDF17MT28(t *testing.T) {
 		name      string
 		frame     string
 		emergency bool
-		cap int
+		cap       int
 	}{
 		{name: fmt.Sprintf("DF17/MT28/ST01 %s", DF17FrameEmergencyPriority), frame: "8C7C4A0CE104BC0000000069DE1A", cap: 4},
 		{name: fmt.Sprintf("DF17/MT28/ST01 %s", DF17FrameEmergencyPriority), frame: "8D7C4A0CE101950000000095FC54", cap: 5},

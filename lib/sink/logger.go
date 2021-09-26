@@ -1,11 +1,8 @@
 package sink
 
 import (
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"os"
 	"plane.watch/lib/tracker"
-	"time"
 )
 
 type (
@@ -21,13 +18,8 @@ func NewLoggerSink(opts ...Option) *LoggerSink {
 	for _, opt := range opts {
 		opt(&l.Config)
 	}
-	return l
-}
 
-func WithCliLogger() Option {
-	return func(config *Config) {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.UnixDate})
-	}
+	return l
 }
 
 func (l *LoggerSink) Finish() {
@@ -37,12 +29,17 @@ func (l *LoggerSink) Finish() {
 func (l *LoggerSink) OnEvent(e tracker.Event) {
 	switch e.(type) {
 	case *tracker.LogEvent:
-		log.Info().Str("event","method").Msg(e.String())
+		log.Info().Str("event", "method").Msg(e.String())
 	case *tracker.PlaneLocationEvent:
 		if l.logLocation {
 			log.Info().Msg(e.String())
 		}
 	case *tracker.InfoEvent:
-		log.Info().Msg(e.String())
+		i := e.(*tracker.InfoEvent)
+		log.Info().
+			Int("num-receivers", i.NumReceivers()).
+			Uint64("num-frames", i.NumFrames()).
+			Float64("uptime", i.Uptime()).
+			Msg(e.String())
 	}
 }

@@ -103,7 +103,7 @@ func WithFiles(filePaths []string) Option {
 		p.run = func() {
 			p.readFiles(filePaths, func(reader io.Reader, fileName string) error {
 				scanner := bufio.NewScanner(reader)
-				p.FrameSource.OriginIdentifier = "file://"+fileName
+				p.FrameSource.OriginIdentifier = "file://" + fileName
 				return p.readFromScanner(scanner)
 			})
 		}

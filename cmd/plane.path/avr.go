@@ -2,11 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
-	"os"
+	"plane.watch/lib/logging"
 	"plane.watch/lib/producer"
-	"plane.watch/lib/sink"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/mode_s"
 	"sync"
@@ -14,15 +12,9 @@ import (
 )
 
 func parseAvr(c *cli.Context) error {
-	opts := make([]tracker.Option,0)
+	opts := make([]tracker.Option, 0)
 	var verbose bool
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	if c.Bool("verbose") {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	}
-	if c.Bool("quiet") {
-		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
-	}
+	logging.SetVerboseOrQuiet(c.Bool("verbose"), c.Bool("quiet"))
 
 	out, err := getOutput(c)
 	if nil != err {
@@ -32,7 +24,7 @@ func parseAvr(c *cli.Context) error {
 	trk := tracker.NewTracker(opts...)
 	trk.AddMiddleware(timeFiddler)
 	if verbose {
-		trk.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stderr)))
+		logging.SetVerboseOrQuiet(verbose, false)
 	}
 	trk.AddProducer(producer.New(producer.WithType(producer.Avr), producer.WithFiles(getFilePaths(c))))
 	trk.Wait()

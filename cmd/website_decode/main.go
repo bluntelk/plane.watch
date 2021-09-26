@@ -3,14 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"io/fs"
 	"net/http"
 	"os"
 	"path"
-	"plane.watch/lib/sink"
+	"plane.watch/lib/logging"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/mode_s"
 	"runtime/debug"
@@ -36,8 +35,7 @@ func main() {
 	}
 
 	app.Action = runHttpServer
-
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.UnixDate})
+	logging.ConfigureForCli()
 
 	if err := app.Run(os.Args); nil != err {
 		log.Error().Err(err).Send()
@@ -59,6 +57,7 @@ func runHttpServer(c *cli.Context) error {
 		htdocsPath = path.Clean(c.Args().First())
 		files = os.DirFS(htdocsPath)
 	}
+	logging.SetVerboseOrQuiet(c.Bool("verbose"), false)
 
 	http.Handle("/", http.FileServer(http.FS(files)))
 
@@ -73,9 +72,6 @@ func runHttpServer(c *cli.Context) error {
 		switch r.URL.Path {
 		case "/decode":
 			pt := tracker.NewTracker()
-			if c.Bool("verbose") {
-				pt.AddSink(sink.NewLoggerSink(sink.WithLogOutput(os.Stdout)))
-			}
 			var submittedPackets string
 			_ = r.ParseForm()
 			submittedPackets = r.FormValue("packet")

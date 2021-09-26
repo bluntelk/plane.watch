@@ -12,12 +12,11 @@ type (
 
 	// default sink -> plane.watch
 	outgoing struct {
-
 	}
 
 	mixer struct {
-		inputs []incoming
-		outputs [] outgoing
+		inputs  []incoming
+		outputs []outgoing
 	}
 )
 

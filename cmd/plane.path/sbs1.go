@@ -2,21 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
+	"plane.watch/lib/logging"
 	"plane.watch/lib/producer"
 	"plane.watch/lib/tracker"
 )
 
 func parseSbs1(c *cli.Context) error {
-	opts := make([]tracker.Option,0)
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	if c.Bool("verbose") {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	}
-	if c.Bool("quiet") {
-		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
-	}
+	opts := make([]tracker.Option, 0)
+	logging.SetVerboseOrQuiet(c.Bool("verbose"), c.Bool("quiet"))
 
 	out, err := getOutput(c)
 	if nil != err {

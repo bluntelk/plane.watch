@@ -31,7 +31,6 @@ func (p *producer) beastScanner(scan *bufio.Scanner) error {
 	return scan.Err()
 }
 
-
 func ScanBeast(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil

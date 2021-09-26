@@ -3,14 +3,15 @@ package sink
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
+	"plane.watch/lib/logging"
 	"plane.watch/lib/sink/rabbitmq"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/beast"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -72,6 +73,13 @@ var AllQueues = [...]string{
 	QueueLocationUpdates,
 }
 
+const ansi = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
+
+var re = regexp.MustCompile(ansi)
+
+func stripAnsi(str string) string {
+	return re.ReplaceAllString(str, "")
+}
 func NewRabbitMqSink(opts ...Option) (*RabbitMqSink, error) {
 	r := &RabbitMqSink{
 		exchange: "plane.watch.data",
@@ -91,13 +99,22 @@ func NewRabbitMqSink(opts ...Option) (*RabbitMqSink, error) {
 		return nil, err
 	}
 
+	if _, ok := r.queue[QueueTypeLogs]; ok {
+		logging.AddLogDestination(r)
+	}
+
 	// setup a hook for messages
-	log.Logger.Hook(r)
 	return r, nil
 }
 
-func (r *RabbitMqSink) Run(e *zerolog.Event, level zerolog.Level, message string) {
-
+func (r *RabbitMqSink) Write(b []byte) (int, error) {
+	err := r.mq.Publish(r.exchange, QueueTypeLogs, amqp.Publishing{
+		ContentType:     "text/plain",
+		ContentEncoding: "utf-8",
+		Timestamp:       time.Now(),
+		Body:            []byte(stripAnsi(string(b))),
+	})
+	return len(b), err
 }
 
 func WithRabbitVhost(vhost string) Option {
@@ -241,7 +258,7 @@ func (r *RabbitMqSink) connect(timeout time.Duration) (*rabbitmq.RabbitMQ, error
 	rabbitConfig.Password = r.pass
 	rabbitConfig.Vhost = r.vhost
 
-	//log.Printf("Connecting to RabbitMQ @ %s", rabbitConfig)
+	log.Info().Str("host", rabbitConfig.String()).Msg("Connecting to RabbitMQ")
 	rabbit := rabbitmq.New(rabbitConfig)
 	connected := make(chan bool)
 	go rabbit.Connect(connected)
@@ -261,7 +278,7 @@ func (r *RabbitMqSink) setup() error {
 		return err
 	}
 	for t, q := range r.queue {
-		if _, err = r.mq.QueueDeclare(q, r.messageTtlSeconds * 1000); nil != err {
+		if _, err = r.mq.QueueDeclare(q, r.messageTtlSeconds*1000); nil != err {
 			return err
 		}
 

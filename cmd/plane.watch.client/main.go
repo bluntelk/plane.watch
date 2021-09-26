@@ -3,12 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"net/url"
 	"os"
 	"plane.watch/lib/dedupe"
+	"plane.watch/lib/logging"
 	"plane.watch/lib/producer"
 	"plane.watch/lib/sink"
 	"plane.watch/lib/tracker"
@@ -26,7 +26,6 @@ func main() {
 		`outputs all sorts if interesting information to the configured sink, including decoded and tracked planes in JSON format.` +
 		"\n\n" +
 		`example: plane.watch.client --source=beast://crawled.mapwithlove.com:3004 --sink=amqp://guest:guest@localhost:5672/pw --tag="cool-stuff" --quiet simple`
-
 
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
@@ -146,14 +145,8 @@ func main() {
 	}
 
 	app.Before = func(c *cli.Context) error {
-		 zerolog.SetGlobalLevel(zerolog.InfoLevel)
-		 if c.Bool("debug") {
-			 zerolog.SetGlobalLevel(zerolog.DebugLevel)
-		 }
-		 if c.Bool("quiet") {
-			 zerolog.SetGlobalLevel(zerolog.ErrorLevel)
-		 }
-		 return nil
+		logging.SetVerboseOrQuiet(c.Bool("debug"), c.Bool("quiet"))
+		return nil
 	}
 
 	if err := app.Run(os.Args); nil != err {
@@ -200,6 +193,9 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		}
 		sourceHost = parsedUrl.Hostname()
 		sourcePort = parsedUrl.Port()
+	}
+	if "" == tag {
+		tag = sourceHost
 	}
 
 	if "" != urlSink {
@@ -303,11 +299,13 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 }
 
 func runSimple(c *cli.Context) error {
+	logging.ConfigureForCli()
+
 	trk, err := commonSetup(c)
 	if nil != err {
 		return err
 	}
-	opts := []sink.Option{sink.WithCliLogger()}
+	var opts []sink.Option
 	if c.Bool("quiet") {
 		opts = append(opts, sink.WithoutLoggingLocation())
 	}

@@ -21,7 +21,7 @@ type CprLocation struct {
 
 	latitudeIndex int32
 
-	oddFrame, evenFrame bool
+	oddFrame, evenFrame   bool
 	oddDecode, evenDecode bool
 
 	nl0, nl1 int32
@@ -247,7 +247,7 @@ func (cpr *CprLocation) surfaceLongitudeTwiddle(refLon float64, loc *PlaneLocati
 	// if reflon is more than 45 degrees away, move some multiple of 90 degrees towards it
 	loc.longitude += math.Floor((refLon-loc.longitude+45.0)/90.0) * 90.0 // this might move us outside (-180..+180), we fix this below
 
-	loc.longitude -= math.Floor( (loc.longitude + 180.0) /360.0) * 360.0
+	loc.longitude -= math.Floor((loc.longitude+180.0)/360.0) * 360.0
 }
 
 func (cpr *CprLocation) normaliseLatLon(loc *PlaneLocation) error {

@@ -27,7 +27,7 @@ type (
 	//PlaneLocationEvent is send whenever a planes information has been updated
 	PlaneLocationEvent struct {
 		new, removed bool
-		p *Plane
+		p            *Plane
 	}
 
 	// FrameEvent is for whenever we get a frame of data from our producers
@@ -37,15 +37,15 @@ type (
 	}
 	FrameSource struct {
 		OriginIdentifier string
-		Name string
-		RefLat, RefLon *float64
+		Name             string
+		RefLat, RefLon   *float64
 	}
 
 	// InfoEvent periodically sends out some interesting stats
 	InfoEvent struct {
 		receivedFrames uint64
-		numReceivers int
-		uptime float64
+		numReceivers   int
+		uptime         float64
 	}
 )
 
@@ -120,4 +120,16 @@ func (i *InfoEvent) Type() string {
 
 func (i *InfoEvent) String() string {
 	return fmt.Sprintf("Info: #feeders=%d, #frames=%d. uptime(s)=%0.2f", i.numReceivers, i.receivedFrames, i.uptime)
+}
+
+func (i *InfoEvent) NumReceivers() int {
+	return i.numReceivers
+}
+
+func (i *InfoEvent) NumFrames() uint64 {
+	return i.receivedFrames
+}
+
+func (i *InfoEvent) Uptime() float64 {
+	return i.uptime
 }

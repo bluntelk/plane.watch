@@ -11,7 +11,6 @@ import (
 	"runtime/pprof"
 )
 
-
 func main() {
 	app := cli.NewApp()
 
@@ -104,7 +103,7 @@ func getFilePaths(c *cli.Context) []string {
 	}
 
 	var files []string
-	for i :=0; i < c.NArg(); i++ {
+	for i := 0; i < c.NArg(); i++ {
 		if !stdOut && i == 0 {
 			continue
 		}

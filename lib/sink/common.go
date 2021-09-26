@@ -3,7 +3,6 @@ package sink
 import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"io"
 	"os"
 	"sync"
 )
@@ -11,15 +10,15 @@ import (
 type (
 	Config struct {
 		host, port string
-		secure bool
+		secure     bool
 
-		vhost string
+		vhost      string
 		user, pass string
-		queue map[string]string
+		queue      map[string]string
 
 		waiter sync.WaitGroup
 
-		logLocation bool
+		logLocation       bool
 		sourceTag         string
 		messageTtlSeconds int
 	}
@@ -36,12 +35,6 @@ func WithUserPass(user, pass string) Option {
 	return func(conf *Config) {
 		conf.user = user
 		conf.pass = pass
-	}
-}
-
-func WithLogOutput(out io.WriteCloser) Option {
-	return func(config *Config) {
-		log.Logger = zerolog.New(out).With().Timestamp().Logger()
 	}
 }
 

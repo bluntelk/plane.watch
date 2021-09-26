@@ -65,7 +65,7 @@ func gatherSamples(filePath string) {
 				continue
 			}
 			existingSamples[key] = true
-		case 20,21:
+		case 20, 21:
 			bdsMap[frame.BdsMessageType()]++
 			if "0.0" == frame.BdsMessageType() {
 				continue
@@ -95,7 +95,7 @@ func gatherSamples(filePath string) {
 
 	println("Sample Frames")
 	for k, s := range samples {
-		println(k, ":", "['" + strings.Join(s, "', '") + "'],")
+		println(k, ":", "['"+strings.Join(s, "', '")+"'],")
 	}
 }
 
@@ -117,11 +117,11 @@ func showTypes(filePath string) {
 		}
 		switch frame.DownLinkType() {
 		case 17:
-			fmt.Printf("DF%02d\tMT%02d\tST%02d\t%s\t%s\n",frame.DownLinkType(), frame.MessageType(), frame.MessageSubType(), frame.IcaoStr(), line)
+			fmt.Printf("DF%02d\tMT%02d\tST%02d\t%s\t%s\n", frame.DownLinkType(), frame.MessageType(), frame.MessageSubType(), frame.IcaoStr(), line)
 		case 20, 21:
-			fmt.Printf("DF%02d\tBDS%s\tST%02d\t%s\t%s\n",frame.DownLinkType(), frame.BdsMessageType(), frame.MessageSubType(), frame.IcaoStr(), line)
+			fmt.Printf("DF%02d\tBDS%s\tST%02d\t%s\t%s\n", frame.DownLinkType(), frame.BdsMessageType(), frame.MessageSubType(), frame.IcaoStr(), line)
 		default:
-			fmt.Printf("DF%02d\tMT%02d\tST%02d\t%s\t%s\n",frame.DownLinkType(), frame.MessageType(), frame.MessageSubType(), frame.IcaoStr(), line)
+			fmt.Printf("DF%02d\tMT%02d\tST%02d\t%s\t%s\n", frame.DownLinkType(), frame.MessageType(), frame.MessageSubType(), frame.IcaoStr(), line)
 
 		}
 

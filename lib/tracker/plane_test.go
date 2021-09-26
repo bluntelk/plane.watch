@@ -53,7 +53,6 @@ func TestGetPlane(t *testing.T) {
 		t.Errorf("Expected planes ICAO identifier to be moo, got %d", plane.IcaoIdentifier())
 	}
 
-
 	plane = trk.GetPlane(1234)
 	err = plane.setCprOddLocation(88385, 125818, time.Now())
 	if nil != err {
@@ -82,7 +81,6 @@ func TestGetPlane(t *testing.T) {
 	if 39846 != plane.cprLocation.evenLon {
 		t.Errorf("Even Lon not recorded properly. expected 39846, got: %0.2f", plane.cprLocation.evenLon)
 	}
-
 
 	plane = trk.GetPlane(1234)
 	location, err := plane.cprLocation.decodeGlobalAir()
@@ -115,7 +113,6 @@ func TestGetPlane(t *testing.T) {
 
 	plane.addLatLong(location.latitude, location.longitude, time.Now())
 }
-
 
 func Test_headingInfo_getCompassLabel(t *testing.T) {
 	type args struct {
