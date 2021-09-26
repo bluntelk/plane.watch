@@ -142,6 +142,11 @@ func main() {
 			Action:    runSimple,
 			ArgsUsage: "[app.log - A file name to output to or stdout if not specified]",
 		},
+		{
+			Name:      "daemon",
+			Usage:     "Docker Daemon Mode",
+			Action:    runDaemon,
+		},
 	}
 
 	app.Before = func(c *cli.Context) error {
@@ -332,4 +337,19 @@ func run(c *cli.Context) error {
 	err = app.Run()
 	trk.Stop()
 	return err
+}
+
+// run is our method for running things
+func runDaemon(c *cli.Context) error {
+	logging.SetVerboseOrQuiet(false, true)
+	trk, err := commonSetup(c)
+	if nil != err {
+		return err
+	}
+	var opts []sink.Option
+	opts = append(opts, sink.WithoutLoggingLocation())
+	trk.AddSink(sink.NewLoggerSink(opts...))
+
+	trk.Wait()
+	return nil
 }
