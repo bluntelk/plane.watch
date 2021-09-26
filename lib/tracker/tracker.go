@@ -38,7 +38,7 @@ type (
 		decodingQueue       chan *FrameEvent
 		decodingQueueWaiter sync.WaitGroup
 
-		eventSync    sync.Mutex
+		eventSync    sync.RWMutex
 		eventsOpen   bool
 		events       chan Event
 		eventsWaiter sync.WaitGroup

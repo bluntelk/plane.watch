@@ -6,6 +6,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"net/url"
 	"os"
+	"plane.watch/lib/dedupe"
 	"plane.watch/lib/producer"
 	"plane.watch/lib/sink"
 	"plane.watch/lib/tracker"
@@ -137,11 +138,6 @@ func main() {
 		},
 	}
 
-	app.Before = func(c *cli.Context) error {
-		fmt.Printf("%+v\n", c.StringSlice("rabbit-queue"))
-		return nil
-	}
-
 	if err := app.Run(os.Args); nil != err {
 		fmt.Println(err)
 	}
@@ -219,6 +215,9 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		trackerOpts = append(trackerOpts, tracker.WithInfoOutput())
 	}
 	trk := tracker.NewTracker(trackerOpts...)
+
+	dedupeFilter := dedupe.NewFilter()
+	trk.AddMiddleware(dedupeFilter.DeDupe)
 
 	producerOpts := make([]producer.Option, 0)
 	if refLat != 0 && refLon != 0 {

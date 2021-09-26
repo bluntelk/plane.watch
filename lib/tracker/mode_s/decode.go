@@ -43,7 +43,6 @@ func DecodeString(rawFrame string, t time.Time) (*Frame, error) {
 	return frame, err
 }
 
-
 func NewFrame(rawFrame string, t time.Time) *Frame {
 	f := Frame{
 		full:      rawFrame,
@@ -105,7 +104,6 @@ func (f *Frame) parseIntoRaw() error {
 	return nil
 }
 
-
 func (f *Frame) Parse() error {
 	var err error
 
@@ -122,7 +120,7 @@ func (f *Frame) Parse() error {
 
 	// now see if the message we got matches up with the DF format we decoded
 	if int(f.getMessageLengthBytes()) != len(f.message) {
-		return fmt.Errorf("cannot Parse AVR Frame (%X). Incorrect length %d != %d", f.message, f.getMessageLengthBytes(), len(f.message))
+		return fmt.Errorf("cannot Parse AVR Frame (DF%d) (%X). Incorrect length %d != %d", f.downLinkFormat, f.message, f.getMessageLengthBytes(), len(f.message))
 	}
 
 	err = f.checkCrc()
@@ -218,7 +216,6 @@ func (f *Frame) parseBeastTimeStamp() error {
 func (f *Frame) BeastTicksNs() time.Duration {
 	return time.Duration(f.beastTicksNs)
 }
-
 
 func (f *Frame) TimeStamp() time.Time {
 	return f.timeStamp

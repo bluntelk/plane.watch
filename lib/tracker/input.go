@@ -177,8 +177,13 @@ func (t *Tracker) decodeQueue() {
 
 		for _, m := range t.middlewares {
 			frame = m(frame)
+			if nil == frame {
+				break
+			}
 		}
-
+		if nil == frame {
+			continue
+		}
 		plane := t.GetPlane(frame.Icao())
 
 		switch frame.(type) {

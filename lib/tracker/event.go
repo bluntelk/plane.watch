@@ -10,7 +10,7 @@ const PlaneLocationEventType = "plane-location-event"
 const InfoEventType = "info-event"
 
 type (
-	// an Event is something that we want to know about. This is the base of our sending of data
+	// Event is something that we want to know about. This is the base of our sending of data
 	Event interface {
 		Type() string
 		String() string
@@ -51,7 +51,11 @@ type (
 )
 
 func (t *Tracker) AddEvent(e Event) {
-	t.events <- e
+	t.eventSync.RLock()
+	defer t.eventSync.RUnlock()
+	if t.eventsOpen {
+		t.events <- e
+	}
 }
 
 func (t *Tracker) processEvents() {

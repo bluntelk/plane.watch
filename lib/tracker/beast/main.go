@@ -160,3 +160,7 @@ func (f *Frame) AvrFrame() *mode_s.Frame {
 	}
 	return f.decodedModeS
 }
+
+func (f *Frame) AvrRaw() []byte {
+	return f.body
+}
