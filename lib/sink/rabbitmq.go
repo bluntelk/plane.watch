@@ -133,11 +133,6 @@ func WithAllRabbitQueues() Option {
 		conf.queue[QueueLocationUpdates] = QueueLocationUpdates
 	}
 }
-func WithRabbitQueue(msgType, queue string) Option {
-	return func(conf *Config) {
-		conf.queue[msgType] = queue
-	}
-}
 
 func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 	var err error
@@ -198,6 +193,9 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 		source := e.(*tracker.FrameEvent).Source()
 
 		sendMessage := func(info frame) error {
+			if _, ok := r.queue[info.RouteKey]; !ok {
+				return nil
+			}
 			body, err = json.Marshal(info)
 			if nil != err {
 				return err
