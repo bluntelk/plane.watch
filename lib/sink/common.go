@@ -68,5 +68,7 @@ func WithLogFile(file string) Option {
 
 func (c *Config) Finish() {
 	c.waiter.Wait()
-	_ = c.out.Close()
+	if nil != c.out {
+		_ = c.out.Close()
+	}
 }
