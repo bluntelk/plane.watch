@@ -1,6 +1,8 @@
 package sink
 
 import (
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"io"
 	"os"
 	"sync"
@@ -15,7 +17,6 @@ type (
 		user, pass string
 		queue map[string]string
 
-		out io.WriteCloser
 		waiter sync.WaitGroup
 
 		logLocation bool
@@ -40,7 +41,7 @@ func WithUserPass(user, pass string) Option {
 
 func WithLogOutput(out io.WriteCloser) Option {
 	return func(config *Config) {
-		config.out = out
+		log.Logger = zerolog.New(out).With().Timestamp().Logger()
 	}
 }
 
@@ -71,13 +72,10 @@ func WithLogFile(file string) Option {
 			println("Cannot open file: ", file)
 			return
 		}
-		config.out = f
+		log.Logger = zerolog.New(f).With().Timestamp().Logger()
 	}
 }
 
 func (c *Config) Finish() {
 	c.waiter.Wait()
-	if nil != c.out {
-		_ = c.out.Close()
-	}
 }

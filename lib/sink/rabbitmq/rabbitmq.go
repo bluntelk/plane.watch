@@ -2,8 +2,8 @@ package rabbitmq
 
 import (
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
-	"log"
 	"net"
 	"net/url"
 	"strings"
@@ -59,7 +59,7 @@ func (r *RabbitMQ) Connect(connected chan bool) {
 	for {
 		select {
 		case <-done:
-			log.Println("RabbitMQ connected and channel established")
+			log.Debug().Msg("RabbitMQ connected and channel established")
 			r.connected = true
 			connected <- true
 			backoffIntervalCounter = 0
@@ -78,7 +78,9 @@ func (r *RabbitMQ) Connect(connected chan bool) {
 				backoffInterval = rabbitmqRetryIntervalMax
 			}
 
-			log.Printf("Failed to connect, attempt %d, Retrying in %d seconds", backoffIntervalCounter, backoffInterval)
+			log.Error().
+				Int64("attempt", backoffIntervalCounter).
+				Msgf("Failed to connect, attempt %d, Retrying in %d seconds", backoffIntervalCounter, backoffInterval)
 
 			timer.Reset(time.Duration(backoffInterval) * time.Second)
 		}
@@ -158,17 +160,17 @@ func (r *RabbitMQ) Publish(exchange, key string, msg amqp.Publishing) error {
 func (r *RabbitMQ) connect(uri string, done chan bool) {
 	var err error
 
-	log.Printf("Dialing %q", uri)
+	log.Debug().Msgf("Dialing %q", uri)
 	r.conn, err = amqp.Dial(uri)
 	if err != nil {
 		log.Printf("Dial: %s", err)
 		return
 	}
 
-	log.Printf("Config established, getting Channel")
+	log.Debug().Msgf("Config established, getting Channel")
 	r.channel, err = r.conn.Channel()
 	if err != nil {
-		log.Printf("Channel: %s", err)
+		log.Error().Msgf("Channel: %s", err)
 		return
 	}
 

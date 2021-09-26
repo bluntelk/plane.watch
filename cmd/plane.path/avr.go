@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
 	"os"
 	"plane.watch/lib/producer"
@@ -15,12 +16,14 @@ import (
 func parseAvr(c *cli.Context) error {
 	opts := make([]tracker.Option,0)
 	var verbose bool
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	if c.Bool("verbose") {
-		opts = append(opts, tracker.WithVerboseOutput())
-		verbose=true
-	} else {
-		opts = append(opts, tracker.WithInfoOutput())
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
+	if c.Bool("quiet") {
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+	}
+
 	out, err := getOutput(c)
 	if nil != err {
 		fmt.Println(err)

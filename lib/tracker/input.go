@@ -38,25 +38,6 @@ type (
 	Middleware func(Frame) Frame
 )
 
-func (t *Tracker) setVerbosity(logLevel int) {
-	t.logLevel = logLevel
-}
-
-func WithVerboseOutput() Option {
-	return func(t *Tracker) {
-		t.setVerbosity(LogLevelDebug)
-	}
-}
-func WithInfoOutput() Option {
-	return func(t *Tracker) {
-		t.setVerbosity(LogLevelInfo)
-	}
-}
-func WithQuietOutput() Option {
-	return func(t *Tracker) {
-		t.setVerbosity(LogLevelQuiet)
-	}
-}
 func WithDecodeWorkerCount(numDecodeWorkers int) Option {
 	return func(t *Tracker) {
 		t.decodeWorkerCount = numDecodeWorkers
@@ -104,9 +85,7 @@ func (t *Tracker) AddProducer(p Producer) {
 				// send this event on!
 				t.AddEvent(e)
 			case *LogEvent:
-				if t.logLevel >= e.(*LogEvent).Level {
-					t.AddEvent(e)
-				}
+				t.AddEvent(e)
 			}
 		}
 		t.producerWaiter.Done()

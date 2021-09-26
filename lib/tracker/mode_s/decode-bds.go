@@ -3,7 +3,7 @@ package mode_s
 import (
 	"errors"
 	"fmt"
-	"log"
+	"github.com/rs/zerolog/log"
 	"strings"
 )
 
@@ -78,7 +78,7 @@ func (f *Frame) decodeCommB() error {
 	if nil != err {
 		// log the error?
 		if !errors.Is(err, UnknownCommBMessage) {
-			log.Println(err)
+			log.Error().Err(err).Send()
 		}
 	}
 

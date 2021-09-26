@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
 	"plane.watch/lib/producer"
 	"plane.watch/lib/tracker"
@@ -9,11 +10,14 @@ import (
 
 func parseSbs1(c *cli.Context) error {
 	opts := make([]tracker.Option,0)
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	if c.Bool("verbose") {
-		opts = append(opts, tracker.WithVerboseOutput())
-	} else {
-		opts = append(opts, tracker.WithInfoOutput())
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
+	if c.Bool("quiet") {
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+	}
+
 	out, err := getOutput(c)
 	if nil != err {
 		fmt.Println(err)

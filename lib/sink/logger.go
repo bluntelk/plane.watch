@@ -1,15 +1,16 @@
 package sink
 
 import (
-	"bufio"
-	"fmt"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"os"
 	"plane.watch/lib/tracker"
+	"time"
 )
 
 type (
 	LoggerSink struct {
 		Config
-		bufOut *bufio.Writer
 	}
 )
 
@@ -20,25 +21,28 @@ func NewLoggerSink(opts ...Option) *LoggerSink {
 	for _, opt := range opts {
 		opt(&l.Config)
 	}
-	l.bufOut = bufio.NewWriter(l.out)
 	return l
 }
 
+func WithCliLogger() Option {
+	return func(config *Config) {
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.UnixDate})
+	}
+}
+
 func (l *LoggerSink) Finish() {
-	_ = l.bufOut.Flush()
 	l.Config.Finish()
 }
 
 func (l *LoggerSink) OnEvent(e tracker.Event) {
 	switch e.(type) {
 	case *tracker.LogEvent:
-		_, _ = fmt.Fprintln(l.bufOut, e.String())
+		log.Info().Str("event","method").Msg(e.String())
 	case *tracker.PlaneLocationEvent:
 		if l.logLocation {
-			_, _ = fmt.Fprintln(l.bufOut, e.String())
+			log.Info().Msg(e.String())
 		}
 	case *tracker.InfoEvent:
-		_, _ = fmt.Fprintln(l.bufOut, e.String())
-		_ = l.bufOut.Flush()
+		log.Info().Msg(e.String())
 	}
 }

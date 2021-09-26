@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
 	"sync"
@@ -19,9 +20,6 @@ const (
 type (
 	Tracker struct {
 		planeList sync.Map
-
-		// configurable options
-		logLevel int
 
 		// pruneTick is how long between pruning attempts
 		// pruneAfter is how long we wait from the last message before we remove it from the tracker
@@ -62,7 +60,6 @@ var (
 // NewTracker creates a new tracker with which we can populate with plane tracking data
 func NewTracker(opts ...Option) *Tracker {
 	t := &Tracker{
-		logLevel:          LogLevelQuiet,
 		producers:         []Producer{},
 		middlewares:       []Middleware{},
 		decodeWorkerCount: 5,
@@ -94,19 +91,15 @@ func NewTracker(opts ...Option) *Tracker {
 }
 
 func (t *Tracker) debugMessage(sfmt string, a ...interface{}) {
-	if t.logLevel >= LogLevelDebug {
-		t.AddEvent(NewLogEvent(LogLevelDebug, "Tracker", fmt.Sprintf("DEBUG: "+sfmt, a...)))
-	}
+	log.Debug().Str("section", "Tracker").Msgf(sfmt, a...)
 }
 
 func (t *Tracker) infoMessage(sfmt string, a ...interface{}) {
-	if t.logLevel >= LogLevelInfo {
-		t.AddEvent(NewLogEvent(LogLevelInfo, "Tracker", fmt.Sprintf("INFO : "+sfmt, a...)))
-	}
+	log.Info().Str("section", "Tracker").Msgf(sfmt, a...)
 }
 
 func (t *Tracker) errorMessage(sfmt string, a ...interface{}) {
-	t.AddEvent(NewLogEvent(LogLevelError, "Tracker", fmt.Sprintf("ERROR : "+sfmt, a...)))
+	log.Error().Str("section", "Tracker").Msgf(sfmt, a...)
 }
 
 func (t *Tracker) numPlanes() int {

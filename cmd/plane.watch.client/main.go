@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"net/url"
 	"os"
@@ -143,14 +145,23 @@ func main() {
 		},
 	}
 
+	app.Before = func(c *cli.Context) error {
+		 zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		 if c.Bool("debug") {
+			 zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		 }
+		 if c.Bool("quiet") {
+			 zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+		 }
+		 return nil
+	}
+
 	if err := app.Run(os.Args); nil != err {
-		fmt.Println(err)
+		log.Error().Err(err).Msg("Finishing with an error")
 	}
 }
 
 func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
-	isDebug := c.Bool("debug")
-	isQuiet := c.Bool("quiet")
 	refLat := c.Float64("refLat")
 	refLon := c.Float64("refLon")
 	redisHost := c.String("redis-host")
@@ -212,13 +223,6 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	}
 
 	trackerOpts := make([]tracker.Option, 0)
-	if isDebug {
-		trackerOpts = append(trackerOpts, tracker.WithVerboseOutput())
-	} else if isQuiet {
-		trackerOpts = append(trackerOpts, tracker.WithQuietOutput())
-	} else {
-		trackerOpts = append(trackerOpts, tracker.WithInfoOutput())
-	}
 	trk := tracker.NewTracker(trackerOpts...)
 
 	dedupeFilter := dedupe.NewFilter()
@@ -303,7 +307,7 @@ func runSimple(c *cli.Context) error {
 	if nil != err {
 		return err
 	}
-	opts := []sink.Option{sink.WithLogOutput(os.Stdout)}
+	opts := []sink.Option{sink.WithCliLogger()}
 	if c.Bool("quiet") {
 		opts = append(opts, sink.WithoutLoggingLocation())
 	}

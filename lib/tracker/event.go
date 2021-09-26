@@ -67,24 +67,11 @@ func (t *Tracker) processEvents() {
 	t.eventsWaiter.Done()
 }
 
-func NewLogEvent(level int, section, msg string) *LogEvent {
-	return &LogEvent{
-		When:    time.Now(),
-		Section: section,
-		Level:   level,
-		Message: msg,
-	}
-}
-
 func (l *LogEvent) Type() string {
 	return LogEventType
 }
 func (l *LogEvent) String() string {
-	if l.Level > LogLevelDebug {
-		l.Level = LogLevelDebug
-	}
-	lvl := Levels[l.Level]
-	return fmt.Sprintf("%s - %s - %s - %s", l.When.Format(time.Stamp), lvl, l.Section, l.Message)
+	return l.Message
 }
 
 func newPlaneLocationEvent(p *Plane) *PlaneLocationEvent {

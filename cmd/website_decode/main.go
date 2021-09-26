@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -87,7 +87,7 @@ func runHttpServer(c *cli.Context) error {
 				if "" == packet {
 					continue
 				}
-				log.Println("Decoding Frame:", packet)
+				log.Debug().Msgf("Decoding Frame:", packet)
 				frame, err := mode_s.DecodeString(packet, time.Now())
 				if err != nil {
 					_, _ = fmt.Fprintln(w, "Failed to decode.", err)
@@ -118,7 +118,9 @@ func runHttpServer(c *cli.Context) error {
 	})
 
 	port := ":" + c.String("port")
-	log.Printf("Listening on %s...\n", port)
-	log.Fatal(http.ListenAndServe(port, nil))
+	log.Debug().Msgf("Listening on %s...", port)
+	if err := http.ListenAndServe(port, nil); nil != err {
+		log.Error().Err(err).Send()
+	}
 	return nil
 }

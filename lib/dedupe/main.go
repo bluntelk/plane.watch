@@ -2,7 +2,7 @@ package dedupe
 
 import (
 	"fmt"
-	"log"
+	"github.com/rs/zerolog/log"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/beast"
 	"plane.watch/lib/tracker/mode_s"
@@ -71,7 +71,7 @@ func (f *ForgetfulSynMap) sweep() {
 
 		return true
 	})
-	log.Printf("Removed %d old of %d entries", removeCount, testCount)
+	log.Debug().Msgf("Removed %d old of %d entries", removeCount, testCount)
 }
 
 func (f *ForgetfulSynMap) HasKey(key interface{}) bool {

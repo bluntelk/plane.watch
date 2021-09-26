@@ -3,8 +3,9 @@ package sink
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
-	"log"
 	"plane.watch/lib/sink/rabbitmq"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/beast"
@@ -89,7 +90,14 @@ func NewRabbitMqSink(opts ...Option) (*RabbitMqSink, error) {
 	if err = r.setup(); nil != err {
 		return nil, err
 	}
+
+	// setup a hook for messages
+	log.Logger.Hook(r)
 	return r, nil
+}
+
+func (r *RabbitMqSink) Run(e *zerolog.Event, level zerolog.Level, message string) {
+
 }
 
 func WithRabbitVhost(vhost string) Option {
@@ -115,7 +123,7 @@ func WithRabbitQueues(queues []string) Option {
 				}
 			}
 			if !found {
-				log.Printf("Error: Unknown Queue Type: %s", requestedQueue)
+				log.Error().Msgf("Error: Unknown Queue Type: %s", requestedQueue)
 			}
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"io"
 	"math/rand"
 	"net"
@@ -163,15 +164,15 @@ func (p *producer) addFrame(f tracker.Frame, s *tracker.FrameSource) {
 }
 
 func (p *producer) addDebug(sfmt string, v ...interface{}) {
-	p.AddEvent(tracker.NewLogEvent(tracker.LogLevelDebug, p.Name, fmt.Sprintf(sfmt, v...)))
+	log.Debug().Str("section", p.Name).Msgf(sfmt, v...)
 }
 
 func (p *producer) addInfo(sfmt string, v ...interface{}) {
-	p.AddEvent(tracker.NewLogEvent(tracker.LogLevelInfo, p.Name, fmt.Sprintf(sfmt, v...)))
+	log.Info().Str("section", p.Name).Msgf(sfmt, v...)
 }
 
 func (p *producer) addError(err error) {
-	p.AddEvent(tracker.NewLogEvent(tracker.LogLevelError, p.Name, fmt.Sprint(err)))
+	log.Error().Str("section", p.Name).Err(err).Send()
 }
 
 func (p *producer) Stop() {
