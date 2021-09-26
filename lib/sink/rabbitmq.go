@@ -176,7 +176,7 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 			jsonBuf, err = json.MarshalIndent(&eventStruct, "", "  ")
 			if nil == err {
 				err = r.mq.Publish(r.exchange, QueueLocationUpdates, amqp.Publishing{
-					ContentType:     "text/plain",
+					ContentType:     "application/json",
 					ContentEncoding: "utf-8",
 					Timestamp:       time.Now(),
 					Body:            jsonBuf,
@@ -201,7 +201,8 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 				return err
 			}
 			return r.mq.Publish(r.exchange, info.RouteKey, amqp.Publishing{
-				ContentType:     "text/plain",
+				//ContentType:     "text/plain",
+				ContentType:     "application/json",
 				ContentEncoding: "utf-8",
 				Timestamp:       time.Now(),
 				Body:            body,
