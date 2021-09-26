@@ -19,7 +19,8 @@ type (
 		waiter sync.WaitGroup
 
 		logLocation bool
-		sourceTag string
+		sourceTag         string
+		messageTtlSeconds int
 	}
 	Option func(*Config)
 )
@@ -52,6 +53,14 @@ func WithoutLoggingLocation() Option {
 func WithSourceTag(tag string) Option {
 	return func(config *Config) {
 		config.sourceTag = tag
+	}
+}
+
+func WithMessageTtl(ttl int) Option {
+	return func(config *Config) {
+		if ttl >= 0 {
+			config.messageTtlSeconds = ttl
+		}
 	}
 }
 

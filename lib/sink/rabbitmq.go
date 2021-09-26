@@ -254,7 +254,7 @@ func (r *RabbitMqSink) setup() error {
 		return err
 	}
 	for t, q := range r.queue {
-		if _, err = r.mq.QueueDeclare(q); nil != err {
+		if _, err = r.mq.QueueDeclare(q, r.messageTtlSeconds * 1000); nil != err {
 			return err
 		}
 

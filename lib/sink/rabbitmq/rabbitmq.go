@@ -108,14 +108,18 @@ func (r *RabbitMQ) ExchangeDeclare(name, kind string) error {
 	)
 }
 
-func (r *RabbitMQ) QueueDeclare(name string) (amqp.Queue, error) {
+// QueueDeclare makes sure we have our queue setup with a default message expiry
+// ttlMs is the number of seconds we will wait before expiring a message, in MilliSeconds
+func (r *RabbitMQ) QueueDeclare(name string, ttlMs int) (amqp.Queue, error) {
 	return r.channel.QueueDeclare(
 		name,
 		false,
 		true,
 		false,
 		false,
-		nil,
+		map[string]interface{}{
+			"x-message-ttl": ttlMs,
+		},
 	)
 }
 

@@ -47,7 +47,6 @@ type (
 		numReceivers int
 		uptime float64
 	}
-
 )
 
 func (t *Tracker) AddEvent(e Event) {

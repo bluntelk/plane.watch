@@ -104,6 +104,11 @@ func main() {
 			Value: "",
 			Usage: "A file to read beast format AVR frames from",
 		},
+		&cli.IntFlag{
+			Name:  "sink-message-ttl",
+			Value: 60,
+			Usage: "Instruct our sinks to hold onto generated messages this long. In Seconds",
+		},
 		&cli.Float64Flag{
 			Name:  "ref-lat",
 			Usage: "The reference latitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
@@ -167,6 +172,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	// let's parse our URL forms
 	urlSource := c.String("source")
 	urlSink := c.String("sink")
+	messageTtl := c.Int("sink-message-ttl")
 	tag := c.String("tag")
 
 	if "" != urlSource {
@@ -203,7 +209,6 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		default:
 			return nil, fmt.Errorf("unknown scheme: %s, expected one of [redis|amqp|rabbitmq]", parsedUrl.Scheme)
 		}
-
 	}
 
 	trackerOpts := make([]tracker.Option, 0)
@@ -237,6 +242,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 			sink.WithRabbitVhost(rabbitVHost),
 			sink.WithRabbitQueues(rabbitQueues),
 			sink.WithSourceTag(tag),
+			sink.WithMessageTtl(messageTtl),
 		)
 		if nil != err {
 			return nil, err
