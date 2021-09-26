@@ -904,7 +904,9 @@ func (f *Frame) formatBitString(features []featureBreakdown) string {
 		}
 
 		if fieldBitCounter != feat.start {
-			log.Warn().Msgf("Describe: Top Level Fields Not Adding up. (%d %s %d). Expected Start=%d, got=%d", f.downLinkFormat, sk, f.messageSubType, feat.start, fieldBitCounter)
+			log.Warn().
+				Str("frame", f.raw).
+				Msgf("Describe: Top Level Fields Not Adding up. (%d %s %d). Expected Start=%d, got=%d", f.downLinkFormat, sk, f.messageSubType, feat.start, fieldBitCounter)
 		}
 		fieldBitCounter = feat.end
 
@@ -927,7 +929,9 @@ func (f *Frame) formatBitString(features []featureBreakdown) string {
 			//footer += fmt.Sprintf("-- Field=%s -- SubFields -- %s: %s \n", feat.name, feature.field, feature.meaning)
 			for _, sf := range feat.subFields[sk] {
 				if subFieldBitCounter != sf.start {
-					log.Warn().Msgf("Describe: Second Level Fields Not Adding up. (%d %s %d). Expected Start=%d, got=%d", f.downLinkFormat, sk, f.messageSubType, sf.start, subFieldBitCounter)
+					log.Warn().
+						Str("frame", f.raw).
+						Msgf("Describe: Second Level Fields Not Adding up. (%d %s %d). Expected Start=%d, got=%d", f.downLinkFormat, sk, f.messageSubType, sf.start, subFieldBitCounter)
 				}
 				subFieldBitCounter = sf.end
 				if 0 == len(sf.subFields[sk]) {
@@ -940,7 +944,9 @@ func (f *Frame) formatBitString(features []featureBreakdown) string {
 					ssk := strconv.Itoa(int(f.messageSubType))
 					for _, ssf := range sf.subFields[ssk] {
 						if subSubFieldBitCounter != ssf.start {
-							log.Warn().Msgf("Describe: Third Level Fields Not Adding up. (%d %s %d). Expected Start=%d, got=%d", f.downLinkFormat, sk, f.messageSubType, ssf.start, subSubFieldBitCounter)
+							log.Warn().
+								Str("frame", f.raw).
+								Msgf("Describe: Third Level Fields Not Adding up. (%d %s %d). Expected Start=%d, got=%d", f.downLinkFormat, sk, f.messageSubType, ssf.start, subSubFieldBitCounter)
 						}
 						doMakeBitString(ssf)
 						doMakeFooterString(ssf, "   -> ")

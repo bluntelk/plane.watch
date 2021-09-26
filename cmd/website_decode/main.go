@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"io/fs"
@@ -36,8 +37,10 @@ func main() {
 
 	app.Action = runHttpServer
 
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.UnixDate})
+
 	if err := app.Run(os.Args); nil != err {
-		fmt.Println(err)
+		log.Error().Err(err).Send()
 	}
 }
 
@@ -87,7 +90,7 @@ func runHttpServer(c *cli.Context) error {
 				if "" == packet {
 					continue
 				}
-				log.Debug().Msgf("Decoding Frame:", packet)
+				log.Debug().Str("frame", packet).Msg("Decoding Frame")
 				frame, err := mode_s.DecodeString(packet, time.Now())
 				if err != nil {
 					_, _ = fmt.Fprintln(w, "Failed to decode.", err)
