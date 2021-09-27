@@ -74,9 +74,29 @@ func New(opts ...Option) *producer {
 
 func WithListener(host, port string) Option {
 	return func(p *producer) {
-		// TODO: implement a listener
 		p.run = func() {
+			addr := net.JoinHostPort(host, port)
+			ln, err := net.Listen("tcp", addr)
+			if err != nil {
+				// handle error
+				log.Error().Err(err).Str("host:port", addr).Msg("Failed to listen")
+			}
+			for {
+				conn, errConn := ln.Accept()
+				if errConn != nil {
+					// handle error
+					log.Error().Err(errConn).Msg("Failed to accept a connection")
+				}
 
+				go func(c net.Conn) {
+					scan := bufio.NewScanner(c)
+					scan.Split(p.splitter)
+					errRead := p.readFromScanner(scan)
+					if nil != errRead {
+						log.Error().Err(errRead).Msg("No more reading")
+					}
+				}(conn)
+			}
 		}
 	}
 }
@@ -128,11 +148,15 @@ func WithBeastDelay(beastDelay bool) Option {
 
 func WithType(producerType int) Option {
 	return func(p *producer) {
-		p.producerType = producerType
-		if producerType == Beast {
-			p.splitter = ScanBeast
-		} else {
+		switch producerType {
+		case Avr, Sbs1:
+			p.producerType = producerType
 			p.splitter = bufio.ScanLines
+		case Beast:
+			p.producerType = producerType
+			p.splitter = ScanBeast
+		default:
+			log.Error().Msgf("Unknown Producer Type")
 		}
 	}
 }
