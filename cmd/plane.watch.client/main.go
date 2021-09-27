@@ -26,7 +26,7 @@ func main() {
 	app.Description = `This program takes a stream of plane tracking info (beast/avr/sbs1), tracks the planes and ` +
 		`outputs all sorts if interesting information to the configured sink, including decoded and tracked planes in JSON format.` +
 		"\n\n" +
-		`example: plane.watch.client --source=beast://crawled.mapwithlove.com:3004 --sink=amqp://guest:guest@localhost:5672/pw --tag="cool-stuff" --quiet simple`
+		`example: plane.watch.client --fetch=beast://crawled.mapwithlove.com:3004 --sink=amqp://guest:guest@localhost:5672/pw?queues=location-updates --tag="cool-stuff" --quiet simple`
 
 	app.Flags = []cli.Flag{
 		&cli.StringSliceFlag{
@@ -48,6 +48,11 @@ func main() {
 			Name:    "file",
 			Usage:   "The Source in URL Form. [avr|beast|sbs1]:///path/to/file?tag=MYTAG&refLat=-31.0&refLon=115.0",
 			EnvVars: []string{"FILE"},
+		},
+		&cli.StringSliceFlag{
+			Name:    "rabbit-queue",
+			Usage:   fmt.Sprintf("The types of output we want from this binary. Valid options are %v", sink.AllQueues),
+			EnvVars: []string{"QUEUES"},
 		},
 		&cli.StringFlag{
 			Name:    "tag",
