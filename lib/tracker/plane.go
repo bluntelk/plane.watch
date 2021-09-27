@@ -3,6 +3,7 @@ package tracker
 import (
 	"fmt"
 	"math"
+	"os"
 	"sync"
 	"time"
 )
@@ -92,6 +93,7 @@ var (
 		{from: 303.75, to: 326.25, label: "NW"},
 		{from: 326.25, to: 348.75, label: "NNW"},
 	}
+	colourOutput = haveTty()
 )
 
 func newPlane(icao uint32) *Plane {
@@ -183,6 +185,19 @@ func (p *Plane) Special() string {
 	return p.special
 }
 
+func haveTty() bool {
+	fi, err := os.Stdout.Stat()
+	if nil != err {
+		return false
+	}
+
+	if fi.Mode() & os.ModeCharDevice == 0 {
+		return false
+	}
+
+	return true
+}
+
 // String gives us a nicely printable ANSI escaped string
 func (p *Plane) String() string {
 	var id, alt, position, direction, special, strength string
@@ -193,29 +208,54 @@ func (p *Plane) String() string {
 	blue := "\033[38;5;122m"
 	red := "\033[38;5;160m"
 
-	id = fmt.Sprintf("%sPlane (%s%s %-8s%s)", white, lime, p.IcaoIdentifierStr(), p.FlightNumber(), white)
+	if colourOutput {
+		id = fmt.Sprintf("%sPlane (%s%s %-8s%s)", white, lime, p.IcaoIdentifierStr(), p.FlightNumber(), white)
+	} else {
+		id = fmt.Sprintf("Plane (%s %-8s)", p.IcaoIdentifierStr(), p.FlightNumber())
+	}
 
 	if p.OnGround() {
 		position += " is on the ground."
 	} else if p.Altitude() > 0 {
-		alt = fmt.Sprintf(" %s%d%s %s,", orange, p.Altitude(), white, p.AltitudeUnits())
+		if colourOutput {
+			alt = fmt.Sprintf(" %s%d%s %s,", orange, p.Altitude(), white, p.AltitudeUnits())
+		} else {
+			alt = fmt.Sprintf(" %d %s,", p.Altitude(), p.AltitudeUnits())
+		}
 	}
 
 	if p.HasLocation() {
-		position += fmt.Sprintf(" %s%+03.13f%s, %s%+03.13f%s,", blue, p.Lat(), white, blue, p.Lon(), white)
+		if colourOutput {
+			position += fmt.Sprintf(" %s%+03.13f%s, %s%+03.13f%s,", blue, p.Lat(), white, blue, p.Lon(), white)
+		} else {
+			position += fmt.Sprintf(" %+03.13f, %+03.13f,", p.Lat(), p.Lon())
+		}
 	}
 
 	if p.HasHeading() {
-		direction += fmt.Sprintf(" heading %s%0.2f%s, speed %s%0.2f%s knots", orange, p.Heading(), white, orange, p.Velocity(), white)
+		if colourOutput {
+			direction += fmt.Sprintf(" heading %s%0.2f%s, speed %s%0.2f%s knots", orange, p.Heading(), white, orange, p.Velocity(), white)
+		} else {
+			direction += fmt.Sprintf(" heading %0.2f, speed %0.2f knots", p.Heading(), p.Velocity())
+		}
 	}
 
 	//strength = fmt.Sprintf(" %0.2f pps", float64(p.recentFrameCount)/10.0)
 
 	if "" != p.special {
-		special = " " + red + p.Special() + white + ", "
+		if colourOutput {
+			special = " " + red + p.Special() + white + ", "
+		} else {
+			special = " " + p.Special() + ", "
+		}
 	}
 
-	return id + alt + position + direction + special + strength + "\033[0m"
+	ret := id + alt + position + direction + special + strength
+	if colourOutput {
+		return ret + "\033[0m"
+	} else {
+		return ret
+	}
 }
 
 // setLocationUpdateTime sets the last time the location was updated
