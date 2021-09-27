@@ -50,6 +50,7 @@ func New(opts ...Option) *producer {
 		FrameSource: tracker.FrameSource{
 			OriginIdentifier: "",
 			Name:             "",
+			Tag:              "",
 			RefLat:           nil,
 			RefLon:           nil,
 		},
@@ -74,6 +75,15 @@ func New(opts ...Option) *producer {
 func WithListener(host, port string) Option {
 	return func(p *producer) {
 		// TODO: implement a listener
+		p.run = func() {
+
+		}
+	}
+}
+
+func WithSourceTag(tag string) Option {
+	return func(p *producer) {
+		p.FrameSource.Tag = tag
 	}
 }
 

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
+	"math"
 	"net/url"
 	"os"
 	"plane.watch/lib/dedupe"
@@ -12,6 +12,7 @@ import (
 	"plane.watch/lib/producer"
 	"plane.watch/lib/sink"
 	"plane.watch/lib/tracker"
+	"strconv"
 	"strings"
 )
 
@@ -28,82 +29,30 @@ func main() {
 		`example: plane.watch.client --source=beast://crawled.mapwithlove.com:3004 --sink=amqp://guest:guest@localhost:5672/pw --tag="cool-stuff" --quiet simple`
 
 	app.Flags = []cli.Flag{
-		&cli.StringFlag{
-			Name:    "source",
-			Usage:   "The Source in URL Form. [avr|beast|sbs1]://host:port",
+		&cli.StringSliceFlag{
+			Name:    "fetch",
+			Usage:   "The Source in URL Form. [avr|beast|sbs1]://host:port?tag=MYTAG&refLat=-31.0&refLon=115.0",
 			EnvVars: []string{"SOURCE"},
 		},
-		&cli.StringFlag{
+		&cli.StringSliceFlag{
+			Name:    "listen",
+			Usage:   "The Source in URL Form. [avr|beast|sbs1]://host:port?tag=MYTAG&refLat=-31.0&refLon=115.0",
+			EnvVars: []string{"LISTEN"},
+		},
+		&cli.StringSliceFlag{
 			Name:    "sink",
-			Usage:   "The place to send decoded JSON in URL Form. [redis|amqp]://user:pass@host:port/vhost",
+			Usage:   "The place to send decoded JSON in URL Form. [redis|amqp]://user:pass@host:port/vhost?ttl=60",
 			EnvVars: []string{"SINK"},
+		},
+		&cli.StringSliceFlag{
+			Name:    "file",
+			Usage:   "The Source in URL Form. [avr|beast|sbs1]:///path/to/file?tag=MYTAG&refLat=-31.0&refLon=115.0",
+			EnvVars: []string{"FILE"},
 		},
 		&cli.StringFlag{
 			Name:    "tag",
 			Usage:   "A value that is included in the payloads output to the Sinks. Useful for knowing where something came from",
 			EnvVars: []string{"TAG"},
-		},
-		&cli.StringSliceFlag{
-			Name:    "rabbit-queue",
-			Usage:   fmt.Sprintf("The types of output we want from this binary. Valid options are %v", sink.AllQueues),
-			EnvVars: []string{"QUEUES"},
-		},
-
-		&cli.StringFlag{
-			Name:    "rabbit-host",
-			Usage:   "the rabbitmq host to talk to",
-			EnvVars: []string{"RABBITMQ_HOST"},
-		},
-		&cli.IntFlag{
-			Name:    "rabbit-port",
-			Value:   5672,
-			Usage:   "The rabbitmq port to talk to",
-			EnvVars: []string{"RABBITMQ_PORT"},
-		},
-		&cli.StringFlag{
-			Name:    "rabbit-user",
-			Value:   "guest",
-			Usage:   "user for rabbitmq",
-			EnvVars: []string{"RABBITMQ_USER"},
-		},
-		&cli.StringFlag{
-			Name:    "rabbit-pass",
-			Value:   "guest",
-			Usage:   "rabbitmq password",
-			EnvVars: []string{"RABBITMQ_PASS"},
-		},
-		&cli.StringFlag{
-			Name:    "rabbit-vhost",
-			Value:   "plane.watch",
-			Usage:   "the virtual host on the rabbit server to use",
-			EnvVars: []string{"RABBITMQ_VHOST"},
-		},
-		&cli.StringFlag{
-			Name:    "dump1090-host",
-			Value:   "",
-			Usage:   "The host to read dump1090 from",
-			EnvVars: []string{"DUMP1090_HOST"},
-		},
-		&cli.StringFlag{
-			Name:    "dump1090-port",
-			Value:   "30005",
-			Usage:   "The port on the dump 1090 host to read from",
-			EnvVars: []string{"DUMP1090_PORT"},
-		},
-		&cli.StringFlag{
-			Name:  "feed-type",
-			Value: "",
-			Usage: "if not on a standard port, specify the type of feed (avr, sbs1, beast)",
-		},
-		&cli.StringFlag{
-			Name:  "avr-file",
-			Value: "",
-			Usage: "A file to read AVR frames from",
-		},
-		&cli.StringFlag{
-			Name:  "beast-file",
-			Value: "",
-			Usage: "A file to read beast format AVR frames from",
 		},
 		&cli.IntFlag{
 			Name:  "sink-message-ttl",
@@ -143,9 +92,9 @@ func main() {
 			ArgsUsage: "[app.log - A file name to output to or stdout if not specified]",
 		},
 		{
-			Name:      "daemon",
-			Usage:     "Docker Daemon Mode",
-			Action:    runDaemon,
+			Name:   "daemon",
+			Usage:  "Docker Daemon Mode",
+			Action: runDaemon,
 		},
 	}
 
@@ -159,146 +108,178 @@ func main() {
 	}
 }
 
+func getTag(parsedUrl *url.URL, defaultTag string) string {
+	if parsedUrl.Query().Has("tag") {
+		return parsedUrl.Query().Get("tag")
+	}
+	return defaultTag
+}
+func getRef(parsedUrl *url.URL, what string, defaultRef float64) float64 {
+	if parsedUrl.Query().Has(what) {
+		f, err := strconv.ParseFloat(parsedUrl.Query().Get(what), 64)
+		if nil == err {
+			return f
+		}
+		log.Error().Err(err).Str("query_param", what).Msg("Could not determine reference value")
+	}
+	return defaultRef
+}
+
+func handleSink(urlSink, defaultTag string, defaultTtl int, defaultQueues []string) (tracker.Sink, error) {
+	parsedUrl, err := url.Parse(urlSink)
+	if nil != err {
+		return nil, err
+	}
+	switch strings.ToLower(parsedUrl.Scheme) {
+	case "redis":
+		redisHost := parsedUrl.Hostname()
+		redisPort := parsedUrl.Port()
+		return sink.NewRedisSink(sink.WithHost(redisHost, redisPort), sink.WithSourceTag(getTag(parsedUrl, defaultTag))), nil
+	case "amqp", "rabbitmq":
+		rabbitPass, _ := parsedUrl.User.Password()
+		messageTtl := defaultTtl
+		if parsedUrl.Query().Has("ttl") {
+			var requestedTtl int64
+			requestedTtl, err = strconv.ParseInt(parsedUrl.Query().Get("ttl"), 10, 32)
+			if requestedTtl > 0 && requestedTtl < math.MaxInt32 {
+				messageTtl = int(requestedTtl)
+			}
+		}
+
+		rabbitQueues := defaultQueues
+		if parsedUrl.Query().Has("queues") {
+			rabbitQueues = strings.Split(parsedUrl.Query().Get("queues"), ",")
+		}
+
+		return sink.NewRabbitMqSink(
+			sink.WithHost(parsedUrl.Hostname(), parsedUrl.Port()),
+			sink.WithUserPass(parsedUrl.User.Username(), rabbitPass),
+			sink.WithRabbitVhost(parsedUrl.Path),
+			sink.WithRabbitQueues(rabbitQueues),
+			sink.WithSourceTag(getTag(parsedUrl, defaultTag)),
+			sink.WithMessageTtl(messageTtl),
+		)
+
+	default:
+		return nil, fmt.Errorf("unknown scheme: %s, expected one of [redis|amqp|rabbitmq]", parsedUrl.Scheme)
+	}
+
+}
+
+func handleSource(urlSource, defaultTag string, defaultRefLat, defaultRefLon float64, listen bool) (tracker.Producer, error) {
+	parsedUrl, err := url.Parse(urlSource)
+	if nil != err {
+		return nil, err
+	}
+
+	producerOpts := make([]producer.Option, 2)
+	producerOpts[0] = producer.WithSourceTag(getTag(parsedUrl, defaultTag))
+
+	switch strings.ToLower(parsedUrl.Scheme) {
+	case "avr":
+		producerOpts[1] = producer.WithType(producer.Avr)
+	case "beast":
+		producerOpts[1] = producer.WithType(producer.Beast)
+	case "sbs1":
+		producerOpts[1] = producer.WithType(producer.Sbs1)
+	default:
+		return nil, fmt.Errorf("unknown scheme: %s, expected one of [avr|beast|sbs1]", parsedUrl.Scheme)
+	}
+
+	refLat := getRef(parsedUrl, "refLat", defaultRefLat)
+	refLon := getRef(parsedUrl, "refLon", defaultRefLon)
+	if refLat != 0 && refLon != 0 {
+		producerOpts = append(producerOpts, producer.WithReferenceLatLon(refLat, refLon))
+	}
+
+	if listen {
+		producerOpts = append(producerOpts, producer.WithListener(parsedUrl.Hostname(), parsedUrl.Port()))
+	} else {
+		producerOpts = append(producerOpts, producer.WithFetcher(parsedUrl.Hostname(), parsedUrl.Port()))
+	}
+
+	return producer.New(producerOpts...), nil
+}
+
+func handleFileSource(urlFile, defaultTag string, defaultRefLat, defaultRefLon float64) (tracker.Producer, error) {
+	parsedUrl, err := url.Parse(urlFile)
+	if nil != err {
+		return nil, err
+	}
+	producerOpts := make([]producer.Option, 1)
+	switch strings.ToLower(parsedUrl.Scheme) {
+	case "avr":
+		producerOpts[0] = producer.WithType(producer.Avr)
+	case "beast":
+		producerOpts[0] = producer.WithType(producer.Beast)
+	case "sbs1":
+		producerOpts[0] = producer.WithType(producer.Sbs1)
+	default:
+		return nil, fmt.Errorf("unknown file Type: %s", parsedUrl.Scheme)
+	}
+	refLat := getRef(parsedUrl, "refLat", defaultRefLat)
+	refLon := getRef(parsedUrl, "refLon", defaultRefLon)
+	if refLat != 0 && refLon != 0 {
+		producerOpts = append(producerOpts, producer.WithReferenceLatLon(refLat, refLon))
+	}
+
+	producerOpts = append(
+		producerOpts,
+		producer.WithSourceTag(getTag(parsedUrl, defaultTag)),
+		producer.WithFiles([]string{parsedUrl.Path}),
+	)
+
+	return producer.New(producerOpts...), nil
+}
+
 func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	refLat := c.Float64("refLat")
 	refLon := c.Float64("refLon")
-	redisHost := c.String("redis-host")
-	redisPort := c.String("redis-port")
-	rabbitHost := c.String("rabbit-host")
-	rabbitPort := c.String("rabbit-port")
-	rabbitUser := c.String("rabbit-user")
-	rabbitPass := c.String("rabbit-pass")
-	rabbitVHost := c.String("rabbit-vhost")
-	rabbitQueues := c.StringSlice("rabbit-queue")
-
-	sourceHost := c.String("dump1090-host")
-	sourcePort := c.String("dump1090-port")
-	sourceFormat := c.String("feed-type")
-
-	sourceFileAvr := c.String("avr-file")
-	sourceFileBeast := c.String("beast-file")
 
 	// let's parse our URL forms
-	urlSource := c.String("source")
-	urlSink := c.String("sink")
-	messageTtl := c.Int("sink-message-ttl")
-	tag := c.String("tag")
-
-	if "" != urlSource {
-		parsedUrl, err := url.Parse(urlSource)
-		if nil != err {
-			return nil, err
-		}
-
-		switch strings.ToLower(parsedUrl.Scheme) {
-		case "avr", "beast", "sbs1":
-			sourceFormat = strings.ToLower(parsedUrl.Scheme)
-		default:
-			return nil, fmt.Errorf("unknown scheme: %s, expected one of [avr|beast|sbs1]", parsedUrl.Scheme)
-		}
-		sourceHost = parsedUrl.Hostname()
-		sourcePort = parsedUrl.Port()
-	}
-	if "" == tag {
-		tag = sourceHost
-	}
-
-	if "" != urlSink {
-		parsedUrl, err := url.Parse(urlSink)
-		if nil != err {
-			return nil, err
-		}
-		switch strings.ToLower(parsedUrl.Scheme) {
-		case "redis":
-			redisHost = parsedUrl.Hostname()
-			redisPort = parsedUrl.Port()
-		case "amqp", "rabbitmq":
-			rabbitHost = parsedUrl.Hostname()
-			rabbitPort = parsedUrl.Port()
-			rabbitUser = parsedUrl.User.Username()
-			rabbitPass, _ = parsedUrl.User.Password()
-			rabbitVHost = parsedUrl.Path
-		default:
-			return nil, fmt.Errorf("unknown scheme: %s, expected one of [redis|amqp|rabbitmq]", parsedUrl.Scheme)
-		}
-	}
+	defaultTTl := c.Int("sink-message-ttl")
+	defaultTag := c.String("tag")
+	defaultQueues := c.StringSlice("rabbit-queue")
 
 	trackerOpts := make([]tracker.Option, 0)
 	trk := tracker.NewTracker(trackerOpts...)
 
 	trk.AddMiddleware(dedupe.NewFilter())
 
-	producerOpts := make([]producer.Option, 0)
-	if refLat != 0 && refLon != 0 {
-		producerOpts = append(producerOpts, producer.WithReferenceLatLon(refLat, refLon))
-	}
-	if "" != tag {
-		producerOpts = append(producerOpts, producer.WithOriginName(tag))
-	}
-
-	if "" != redisHost {
-		trk.AddSink(sink.NewRedisSink(sink.WithHost(redisHost, redisPort), sink.WithSourceTag(tag)))
-	}
-	if "" != rabbitHost {
-		rabbitSink, err := sink.NewRabbitMqSink(
-			sink.WithHost(rabbitHost, rabbitPort),
-			sink.WithUserPass(rabbitUser, rabbitPass),
-			sink.WithRabbitVhost(rabbitVHost),
-			sink.WithRabbitQueues(rabbitQueues),
-			sink.WithSourceTag(tag),
-			sink.WithMessageTtl(messageTtl),
-		)
+	for _, sinkUrl := range c.StringSlice("sink") {
+		log.Debug().Str("sink-url", sinkUrl).Send()
+		p, err := handleSink(sinkUrl, defaultTag, defaultTTl, defaultQueues)
 		if nil != err {
-			return nil, err
-		}
-
-		trk.AddSink(rabbitSink)
-	}
-
-	if "" != sourceHost {
-		producerOpts = append(producerOpts, producer.WithFetcher(sourceHost, sourcePort))
-		if "" != sourceFormat {
-			switch sourceFormat {
-			case "avr":
-				producerOpts = append(producerOpts, producer.WithType(producer.Avr))
-			case "sbs1":
-				producerOpts = append(producerOpts, producer.WithType(producer.Sbs1))
-			case "beast":
-				producerOpts = append(producerOpts, producer.WithType(producer.Beast))
-			default:
-				return nil, errors.New("don't know how to handle type:" + sourceFormat)
-
-			}
+			log.Error().Err(err).Str("url", sinkUrl).Msgf("Failed to understand URL: %s", err)
 		} else {
-			switch sourcePort {
-			case "30002":
-				producerOpts = append(producerOpts, producer.WithType(producer.Avr))
-			case "30003":
-				producerOpts = append(producerOpts, producer.WithType(producer.Sbs1))
-			case "30005":
-				producerOpts = append(producerOpts, producer.WithType(producer.Beast))
-			default:
-				return nil, errors.New("don't know how to handle port:" + sourcePort)
-			}
+			trk.AddSink(p)
 		}
-	} else {
-		if "" != sourceFileAvr {
-			producerOpts = append(
-				producerOpts,
-				producer.WithType(producer.Avr),
-				producer.WithFiles([]string{sourceFileAvr}),
-			)
+	}
+	for _, fetchUrl := range c.StringSlice("fetch") {
+		p, err := handleSource(fetchUrl, defaultTag, refLat, refLon, false)
+		if nil != err {
+			log.Error().Err(err).Str("url", fetchUrl).Msgf("Failed to understand URL: %s", err)
+		} else {
+			trk.AddProducer(p)
 		}
-		if "" != sourceFileBeast {
-			producerOpts = append(
-				producerOpts,
-				producer.WithType(producer.Beast),
-				producer.WithFiles([]string{sourceFileBeast}),
-			)
+	}
+	for _, listenUrl := range c.StringSlice("listen") {
+		p, err := handleSource(listenUrl, defaultTag, refLat, refLon, true)
+		if nil != err {
+			log.Error().Err(err).Str("url", listenUrl).Msgf("Failed to understand URL: %s", err)
+		} else {
+			trk.AddProducer(p)
+		}
+	}
+	for _, fileUrl := range c.StringSlice("file") {
+		p, err := handleFileSource(fileUrl, defaultTag, refLat, refLon)
+		if nil != err {
+			log.Error().Err(err).Str("url", fileUrl).Msgf("Failed to understand URL: %s", err)
+		} else {
+			trk.AddProducer(p)
 		}
 	}
 
-	trk.AddProducer(producer.New(producerOpts...))
 	return trk, nil
 }
 

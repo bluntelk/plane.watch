@@ -41,7 +41,7 @@ type (
 
 	FrameSource struct {
 		OriginIdentifier string
-		Name             string
+		Name, Tag        string
 		RefLat, RefLon   *float64
 	}
 
