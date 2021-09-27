@@ -226,8 +226,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	trackerOpts := make([]tracker.Option, 0)
 	trk := tracker.NewTracker(trackerOpts...)
 
-	dedupeFilter := dedupe.NewFilter()
-	trk.AddMiddleware(dedupeFilter.DeDupe)
+	trk.AddMiddleware(dedupe.NewFilter())
 
 	producerOpts := make([]producer.Option, 0)
 	if refLat != 0 && refLon != 0 {

@@ -10,13 +10,6 @@ import (
 	"time"
 )
 
-const (
-	LogLevelQuiet = 0
-	LogLevelError = 1
-	LogLevelInfo  = 2
-	LogLevelDebug = 3
-)
-
 type (
 	Tracker struct {
 		planeList sync.Map
@@ -31,6 +24,7 @@ type (
 		sinks       []Sink
 
 		producerWaiter sync.WaitGroup
+		middlewareWaiter sync.WaitGroup
 
 		decodeWorkerCount   int
 		decodingQueue       chan *FrameEvent
@@ -45,15 +39,6 @@ type (
 
 		startTime time.Time
 		numFrames uint64
-	}
-)
-
-var (
-	Levels = [4]string{
-		"Quiet",
-		"Error",
-		"Info",
-		"Debug",
 	}
 )
 

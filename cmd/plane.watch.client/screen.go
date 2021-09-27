@@ -230,3 +230,6 @@ func (d *display) OnEvent(e tracker.Event) {
 		//d.drawTable()
 	}
 }
+func (d *display) Stop() {
+	d.app.Stop()
+}

@@ -2,13 +2,10 @@ package dedupe
 
 import (
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/beast"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
-	"sync"
-	"time"
 )
 
 /**
@@ -18,88 +15,44 @@ Consider a message a duplicate if we have seen it in the last minute
 */
 
 type (
-	ForgetfulSynMap struct {
-		lookup        *sync.Map
-		sweeper       *time.Timer
-		sweepInterval time.Duration
-		oldAfter      time.Duration
+	Filter struct {
+		events chan tracker.Event
+		list   *ForgetfulSyncMap
 	}
 
-	Filter struct {
-		list *ForgetfulSynMap
-	}
 )
 
 func NewFilter() *Filter {
 	return &Filter{
 		list: NewForgetfulSyncMap(),
+		events: make(chan tracker.Event),
 	}
 }
 
-func NewForgetfulSyncMap() *ForgetfulSynMap {
-	f := ForgetfulSynMap{
-		lookup:        &sync.Map{},
-		sweepInterval: time.Second * 10,
-		oldAfter:      time.Minute,
-	}
-	f.sweeper = time.AfterFunc(f.oldAfter, func() {
-		f.sweep()
-		f.sweeper.Reset(f.sweepInterval)
-	})
-
-	return &f
+func (f *Filter) Listen() chan tracker.Event {
+	return f.events
 }
 
-func (f *ForgetfulSynMap) sweep() {
-	var remove bool
-	removeCount := 0
-	testCount := 0
-	oldest := time.Now().Add(-time.Minute)
-	f.lookup.Range(func(key, value interface{}) bool {
-		remove = true
-		testCount++
-		if t, ok := value.(time.Time); ok {
-			if t.After(oldest) {
-				remove = false
-			}
+func (f *Filter) Stop() {
+	close(f.events)
+}
+
+func (f *Filter) String() string {
+	return "Dedupe"
+}
+
+func (f *Filter) addDedupedFrame(frame tracker.Frame, src *tracker.FrameSource) {
+	defer func() {
+		if nil != recover() {
+			// it's ok, we didn't need that message anyway...
 		}
+	}()
 
-		if remove {
-			f.lookup.Delete(key)
-			removeCount++
-		}
-
-		return true
-	})
-	log.Debug().Msgf("Removed %d old of %d entries", removeCount, testCount)
+	event := tracker.NewDedupedFrameEvent(frame, src)
+	f.events <- event
 }
 
-func (f *ForgetfulSynMap) HasKey(key interface{}) bool {
-	if _, ok := f.lookup.Load(key); ok {
-		return true
-	}
-	return false
-}
-
-func (f *ForgetfulSynMap) AddKey(key interface{}) {
-	// avoid storing empty things
-	if nil == key {
-		return
-	}
-	if kb, ok := key.([]byte); ok {
-		if 0 == len(kb) {
-			return
-		}
-	}
-	if ks, ok := key.(string); ok {
-		if "" == ks {
-			return
-		}
-	}
-	f.lookup.Store(key, time.Now())
-}
-
-func (f *Filter) DeDupe(frame tracker.Frame) tracker.Frame {
+func (f *Filter) Handle(frame tracker.Frame, src *tracker.FrameSource) tracker.Frame {
 	if nil == frame {
 		return nil
 	}
@@ -118,5 +71,8 @@ func (f *Filter) DeDupe(frame tracker.Frame) tracker.Frame {
 		return nil
 	}
 	f.list.AddKey(key)
+
+	// we have a deduped frame, do send it to the dedupe queue
+	f.addDedupedFrame(frame, src)
 	return frame
 }

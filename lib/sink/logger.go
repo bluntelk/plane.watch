@@ -22,7 +22,7 @@ func NewLoggerSink(opts ...Option) *LoggerSink {
 	return l
 }
 
-func (l *LoggerSink) Finish() {
+func (l *LoggerSink) Stop() {
 	l.Config.Finish()
 }
 

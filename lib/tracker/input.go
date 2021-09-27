@@ -2,9 +2,11 @@ package tracker
 
 import (
 	"errors"
+	"fmt"
 	"plane.watch/lib/tracker/beast"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -13,6 +15,16 @@ type (
 	// Option allows us to configure our new Tracker as we need it
 	Option func(*Tracker)
 
+	EventMaker interface {
+		Stopper
+		Listen() chan Event
+	}
+	EventListener interface {
+		OnEvent(Event)
+	}
+	Stopper interface {
+		Stop()
+	}
 	// Frame is our general object for a tracking update, AVR, SBS1, Modes Beast Binary
 	Frame interface {
 		Icao() uint32
@@ -21,21 +33,27 @@ type (
 		TimeStamp() time.Time
 		Raw() []byte
 	}
+
 	// A Producer can listen for or generate Frames, it provides the output via a channel that the handler can then
 	// processes further.
 	// A Producer can send *LogEvent and  *FrameEvent events
 	Producer interface {
-		String() string
-		Listen() chan Event
-		Stop()
+		EventMaker
+		fmt.Stringer
 	}
+
+	// Sink is something that takes the output from our producers and trackers
 	Sink interface {
-		OnEvent(Event)
-		Finish()
+		EventListener
+		Stopper
 	}
 
 	// Middleware has a chance to modify a frame before we send it to the plane Tracker
-	Middleware func(Frame) Frame
+	Middleware interface {
+		EventMaker
+		fmt.Stringer
+		Handle(Frame, *FrameSource) Frame
+	}
 )
 
 func WithDecodeWorkerCount(numDecodeWorkers int) Option {
@@ -55,6 +73,9 @@ func (t *Tracker) Finish() {
 	for _, p := range t.producers {
 		p.Stop()
 	}
+	for _, m := range t.middlewares {
+		m.Stop()
+	}
 	close(t.decodingQueue)
 	t.pruneExitChan <- true
 	t.eventSync.Lock()
@@ -63,8 +84,26 @@ func (t *Tracker) Finish() {
 
 	close(t.events)
 	for _, s := range t.sinks {
-		s.Finish()
+		s.Stop()
 	}
+}
+
+func (t *Tracker) EventListener(eventSource EventMaker, waiter *sync.WaitGroup) {
+	for e := range eventSource.Listen() {
+		//fmt.Printf("Event For %s %s\n", eventSource, e)
+		switch e.(type) {
+		case *FrameEvent:
+			t.decodingQueue <- e.(*FrameEvent)
+			// send this event on!
+			t.AddEvent(e)
+		case *LogEvent:
+			t.AddEvent(e)
+		case *DedupedFrameEvent:
+			t.AddEvent(e)
+		}
+	}
+	waiter.Done()
+	t.debugMessage("Done with Event Source %s", eventSource)
 }
 
 // AddProducer wires up a Producer to start feeding data into the tracker
@@ -77,20 +116,7 @@ func (t *Tracker) AddProducer(p Producer) {
 	t.producers = append(t.producers, p)
 	t.producerWaiter.Add(1)
 
-	go func() {
-		for e := range p.Listen() {
-			switch e.(type) {
-			case *FrameEvent:
-				t.decodingQueue <- e.(*FrameEvent)
-				// send this event on!
-				t.AddEvent(e)
-			case *LogEvent:
-				t.AddEvent(e)
-			}
-		}
-		t.producerWaiter.Done()
-		t.debugMessage("Done with producer %s", p)
-	}()
+	go t.EventListener(p, &t.producerWaiter)
 	t.debugMessage("Just added a producer")
 }
 
@@ -99,7 +125,12 @@ func (t *Tracker) AddMiddleware(m Middleware) {
 	if nil == m {
 		return
 	}
+	t.debugMessage("Adding middleware: %s", m)
 	t.middlewares = append(t.middlewares, m)
+
+	t.middlewareWaiter.Add(1)
+	go t.EventListener(m, &t.middlewareWaiter)
+	t.debugMessage("Just added a middleware")
 }
 
 // AddSink wires up a Sink in the tracker. Whenever an event happens it gets sent to each Sink
@@ -117,6 +148,7 @@ func (t *Tracker) Stop() {
 	t.producerWaiter.Wait()
 	t.decodingQueueWaiter.Wait()
 	t.eventsWaiter.Wait()
+	t.middlewareWaiter.Wait()
 }
 
 // Wait waits for all producers to stop producing input and then returns
@@ -155,7 +187,7 @@ func (t *Tracker) decodeQueue() {
 		}
 
 		for _, m := range t.middlewares {
-			frame = m(frame)
+			frame = m.Handle(frame, f.source)
 			if nil == frame {
 				break
 			}
@@ -178,8 +210,4 @@ func (t *Tracker) decodeQueue() {
 		}
 	}
 	t.decodingQueueWaiter.Done()
-}
-
-func NewFrameEvent(f Frame, s *FrameSource) *FrameEvent {
-	return &FrameEvent{frame: f, source: s}
 }

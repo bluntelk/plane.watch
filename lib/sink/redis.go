@@ -5,11 +5,14 @@ import "plane.watch/lib/tracker"
 type (
 	RedisSink struct {
 		Config
+		events chan tracker.Event
 	}
 )
 
 func NewRedisSink(opts ...Option) *RedisSink {
-	r := &RedisSink{}
+	r := &RedisSink{
+		events: make(chan tracker.Event),
+	}
 	for _, opt := range opts {
 		opt(&r.Config)
 	}
@@ -17,5 +20,13 @@ func NewRedisSink(opts ...Option) *RedisSink {
 }
 
 func (r *RedisSink) OnEvent(e tracker.Event) {
+	panic("Implement REDIS")
+}
 
+func (r *RedisSink) Listen() chan tracker.Event {
+	return r.events
+}
+
+func (r *RedisSink) Stop() {
+	close (r.events)
 }

@@ -11,6 +11,28 @@ import (
 	"time"
 )
 
+type timeFiddler struct{
+	events chan tracker.Event
+}
+
+func NewTimeFiddler() *timeFiddler {
+	return &timeFiddler{
+		events: make(chan tracker.Event),
+	}
+}
+
+func (fm *timeFiddler) Listen() chan tracker.Event {
+	return fm.events
+}
+
+func (fm *timeFiddler) String() string {
+	return "Time Fiddler"
+}
+
+func (fm *timeFiddler) Stop() {
+	close(fm.events)
+}
+
 func parseAvr(c *cli.Context) error {
 	opts := make([]tracker.Option, 0)
 	var verbose bool
@@ -22,7 +44,7 @@ func parseAvr(c *cli.Context) error {
 	}
 
 	trk := tracker.NewTracker(opts...)
-	trk.AddMiddleware(timeFiddler)
+	trk.AddMiddleware(NewTimeFiddler())
 	if verbose {
 		logging.SetVerboseOrQuiet(verbose, false)
 	}
@@ -33,9 +55,9 @@ func parseAvr(c *cli.Context) error {
 
 var lastSeenMap sync.Map
 
-// timeFiddler ensures we have enough time between messages for a plane to have travelled the distance it says it did
+// Handle ensures we have enough time between messages for a plane to have travelled the distance it says it did
 // this is because we do not have the timestamp for when it was collected when processing AVR frames
-func timeFiddler(f tracker.Frame) tracker.Frame {
+func (fm *timeFiddler) Handle(f tracker.Frame, src *tracker.FrameSource) tracker.Frame {
 	switch f.(type) {
 	case *mode_s.Frame:
 		lastSeen, _ := lastSeenMap.LoadOrStore(f.Icao(), time.Now().Add(-24*time.Hour))

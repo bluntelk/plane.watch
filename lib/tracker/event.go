@@ -35,6 +35,10 @@ type (
 		frame  Frame
 		source *FrameSource
 	}
+	DedupedFrameEvent struct {
+		FrameEvent
+	}
+
 	FrameSource struct {
 		OriginIdentifier string
 		Name             string
@@ -96,6 +100,14 @@ func (p *PlaneLocationEvent) New() bool {
 }
 func (p *PlaneLocationEvent) Removed() bool {
 	return p.removed
+}
+
+func NewFrameEvent(f Frame, s *FrameSource) *FrameEvent {
+	return &FrameEvent{frame: f, source: s}
+}
+
+func NewDedupedFrameEvent(f Frame, s *FrameSource) *DedupedFrameEvent {
+	return &DedupedFrameEvent{FrameEvent{frame: f, source: s}}
 }
 
 func (f *FrameEvent) Type() string {
