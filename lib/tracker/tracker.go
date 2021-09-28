@@ -244,6 +244,20 @@ func (p *Plane) HandleModeSFrame(frame *mode_s.Frame, refLat, refLon *float64) {
 				} else {
 					_ = p.setCprOddLocation(float64(frame.Latitude()), float64(frame.Longitude()), frame.TimeStamp())
 				}
+				if nil == refLat || nil == refLon {
+					// let's see if we can use a past plane location for this decode
+					// all we need for our reference lat/lon is a location within 45 nautical miles
+					for _, loc := range p.locationHistory {
+						// assume our aircraft is travelling < mach 4 and that it will not cover > 45mn in 1 minute
+						if nil != loc && loc.hasLatLon && loc.timeStamp.After(time.Now().Add(-time.Minute)) {
+							lat := loc.latitude
+							refLat = &lat
+							lon := loc.longitude
+							refLon = &lon
+							break
+						}
+					}
+				}
 				if nil != refLat && nil != refLon {
 					if err := p.decodeCpr(*refLat, *refLon, frame.TimeStamp()); nil != err {
 						debugMessage("%s", err)
