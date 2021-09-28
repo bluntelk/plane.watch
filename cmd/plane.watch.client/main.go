@@ -114,12 +114,18 @@ func main() {
 }
 
 func getTag(parsedUrl *url.URL, defaultTag string) string {
+	if nil == parsedUrl {
+		return ""
+	}
 	if parsedUrl.Query().Has("tag") {
 		return parsedUrl.Query().Get("tag")
 	}
 	return defaultTag
 }
 func getRef(parsedUrl *url.URL, what string, defaultRef float64) float64 {
+	if nil == parsedUrl {
+		return 0
+	}
 	if parsedUrl.Query().Has(what) {
 		f, err := strconv.ParseFloat(parsedUrl.Query().Get(what), 64)
 		if nil == err {
