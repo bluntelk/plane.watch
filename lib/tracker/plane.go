@@ -26,6 +26,7 @@ type (
 		latitude, longitude  float64
 		altitude             int32
 		hasVerticalRate      bool
+		hasVelocity          bool
 		verticalRate         int
 		altitudeUnits        string
 		heading, velocity    float64
@@ -191,7 +192,7 @@ func haveTty() bool {
 		return false
 	}
 
-	if fi.Mode() & os.ModeCharDevice == 0 {
+	if fi.Mode()&os.ModeCharDevice == 0 {
 		return false
 	}
 
@@ -418,6 +419,7 @@ func (p *Plane) setVelocity(velocity float64) {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	// set the current altitude
+	p.location.hasVelocity = true
 	p.location.velocity = velocity
 }
 
@@ -468,6 +470,13 @@ func (p *Plane) HasVerticalRate() bool {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
 	return p.location.hasVerticalRate
+}
+
+// HasVelocity tells us if the plane has reported its Velocity
+func (p *Plane) HasVelocity() bool {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.location.hasVelocity
 }
 
 // HasLocation tells us if we have a latitude/longitude decoded

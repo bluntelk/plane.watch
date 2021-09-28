@@ -34,7 +34,7 @@ type (
 		mq       *rabbitmq.RabbitMQ
 		exchange string
 
-		sendFrameAll func(tracker.Frame, *tracker.FrameSource) error
+		sendFrameAll    func(tracker.Frame, *tracker.FrameSource) error
 		sendFrameDedupe func(tracker.Frame, *tracker.FrameSource) error
 	}
 
@@ -48,17 +48,22 @@ type (
 		New, Removed      bool
 		Icao              string
 		Lat, Lon, Heading float64
+		Velocity          float64
 		Altitude          int
 		VerticalRate      int
 		AltitudeUnits     string
 		FlightNumber      string
 		FlightStatus      string
+		OnGround          bool
 		Airframe          string
 		AirframeType      string
 		HasLocation       bool
 		HasHeading        bool
 		HasVerticalRate   bool
+		HasVelocity       bool
 		SourceTag         string
+		Squawk            string
+		Special           string
 		TrackedSince      time.Time
 		LastMsg           time.Time
 	}
@@ -182,14 +187,19 @@ func (r *RabbitMqSink) sendLocationEventToQueue(queue string, le *tracker.PlaneL
 			Altitude:      int(plane.Altitude()),
 			VerticalRate:  plane.VerticalRate(),
 			AltitudeUnits: plane.AltitudeUnits(),
+			Velocity:      plane.Velocity(),
 			FlightNumber:  strings.TrimSpace(plane.FlightNumber()),
 			FlightStatus:  plane.FlightStatus(),
+			OnGround:      plane.OnGround(),
 			Airframe:      plane.AirFrame(),
 			AirframeType:  plane.AirFrameType(),
+			Squawk:        plane.SquawkIdentityStr(),
+			Special:       plane.Special(),
 
 			HasLocation:     plane.HasLocation(),
 			HasHeading:      plane.HasHeading(),
 			HasVerticalRate: plane.HasVerticalRate(),
+			HasVelocity:     plane.HasVelocity(),
 			SourceTag:       r.Config.sourceTag,
 			LastMsg:         plane.LastSeen().UTC(),
 			TrackedSince:    plane.TrackedSince().UTC(),
