@@ -277,6 +277,8 @@ func (p *Plane) HandleModeSFrame(frame *mode_s.Frame, refLat, refLon *float64) {
 
 				if frame.HasSurveillanceStatus() {
 					hasChanged = hasChanged || p.setSpecial("surveillance", frame.SurveillanceStatus())
+				} else {
+					hasChanged = hasChanged || p.setSpecial("surveillance", "")
 				}
 
 				break
