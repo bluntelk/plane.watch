@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -55,7 +56,7 @@ type (
 		locationHistory  []*PlaneLocation
 		location         *PlaneLocation
 		cprLocation      CprLocation
-		special          string
+		special          map[string]string
 		frameTimes       []time.Time
 		recentFrameCount int
 		msgCount         uint64
@@ -100,6 +101,7 @@ var (
 func newPlane(icao uint32) *Plane {
 	p := &Plane{
 		location: &PlaneLocation{},
+		special: map[string]string{},
 	}
 	p.setIcaoIdentifier(icao)
 	p.resetLocationHistory()
@@ -173,17 +175,23 @@ func (p *Plane) resetLocationHistory() {
 }
 
 // setSpecial allows us to set any special status this plane is transmitting
-func (p *Plane) setSpecial(status string) {
+func (p *Plane) setSpecial(what, status string) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
-	p.special = status
+	hasChanged := p.special[what] != status
+	p.special[what] = status
+	return hasChanged
 }
 
 // Special returns any special status for this aircraft
 func (p *Plane) Special() string {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
-	return p.special
+	var ret string
+	for _, v := range p.special {
+		ret = ret + v + " "
+	}
+	return strings.TrimSpace(ret)
 }
 
 func haveTty() bool {
@@ -243,7 +251,7 @@ func (p *Plane) String() string {
 
 	//strength = fmt.Sprintf(" %0.2f pps", float64(p.recentFrameCount)/10.0)
 
-	if "" != p.special {
+	if "" != p.Special() {
 		if colourOutput {
 			special = " " + red + p.Special() + white + ", "
 		} else {
@@ -267,13 +275,19 @@ func (p *Plane) setLocationUpdateTime(t time.Time) {
 }
 
 // setAltitude puts our plane in the sky
-func (p *Plane) setAltitude(altitude int32, altitudeUnits string) {
+func (p *Plane) setAltitude(altitude int32, altitudeUnits string) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	// set the current altitude
-
-	p.location.altitude = altitude
-	p.location.altitudeUnits = altitudeUnits
+	var hasChanged bool
+	if p.location.altitude != altitude {
+		p.location.altitude = altitude
+		hasChanged = true
+	}
+	if p.location.altitudeUnits != altitudeUnits {
+		hasChanged = true
+	}
+	return hasChanged
 }
 
 // Altitude is the planes altitude in AltitudeUnits units
@@ -294,10 +308,12 @@ func (p *Plane) AltitudeUnits() string {
 
 // setGroundStatus puts our plane on the ground (or not). Use carefully, planes do not like being put on
 //the ground suddenly.
-func (p *Plane) setGroundStatus(onGround bool) {
+func (p *Plane) setGroundStatus(onGround bool) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
+	hasChanged := p.location.onGround != onGround
 	p.location.onGround = onGround
+	return hasChanged
 }
 
 // OnGround tells us where the plane thinks it is (In the sky or on the ground)
@@ -308,11 +324,15 @@ func (p *Plane) OnGround() bool {
 }
 
 // setFlightStatus sets the flight status of the aircraft, the string is one from mode_s.flightStatusTable
-func (p *Plane) setFlightStatus(statusId byte, statusString string) {
+func (p *Plane) setFlightStatus(statusId byte, statusString string) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
+
+	hasChanged := p.flight.statusId != statusId || p.flight.status != statusString
+
 	p.flight.statusId = statusId
 	p.flight.status = statusString
+	return hasChanged
 }
 
 // FlightStatus gives us the flight status of this aircraft
@@ -330,17 +350,21 @@ func (p *Plane) FlightNumber() string {
 }
 
 // setFlightNumber is the flights identifier/number
-func (p *Plane) setFlightNumber(flightIdentifier string) {
+func (p *Plane) setFlightNumber(flightIdentifier string) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
+	hasChanged := p.flight.identifier != flightIdentifier
 	p.flight.identifier = flightIdentifier
+	return hasChanged
 }
 
 // setSquawkIdentity Sets the planes squawk. A squawk is set by the pilots for various reasons (including flight control)
-func (p *Plane) setSquawkIdentity(ident uint32) {
+func (p *Plane) setSquawkIdentity(ident uint32) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
+	hasChanged := p.squawk != ident
 	p.squawk = ident
+	return hasChanged
 }
 
 // SquawkIdentity the integer version of the squawk
@@ -358,10 +382,12 @@ func (p *Plane) SquawkIdentityStr() string {
 }
 
 // setAirFrameCategory is the type of airframe for this aircraft
-func (p *Plane) setAirFrameCategory(category string) {
+func (p *Plane) setAirFrameCategory(category string) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
+	hasChanged := p.airframeCategory != category
 	p.airframeCategory = category
+	return hasChanged
 }
 
 func (p *Plane) AirFrame() string {
@@ -369,10 +395,12 @@ func (p *Plane) AirFrame() string {
 }
 
 // setAirFrameCategory is the type of airframe for this aircraft
-func (p *Plane) setAirFrameCategoryType(categoryType string) {
+func (p *Plane) setAirFrameCategoryType(categoryType string) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
+	hasChanged := p.airframeType != categoryType
 	p.airframeType = categoryType
+	return hasChanged
 }
 
 func (p *Plane) AirFrameType() string {
@@ -380,12 +408,15 @@ func (p *Plane) AirFrameType() string {
 }
 
 // setHeading gives our plane some direction in life
-func (p *Plane) setHeading(heading float64) {
+func (p *Plane) setHeading(heading float64) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	// set the current altitude
+	hasChanged := p.location.heading != heading || p.location.hasHeading != true
+
 	p.location.heading = heading
 	p.location.hasHeading = true
+	return hasChanged
 }
 
 // Heading tells us which way the plane is currently facing
@@ -415,12 +446,15 @@ func (p *Plane) HasHeading() bool {
 }
 
 // setVelocity allows us to set the speed the plane is heading
-func (p *Plane) setVelocity(velocity float64) {
+func (p *Plane) setVelocity(velocity float64) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	// set the current altitude
+	hasChanged := p.location.hasVelocity != true || p.location.velocity != velocity
+
 	p.location.hasVelocity = true
 	p.location.velocity = velocity
+	return hasChanged
 }
 
 // Velocity is how fast the plane is going in it's Heading
@@ -451,11 +485,13 @@ func (p *Plane) DistanceTravelled() DistanceTravelled {
 }
 
 // setVerticalRate shows us how fast the plane is going up and down and uuupp aaannndd doooowwn
-func (p *Plane) setVerticalRate(rate int) {
+func (p *Plane) setVerticalRate(rate int) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
+	hasChanged := p.location.hasVerticalRate != true || p.location.verticalRate != rate
 	p.location.hasVerticalRate = true
 	p.location.verticalRate = rate
+	return hasChanged
 }
 
 // VerticalRate tells us how fast the plane is going up and down
@@ -496,6 +532,29 @@ func (p *Plane) Lon() float64 {
 	p.rwLock.RLock()
 	defer p.rwLock.RUnlock()
 	return p.location.longitude
+}
+
+func (p *Plane) decodeCprFilledRefLatLon(refLat, refLon *float64, ts time.Time) error {
+	if nil == refLat || nil == refLon {
+		// let's see if we can use a past plane location for this decode
+		// all we need for our reference lat/lon is a location within 45 nautical miles
+		for _, loc := range p.locationHistory {
+			// assume our aircraft is travelling < mach 4 and that it will not cover > 45mn in 1 minute
+			if nil != loc && loc.hasLatLon && loc.timeStamp.After(time.Now().Add(-time.Minute)) {
+				lat := loc.latitude
+				refLat = &lat
+				lon := loc.longitude
+				refLon = &lon
+				break
+			}
+		}
+	}
+	if nil != refLat && nil != refLon {
+		if err := p.decodeCpr(*refLat, *refLon, ts); nil != err {
+			return err
+		}
+	}
+	return nil
 }
 
 // addLatLong Adds a Lat/Long pair to our location tracking and sets it as the current plane location

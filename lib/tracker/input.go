@@ -192,7 +192,8 @@ func (t *Tracker) decodeQueue() {
 				break
 			}
 		}
-		if nil == frame {
+		if nil == frame || frame.Icao() == 0 {
+			// invalid frame || unable to determine planes ICAO
 			continue
 		}
 		plane := t.GetPlane(frame.Icao())

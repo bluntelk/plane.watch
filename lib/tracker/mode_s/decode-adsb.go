@@ -100,7 +100,7 @@ func (f *Frame) decodeAdsb() {
 		}
 
 		if f.messageSubType == 1 || f.messageSubType == 2 {
-			// Ground Speed Message
+			// speed over Ground Message
 			f.eastWestDirection = int(f.message[5]&4) >> 2
 			f.eastWestVelocity = (int(f.message[5]&3) << 8) | int(f.message[6])
 			f.northSouthDirection = int((f.message[7] & 0x80) >> 7)

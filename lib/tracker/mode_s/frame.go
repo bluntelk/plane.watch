@@ -603,6 +603,12 @@ func (f *Frame) Altitude() (int32, error) {
 	}
 	return 0, fmt.Errorf("altitude is not valid")
 }
+func (f *Frame) MustAltitude() int32 {
+	if f.validAltitude {
+		return f.altitude
+	}
+	panic("altitude is not valid")
+}
 
 func (f *Frame) AltitudeUnits() string {
 	if f.unit == modesUnitMetres {
@@ -631,6 +637,13 @@ func (f *Frame) Velocity() (float64, error) {
 	return 0, fmt.Errorf("velocity is not valid")
 }
 
+func (f *Frame) MustVelocity() float64 {
+	if f.validVelocity {
+		return f.velocity
+	}
+	panic("velocity is not valid")
+}
+
 func (f *Frame) VelocityValid() bool {
 	return f.validVelocity
 }
@@ -640,6 +653,12 @@ func (f *Frame) Heading() (float64, error) {
 		return f.heading, nil
 	}
 	return 0, fmt.Errorf("heading is not valid")
+}
+func (f *Frame) MustHeading() float64 {
+	if f.validHeading {
+		return f.heading
+	}
+	panic("heading is not valid")
 }
 
 func (f *Frame) HeadingValid() bool {
@@ -651,6 +670,12 @@ func (f *Frame) VerticalRate() (int, error) {
 		return f.verticalRate, nil
 	}
 	return 0, fmt.Errorf("vertical rate (VR) is not valid")
+}
+func (f *Frame) MustVerticalRate() int {
+	if f.validVerticalRate {
+		return f.verticalRate
+	}
+	panic("vertical rate (VR) is not valid")
 }
 
 func (f *Frame) VerticalRateValid() bool {
@@ -674,6 +699,12 @@ func (f *Frame) OnGround() (bool, error) {
 		return f.onGround, nil
 	}
 	return false, fmt.Errorf("vertical status (VS) is not valid")
+}
+func (f *Frame) MustOnGround() bool {
+	if f.validVerticalStatus {
+		return f.onGround
+	}
+	panic("vertical status (VS) is not valid")
 }
 func (f *Frame) VerticalStatusValid() bool {
 	return f.validVerticalStatus
@@ -711,6 +742,15 @@ func (f *Frame) FlightNumber() string {
 }
 func (f *Frame) Special() string {
 	return f.special
+}
+func (f *Frame) HasSurveillanceStatus() bool {
+	return f.surveillanceStatus > 0
+}
+func (f *Frame) SurveillanceStatus() string {
+	if int(f.surveillanceStatus) < len(surveillanceStatus) {
+		return surveillanceStatus[f.surveillanceStatus]
+	}
+	return ""
 }
 func (f *Frame) Emergency() string {
 	return f.emergency
