@@ -80,7 +80,7 @@ func ScanBeast(data []byte, atEOF bool) (advance int, token []byte, err error) {
 			dataIndex++ // first inc skips past the first 0x1a
 			tokenIndex++
 			// can we get to the next byte?
-			if dataIndex+1 >= bufLen {
+			if dataIndex+1 > bufLen {
 				// run out of buffer, want more
 				return 0, nil, nil
 			}
