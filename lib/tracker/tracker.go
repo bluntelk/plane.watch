@@ -139,9 +139,8 @@ func (p *Plane) HandleModeSFrame(frame *mode_s.Frame, refLat, refLon *float64) {
 		Str("frame", frame.String()).
 		Str("icao", frame.IcaoStr()).
 		Str("Downlink Type", "DF"+strconv.Itoa(int(frame.DownLinkType()))).
-		Str("Downlink Format", frame.DownLinkFormat()).
+		Int("Downlink Format", int(frame.DownLinkType())).
 		Str("DF17 Msg Type", frame.MessageTypeString()).
-		Time("Timestamp", frame.TimeStamp()).
 		Send()
 
 	// determine what to do with our given frame

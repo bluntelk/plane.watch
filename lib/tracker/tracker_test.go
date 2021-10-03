@@ -1,11 +1,23 @@
 package tracker
 
 import (
+	"flag"
 	"fmt"
+	"github.com/rs/zerolog"
 	"plane.watch/lib/tracker/mode_s"
 	"testing"
 	"time"
 )
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	if testing.Verbose() {
+		zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	}
+	m.Run()
+}
 
 func TestNLFunc(t *testing.T) {
 	for i, f := range NLTable {
@@ -183,12 +195,18 @@ func TestTrackingLocationHistory(t *testing.T) {
 		frame        string
 		numLocations int
 	}{
+		// ground position does not trigger location history, only lat/lon does
 		{name: "DF17/MT31/ST00 Airborne Status Frame", frame: "8D7C4A0CF80300030049B8BA7984", numLocations: 0},
 		{name: "DF17/MT31/ST00 Airborne Status Frame", frame: "8D7C4A0CF80300030049B8BA7984", numLocations: 0},
-		{name: "DF17/MT31/ST01 Ground Status Frame", frame: "8C7C4A0CF9004103834938E42BD4", numLocations: 1},
-		{name: "DF17/MT31/ST01 Ground Status Frame", frame: "8C7C4A0CF9004103834938E42BD4", numLocations: 1},
+
+		{name: "DF17/MT31/ST01 Ground Status Frame", frame: "8C7C4A0CF9004103834938E42BD4", numLocations: 0},
+		{name: "DF17/MT31/ST01 Ground Status Frame", frame: "8C7C4A0CF9004103834938E42BD4", numLocations: 0},
+
+		{name: "DF17/MT11/Odd", frame: "8D7C75285841B71C2FB174E7746B", numLocations: 0},
+		{name: "DF17/MT11/Even", frame: "8D7C75285841C2C178571CF5234E", numLocations: 1},
 	}
 	trk := NewTracker()
+	// our second test should have our plane in the air, so we can put it on the ground
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			frame, err := mode_s.DecodeString(tt.frame, time.Now())
