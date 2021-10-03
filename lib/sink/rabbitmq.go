@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
 	"plane.watch/lib/logging"
-	"plane.watch/lib/sink/rabbitmq"
+	"plane.watch/lib/rabbitmq"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/beast"
 	"plane.watch/lib/tracker/mode_s"
