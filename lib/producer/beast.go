@@ -31,6 +31,7 @@ func (p *producer) beastScanner(scan *bufio.Scanner) error {
 	return scan.Err()
 }
 
+// ScanBeast is a splitter for BEAST format messages
 func ScanBeast(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
@@ -86,8 +87,12 @@ func ScanBeast(data []byte, atEOF bool) (advance int, token []byte, err error) {
 			}
 
 			token[tokenIndex] = data[dataIndex]
-			if data[dataIndex] != 0x1A {
+			if data[dataIndex] != 0x1A { // messages start with 0x1A
 				continue
+			}
+			if dataIndex+2 > bufLen {
+				// run out of buffer, want more
+				return 0, nil, nil
 			}
 			if data[dataIndex+1] == 0x1A { // skip over the second <esc>
 				advance++
