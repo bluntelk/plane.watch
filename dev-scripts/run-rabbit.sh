@@ -3,4 +3,4 @@ docker run -d \
   --name=encrichment-shaft \
   -p 15672:15672 \
   -p 5672:5672 \
-  rabbitmq:3-management
+  rabbitmq:3-management || docker start encrichment-shaft

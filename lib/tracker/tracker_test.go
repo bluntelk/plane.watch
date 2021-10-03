@@ -226,5 +226,77 @@ func TestTrackingLocationHistory(t *testing.T) {
 			}
 		})
 	}
+	p := trk.GetPlane(0x7C7528)
+	if nil == p {
+		t.Errorf("Failed to get our plane")
+	}
+	if !p.HasLocation() {
+		t.Errorf("Did not set location correctly")
+	}
+}
 
+func TestPlane_HasLocation(t *testing.T) {
+	trk := NewTracker()
+	p := trk.GetPlane(0x010101)
+	err := p.addLatLong(0.01, 0.02, time.Now())
+	if nil != err {
+		t.Errorf("Got error when adding lat/lon: %s", err)
+	}
+	if !p.HasLocation() {
+		t.Error("Did not correctly set plane location has updated flag")
+	}
+	if 1 != len(p.locationHistory) {
+		t.Errorf("Expected plane history to have 1 item. have %d", len(p.locationHistory))
+	}
+}
+
+func TestPlane_HasHeading(t *testing.T) {
+	trk := NewTracker()
+	p := trk.GetPlane(0x010101)
+	if p.HasLocation() {
+		t.Error("Did not expect to have a heading")
+	}
+
+	changed := p.setHeading(99)
+	if !changed {
+		t.Error("Expected that setting our heading got a change")
+	}
+
+	if !p.HasHeading() {
+		t.Error("Did not correctly set has heading")
+	}
+}
+
+func TestPlane_HasVerticalRate(t *testing.T) {
+	trk := NewTracker()
+	p := trk.GetPlane(0x010101)
+	if p.HasVerticalRate() {
+		t.Error("Did not expect to have a vertical rate")
+	}
+
+	changed := p.setVerticalRate(99)
+	if !changed {
+		t.Error("Expected that setting our vertical rate got a change")
+	}
+
+	if !p.HasVerticalRate() {
+		t.Error("Did not correctly set has vertical rate")
+	}
+}
+
+func TestPlane_HasVelocity(t *testing.T) {
+	trk := NewTracker()
+	p := trk.GetPlane(0x010101)
+	if p.HasVelocity() {
+		t.Error("Did not expect to have a velocity")
+	}
+
+	changed := p.setVelocity(99)
+	if !changed {
+		t.Error("Expected that setting our velocity got a change")
+	}
+
+	if !p.HasVelocity() {
+		t.Error("Did not correctly set velocity")
+	}
 }
