@@ -39,7 +39,7 @@ func ScanBeast(data []byte, atEOF bool) (advance int, token []byte, err error) {
 
 	// skip until we get our first 0x1A (message start)
 	i := bytes.IndexByte(data, 0x1A)
-	if len(data) < i+11 {
+	if -1 == i || len(data) < i+11 {
 		// we do not even have the smallest message, let's get some more data
 		return 0, nil, nil
 	}
