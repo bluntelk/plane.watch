@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
+	"plane.watch/lib/dedupe"
 	"plane.watch/lib/logging"
 	"plane.watch/lib/rabbitmq"
 	"plane.watch/lib/tracker"
@@ -36,6 +37,8 @@ type (
 
 		sendFrameAll    func(tracker.Frame, *tracker.FrameSource) error
 		sendFrameDedupe func(tracker.Frame, *tracker.FrameSource) error
+
+		fsm *dedupe.ForgetfulSyncMap
 	}
 
 	rabbitFrameMsg struct {
@@ -91,6 +94,7 @@ func stripAnsi(str string) string {
 func NewRabbitMqSink(opts ...Option) (*RabbitMqSink, error) {
 	r := &RabbitMqSink{
 		exchange: "plane.watch.data",
+		fsm: dedupe.NewForgetfulSyncMap(),
 	}
 	r.queue = map[string]string{}
 	r.sendFrameAll = r.sendFrameEvent(QueueTypeAvrAll, QueueTypeBeastAll, QueueTypeSbs1All)
@@ -207,6 +211,12 @@ func (r *RabbitMqSink) sendLocationEventToQueue(queue string, le *tracker.PlaneL
 
 		var jsonBuf []byte
 		jsonBuf, err = json.MarshalIndent(&eventStruct, "", "  ")
+		if r.fsm.HasKey(string(jsonBuf)) {
+			// sending a message we have already sent!
+			return nil
+		}
+		r.fsm.AddKey(string(jsonBuf))
+
 		if nil == err {
 			err = r.mq.Publish(r.exchange, queue, amqp.Publishing{
 				ContentType:     "application/json",
