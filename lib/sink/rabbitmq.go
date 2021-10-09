@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
 	"plane.watch/lib/dedupe"
+	"plane.watch/lib/export"
 	"plane.watch/lib/logging"
 	"plane.watch/lib/rabbitmq"
 	"plane.watch/lib/tracker"
@@ -45,30 +46,6 @@ type (
 		Type, RouteKey string
 		Body           []byte
 		Source         *tracker.FrameSource
-	}
-
-	planeLocation struct {
-		New, Removed      bool
-		Icao              string
-		Lat, Lon, Heading float64
-		Velocity          float64
-		Altitude          int
-		VerticalRate      int
-		AltitudeUnits     string
-		FlightNumber      string
-		FlightStatus      string
-		OnGround          bool
-		Airframe          string
-		AirframeType      string
-		HasLocation       bool
-		HasHeading        bool
-		HasVerticalRate   bool
-		HasVelocity       bool
-		SourceTag         string
-		Squawk            string
-		Special           string
-		TrackedSince      time.Time
-		LastMsg           time.Time
 	}
 )
 
@@ -181,7 +158,7 @@ func (r *RabbitMqSink) sendLocationEventToQueue(queue string, le *tracker.PlaneL
 	var err error
 	plane := le.Plane()
 	if nil != plane {
-		eventStruct := planeLocation{
+		eventStruct := export.PlaneLocation{
 			New:           le.New(),
 			Removed:       le.Removed(),
 			Icao:          plane.IcaoIdentifierStr(),
@@ -205,6 +182,7 @@ func (r *RabbitMqSink) sendLocationEventToQueue(queue string, le *tracker.PlaneL
 			HasVerticalRate: plane.HasVerticalRate(),
 			HasVelocity:     plane.HasVelocity(),
 			SourceTag:       r.Config.sourceTag,
+			TileLocation:    plane.GridTileLocation(),
 			LastMsg:         plane.LastSeen().UTC(),
 			TrackedSince:    plane.TrackedSince().UTC(),
 		}

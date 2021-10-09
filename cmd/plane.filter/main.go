@@ -9,6 +9,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"io/ioutil"
 	"os"
+	"plane.watch/lib/export"
 	"plane.watch/lib/logging"
 	"plane.watch/lib/rabbitmq"
 	"time"
@@ -24,31 +25,12 @@ type (
 		samples map[string]planeLocations
 	}
 	planeLocations []planeLocation
-	// straight up copy from lib/sink/rabbitmq.go
+
 	planeLocation struct {
-		original          []byte
-		New, Removed      bool
-		Icao              string
-		Lat, Lon, Heading float64
-		Velocity          float64
-		Altitude          int
-		VerticalRate      int
-		AltitudeUnits     string
-		FlightNumber      string
-		FlightStatus      string
-		OnGround          bool
-		Airframe          string
-		AirframeType      string
-		HasLocation       bool
-		HasHeading        bool
-		HasVerticalRate   bool
-		HasVelocity       bool
-		SourceTag         string
-		Squawk            string
-		Special           string
-		TrackedSince      time.Time
-		LastMsg           time.Time
+		export.PlaneLocation
+		original []byte
 	}
+
 )
 
 func main() {
