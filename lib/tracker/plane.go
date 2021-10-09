@@ -37,6 +37,8 @@ type (
 		distanceTravelled    float64
 		durationTravelled    float64
 		TrackFinished        bool
+
+		gridLocation string
 	}
 
 	flight struct {
@@ -568,6 +570,7 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 	var travelledDistance float64
 	var durationTravelled float64
 	numHistoryItems := len(p.locationHistory)
+	// determine speed?
 	if numHistoryItems > 0 && p.location.latitude != 0 && p.location.longitude != 0 {
 		referenceTime := p.locationHistory[numHistoryItems-1].timeStamp
 		if !referenceTime.IsZero() {
@@ -597,6 +600,16 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 	p.location.latitude = lat
 	p.location.longitude = lon
 	p.location.hasLatLon = true
+
+	needsLookup := true
+	if "" != p.location.gridLocation {
+		if InGridLocation(lat, lon, p.location.gridLocation) {
+			needsLookup = false
+		}
+	}
+	if needsLookup {
+		p.location.gridLocation = lookupTile(lat, lon)
+	}
 	p.locationHistory = append(p.locationHistory, p.location.Copy())
 	return
 }
