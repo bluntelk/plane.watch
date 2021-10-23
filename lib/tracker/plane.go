@@ -37,6 +37,8 @@ type (
 		distanceTravelled    float64
 		durationTravelled    float64
 		TrackFinished        bool
+
+		gridTileLocation string
 	}
 
 	flight struct {
@@ -568,6 +570,7 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 	var travelledDistance float64
 	var durationTravelled float64
 	numHistoryItems := len(p.locationHistory)
+	// determine speed?
 	if numHistoryItems > 0 && p.location.latitude != 0 && p.location.longitude != 0 {
 		referenceTime := p.locationHistory[numHistoryItems-1].timeStamp
 		if !referenceTime.IsZero() {
@@ -597,8 +600,24 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 	p.location.latitude = lat
 	p.location.longitude = lon
 	p.location.hasLatLon = true
+
+	needsLookup := true
+	if "" != p.location.gridTileLocation {
+		if InGridLocation(lat, lon, p.location.gridTileLocation) {
+			needsLookup = false
+		}
+	}
+	if needsLookup {
+		p.location.gridTileLocation = lookupTile(lat, lon)
+	}
 	p.locationHistory = append(p.locationHistory, p.location.Copy())
 	return
+}
+
+func (p *Plane) GridTileLocation() string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.location.gridTileLocation
 }
 
 // zeroCpr is called once we have successfully decoded our CPR pair
