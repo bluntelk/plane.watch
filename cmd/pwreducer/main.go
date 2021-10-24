@@ -90,23 +90,31 @@ func main() {
 	app := cli.NewApp()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
-	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(":9601", nil)
+	app.Version = "1.0.0"
+	app.Name = "Plane Watch Reducer (pwreducer)"
+	app.Usage = "Reads location updates from AMQP and publishes only significant updates."
+
+	app.Description = `This program takes a stream of plane tracking data (location updates) from an AMQP message bus  ` +
+		`and filters messages and only returns significant changes for each aircraft.` +
+		"\n\n" +
+		`example: ./pwreducer --rabbitmq="amqp://guest:guest@localhost:5672" --source-queue-name=location-updates --num-workers=8 --prom-metrics-port=9601`
 
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:    "rabbitmq",
-			Usage:   "The place to send decoded JSON in URL Form. amqp://user:pass@host:port/vhost?ttl=60",
+			Usage:   "Rabbitmq URL for reaching and publishing updates.",
 			EnvVars: []string{"RABBITMQ"},
 		},
 		&cli.StringFlag{
 			Name:    "source-queue-name",
-			Usage:   "Name of the queue to read location updates from. Default: location-updates",
+			Usage:   "Name of the queue to read location updates from.",
+			Value:   "location-updates",
 			EnvVars: []string{"SOURCE_QUEUE_NAME"},
 		},
 		&cli.IntFlag{
 			Name:    "num-workers",
-			Usage:   "Number of workers to process updates. Default: 4",
+			Usage:   "Number of workers to process updates.",
+			Value:   4,
 			EnvVars: []string{"NUM_WORKERS"},
 		},
 		&cli.BoolFlag{
@@ -119,7 +127,14 @@ func main() {
 			Usage:   "Only show important messages",
 			EnvVars: []string{"QUIET"},
 		},
+		&cli.IntFlag{
+			Name:    "prom-metrics-port",
+			Usage:   "Port to listen on for prometheus app metrics.",
+			Value:   9601,
+			EnvVars: []string{"PROM_METRICS_PORT"},
+		},
 	}
+
 	app.Action = run
 
 	app.Before = func(c *cli.Context) error {
@@ -157,6 +172,10 @@ func (r *rabbit) makeQueue(name string) error {
 }
 
 func run(c *cli.Context) error {
+	// setup and start the prom exporter
+	http.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(fmt.Sprintf(":%d", c.Int("prom-metrics-port")), nil)
+
 	var err error
 	// connect to rabbitmq, create ourselves 2 queues
 	r := rabbit{
@@ -190,15 +209,7 @@ func run(c *cli.Context) error {
 		return err
 	}
 
-	var queueName string
-
-	if c.String("source-queue-name") == "" {
-		queueName = c.String("source-queue-name")
-	} else {
-		queueName = "location-updates" //default name
-	}
-
-	if err = r.rmq.QueueBind("reducer-in", queueName, "plane.watch.data"); nil != err {
+	if err = r.rmq.QueueBind("reducer-in", c.String("source-queue-name"), "plane.watch.data"); nil != err {
 		log.Info().Msg("Failed to QueueBind to input queue")
 		return err
 	}
@@ -213,7 +224,6 @@ func run(c *cli.Context) error {
 		return err
 	}
 
-	// open a channel to the reducer-in queue - I think "pw-reducer" is the name?? of the client.
 	ch, err := r.rmq.Consume("reducer-in", "pw-reducer")
 	if nil != err {
 		log.Info().Msg("Failed to consume reducer-in")
@@ -225,16 +235,8 @@ func run(c *cli.Context) error {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
-	var workerCount int
-
-	if c.Int("num-workers") > 0 {
-		workerCount = c.Int("num-workers")
-	} else {
-		workerCount = 4
-	}
-
-	log.Info().Msgf("Starting with %d workers...", workerCount)
-	for i := 0; i < workerCount; i++ {
+	log.Info().Msgf("Starting with %d workers...", c.Int("num-workers"))
+	for i := 0; i < c.Int("num-workers"); i++ {
 		worker := worker{
 			rabbit: &r,
 		}
