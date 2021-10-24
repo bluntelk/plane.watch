@@ -17,4 +17,4 @@ COPY . /app
 RUN go build /app/cmd/plane.watch.client
 
 # Command to run
-CMD ["/app/entrypoint.sh"]
+CMD ["/app/docker/plane.watch.client/entrypoint.sh"]
