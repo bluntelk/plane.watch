@@ -97,7 +97,7 @@ func main() {
 	app.Description = `This program takes a stream of plane tracking data (location updates) from an AMQP message bus  ` +
 		`and filters messages and only returns significant changes for each aircraft.` +
 		"\n\n" +
-		`example: ./pwreducer --rabbitmq="amqp://guest:guest@localhost:5672" --source-queue-name=location-updates --num-workers=8 --prom-metrics-port=9601`
+		`example: ./pwreducer --rabbitmq="amqp://guest:guest@localhost:5672" --source-route-key=location-updates --num-workers=8 --prom-metrics-port=9601`
 
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
@@ -106,10 +106,10 @@ func main() {
 			EnvVars: []string{"RABBITMQ"},
 		},
 		&cli.StringFlag{
-			Name:    "source-queue-name",
-			Usage:   "Name of the queue to read location updates from.",
+			Name:    "source-route-key",
+			Usage:   "Name of the routing key to read location updates from.",
 			Value:   "location-updates",
-			EnvVars: []string{"SOURCE_QUEUE_NAME"},
+			EnvVars: []string{"SOURCE_ROUTE_KEY"},
 		},
 		&cli.IntFlag{
 			Name:    "num-workers",
@@ -209,18 +209,8 @@ func run(c *cli.Context) error {
 		return err
 	}
 
-	if err = r.rmq.QueueBind("reducer-in", c.String("source-queue-name"), "plane.watch.data"); nil != err {
+	if err = r.rmq.QueueBind("reducer-in", c.String("source-route-key"), "plane.watch.data"); nil != err {
 		log.Info().Msg("Failed to QueueBind to input queue")
-		return err
-	}
-
-	if err = r.makeQueue("reducer-out"); nil != err {
-		log.Info().Msg("Failed to makeQueue reducer-out")
-		return err
-	}
-
-	if err = r.rmq.QueueBind("reducer-out", "location-updates-reduced", "plane.watch.data"); nil != err {
-		log.Info().Msg("Failed to QueueBind to output queue")
 		return err
 	}
 

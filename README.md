@@ -73,7 +73,7 @@ COMMANDS:
 
 GLOBAL OPTIONS:
    --rabbitmq value           Rabbitmq URL for reaching and publishing updates. (default: "amqp://guest:guest@localhost:5672") [$RABBITMQ]
-   --source-queue-name value  Name of the queue to read location updates from. (default: "location-updates") [$SOURCE_QUEUE_NAME]
+   --source-route-key value   Name of the routing key to read location updates from. (default: "location-updates") [$SOURCE_ROUTE_KEY]
    --num-workers value        Number of workers to process updates. (default: 8) [$NUM_WORKERS]
    --debug                    Show Extra Debug Information (default: false) [$DEBUG]
    --quiet                    Only show important messages (default: false) [$QUIET]

@@ -17,4 +17,4 @@ COPY . /app
 RUN go build /app/cmd/pwreducer
 
 # Command to run
-CMD ["/app/entrypoint.sh"]
+CMD ["/app/docker/pwreducer/entrypoint.sh"]
