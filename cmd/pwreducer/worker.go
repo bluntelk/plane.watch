@@ -10,6 +10,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
+	"plane.watch/lib/export"
 )
 
 type (
@@ -29,7 +30,6 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 
 	// if any of these fields differ, indicate this update is significant
 	if candidate.HasHeading && last.HasHeading && math.Abs(candidate.Heading-last.Heading) > SIG_HEADING_CHANGE {
-		//fmt.Println(candidate.Icao, " - Heading has changed from ", last.Heading, " to ", candidate.Heading, ", Heading diff: ", last.Heading-candidate.Heading, "Time Diff: ", candidate.LastMsg.Sub(last.LastMsg))
 		log.Debug().
 			Str("aircraft", candidate.Icao).
 			Float64("last", last.Heading).
@@ -41,7 +41,6 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	}
 
 	if candidate.HasVelocity && last.HasVelocity && candidate.Velocity != last.Velocity {
-		//fmt.Println(candidate.Icao, " - Velocity has changed from ", last.Velocity, " to ", candidate.Velocity, ", Velocity diff: ", last.Velocity-candidate.Velocity, "Time Diff: ", candidate.LastMsg.Sub(last.LastMsg))
 		log.Debug().
 			Str("aircraft", candidate.Icao).
 			Float64("last", last.Velocity).
@@ -53,7 +52,6 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	}
 
 	if candidate.HasVerticalRate && last.HasVerticalRate && candidate.VerticalRate != last.VerticalRate {
-		//fmt.Println(candidate.Icao, " - VerticalRate has changed from ", last.VerticalRate, " to ", candidate.VerticalRate, ", VerticalRate diff: ", last.VerticalRate-candidate.VerticalRate, "Time Diff: ", candidate.LastMsg.Sub(last.LastMsg))
 		log.Debug().
 			Str("aircraft", candidate.Icao).
 			Int("last", last.VerticalRate).
@@ -65,7 +63,6 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	}
 
 	if candidate.Altitude != last.Altitude {
-		//fmt.Println(candidate.Icao, " - Altitude has changed from ", last.Altitude, " to ", candidate.Altitude, ", Altitude diff: ", last.Altitude-candidate.Altitude, "Time Diff: ", candidate.LastMsg.Sub(last.LastMsg))
 		log.Debug().
 			Str("aircraft", candidate.Icao).
 			Int("last", last.Altitude).
@@ -77,7 +74,6 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	}
 
 	if candidate.FlightNumber != last.FlightNumber {
-		//fmt.Println(candidate.Icao, " - FlightNumber has changed from ", last.FlightNumber, " to ", candidate.FlightNumber, "Time Diff: ", candidate.LastMsg.Sub(last.LastMsg))
 		log.Debug().
 			Str("aircraft", candidate.Icao).
 			Str("last", last.FlightNumber).
@@ -88,7 +84,6 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	}
 
 	if candidate.FlightStatus != last.FlightStatus {
-		//fmt.Println(candidate.Icao, " - FlightStatus has changed from ", last.FlightStatus, " to ", candidate.FlightStatus, "Time Diff: ", candidate.LastMsg.Sub(last.LastMsg))
 		log.Debug().
 			Str("aircraft", candidate.Icao).
 			Str("last", last.FlightStatus).
@@ -99,7 +94,6 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	}
 
 	if candidate.OnGround != last.OnGround {
-		//fmt.Println(candidate.Icao, " - OnGround has changed from ", last.OnGround, " to ", candidate.OnGround, "Time Diff: ", candidate.LastMsg.Sub(last.LastMsg))
 		log.Debug().
 			Str("aircraft", candidate.Icao).
 			Bool("last", last.OnGround).
@@ -110,7 +104,6 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	}
 
 	if candidate.Special != last.Special {
-		//fmt.Println(candidate.Icao, " - Special has changed from ", last.Special, " to ", candidate.Special, "Time Diff: ", candidate.LastMsg.Sub(last.LastMsg))
 		log.Debug().
 			Str("aircraft", candidate.Icao).
 			Str("last", last.Special).
@@ -121,7 +114,6 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	}
 
 	if candidate.Squawk != last.Squawk {
-		//fmt.Println(candidate.Icao, " - Squawk has changed from ", last.Squawk, " to ", candidate.Squawk, "Time Diff: ", candidate.LastMsg.Sub(last.LastMsg))
 		log.Debug().
 			Str("aircraft", candidate.Icao).
 			Str("last", last.Squawk).
@@ -129,6 +121,15 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 			Int64("diff_time", int64(candidate.LastMsg.Sub(last.LastMsg))).
 			Msg("Significant Squawk change.")
 		return true
+	}
+
+	if candidate.TileLocation != last.TileLocation {
+		log.Debug().
+			Str("aircraft", candidate.Icao).
+			Str("last", last.TileLocation).
+			Str("current", candidate.TileLocation).
+			Int64("diff_time", int64(candidate.LastMsg.Sub(last.LastMsg))).
+			Msg("Significant TileLocation change.")
 	}
 
 	updatesIgnored.Inc()
@@ -140,7 +141,7 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	return false
 }
 
-func (w *worker) logUpdate(update planeLocation) string {
+func (w *worker) logUpdate(update export.PlaneLocation) string {
 	s := fmt.Sprint("(", update.Icao, ",", update.Heading, ",", update.Velocity, ",", update.VerticalRate, ",", update.Altitude, ",", update.FlightNumber, ",", update.FlightStatus, ",", update.OnGround, ",", update.Special, ",", update.Squawk, ")")
 	return s
 }
@@ -177,7 +178,7 @@ func (w *worker) run(ctx context.Context, ch <-chan amqp.Delivery, wg *sync.Wait
 func (w *worker) handleMsg(msg []byte, r *rabbit) error {
 	var err error
 
-	update := planeLocation{}
+	update := export.PlaneLocation{}
 	if err = json.Unmarshal(msg, &update); nil != err {
 		updatesError.Inc()
 		return err
@@ -187,7 +188,7 @@ func (w *worker) handleMsg(msg []byte, r *rabbit) error {
 		updatesError.Inc()
 		return nil
 	}
-	update.original = msg
+	update.Original = msg
 
 	updatesProccessed.Inc()
 
@@ -230,7 +231,7 @@ func (w *worker) handleMsg(msg []byte, r *rabbit) error {
 			ContentType:     "application/json",
 			ContentEncoding: "utf-8",
 			Timestamp:       time.Now(),
-			Body:            t_sig_plane_record.lastSignificantUpdate.original,
+			Body:            t_sig_plane_record.lastSignificantUpdate.Original,
 		})
 
 		updatesPublished.Inc()
