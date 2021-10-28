@@ -15,7 +15,8 @@ import (
 
 type (
 	worker struct {
-		rabbit *rabbit
+		rabbit         *rabbit
+		destRoutingKey string
 	}
 )
 
@@ -229,7 +230,7 @@ func (w *worker) handleMsg(msg []byte, r *rabbit) error {
 
 		if err == nil {
 			// emit the new lastSignificant
-			r.rmq.Publish("plane.watch.data", "location-updates-reduced", amqp.Publishing{
+			r.rmq.Publish("plane.watch.data", w.destRoutingKey, amqp.Publishing{
 				ContentType:     "application/json",
 				ContentEncoding: "utf-8",
 				Timestamp:       time.Now(),

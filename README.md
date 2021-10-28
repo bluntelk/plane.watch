@@ -72,12 +72,13 @@ COMMANDS:
    help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --rabbitmq value           Rabbitmq URL for reaching and publishing updates. (default: "amqp://guest:guest@localhost:5672") [$RABBITMQ]
-   --source-route-key value   Name of the routing key to read location updates from. (default: "location-updates") [$SOURCE_ROUTE_KEY]
-   --num-workers value        Number of workers to process updates. (default: 8) [$NUM_WORKERS]
-   --debug                    Show Extra Debug Information (default: false) [$DEBUG]
-   --quiet                    Only show important messages (default: false) [$QUIET]
-   --prom-metrics-port value  Port to listen on for prometheus app metrics. (default: 9601) [$PROM_METRICS_PORT]
-   --help, -h                 show help (default: false)
-   --version, -v              print the version (default: false)
-```
+   --rabbitmq value               Rabbitmq URL for reaching and publishing updates. (default: "amqp://guest:guest@localhost:5672") [$RABBITMQ]
+   --source-route-key value       Name of the routing key to read location updates from. (default: "location-updates") [$SOURCE_ROUTE_KEY]
+   --destination-route-key value  Name of the routing key to publish significant updates to. (default: "location-updates-reduced") [$DEST_ROUTE_KEY]
+   --num-workers value            Number of workers to process updates. (default: 8) [$NUM_WORKERS]
+   --debug                        Show Extra Debug Information (default: false) [$DEBUG]
+   --quiet                        Only show important messages (default: false) [$QUIET]
+   --prom-metrics-port value      Port to listen on for prometheus app metrics. (default: 9601) [$PROM_METRICS_PORT]
+   --help, -h                     show help (default: false)
+   --version, -v                  print the version (default: false)
+   ```

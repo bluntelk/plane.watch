@@ -86,6 +86,12 @@ func main() {
 			Value:   "location-updates",
 			EnvVars: []string{"SOURCE_ROUTE_KEY"},
 		},
+		&cli.StringFlag{
+			Name:    "destination-route-key",
+			Usage:   "Name of the routing key to publish significant updates to.",
+			Value:   "location-updates-reduced",
+			EnvVars: []string{"DEST_ROUTE_KEY"},
+		},
 		&cli.IntFlag{
 			Name:    "num-workers",
 			Usage:   "Number of workers to process updates.",
@@ -203,7 +209,8 @@ func run(c *cli.Context) error {
 	log.Info().Msgf("Starting with %d workers...", c.Int("num-workers"))
 	for i := 0; i < c.Int("num-workers"); i++ {
 		worker := worker{
-			rabbit: &r,
+			rabbit:         &r,
+			destRoutingKey: c.String("destination-route-key"),
 		}
 		wg.Add(1)
 
