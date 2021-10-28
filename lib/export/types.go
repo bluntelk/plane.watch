@@ -26,6 +26,5 @@ type (
 		TileLocation      string
 		TrackedSince      time.Time
 		LastMsg           time.Time
-		Original          []byte
 	}
 )

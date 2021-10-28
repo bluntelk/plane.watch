@@ -188,7 +188,6 @@ func (w *worker) handleMsg(msg []byte, r *rabbit) error {
 		updatesError.Inc()
 		return nil
 	}
-	update.Original = msg
 
 	updatesProccessed.Inc()
 
@@ -226,15 +225,21 @@ func (w *worker) handleMsg(msg []byte, r *rabbit) error {
 		sig_plane_record, _ := r.sync_samples.Load(update.Icao)
 		t_sig_plane_record := sig_plane_record.(planeLocationLast)
 
-		// emit the new lastSignificant
-		r.rmq.Publish("plane.watch.data", "location-updates-reduced", amqp.Publishing{
-			ContentType:     "application/json",
-			ContentEncoding: "utf-8",
-			Timestamp:       time.Now(),
-			Body:            t_sig_plane_record.lastSignificantUpdate.Original,
-		})
+		jsonBuf, err := json.MarshalIndent(&t_sig_plane_record.lastSignificantUpdate, "", " ")
 
-		updatesPublished.Inc()
+		if err == nil {
+			// emit the new lastSignificant
+			r.rmq.Publish("plane.watch.data", "location-updates-reduced", amqp.Publishing{
+				ContentType:     "application/json",
+				ContentEncoding: "utf-8",
+				Timestamp:       time.Now(),
+				Body:            jsonBuf,
+			})
+
+			updatesPublished.Inc()
+		} else {
+			log.Info().Msg("Error Marshalling update to JSON.")
+		}
 	}
 
 	return nil
