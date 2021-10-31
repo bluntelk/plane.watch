@@ -42,3 +42,43 @@ Examples:
 * --fetch=avr://localhost:30002?tag=local-receiver
 * --listen=beast://0.0.0.0:3005?tag=rando
 * --sink=amqp://guest:guest@localhost:5672/pw
+
+## pwreducer
+
+This binary is used to reduce the incoming feed of location updates down to only updates that indicate a "significant" change. 
+A significant change is where:
+* Aircraft heading changes by at least 1 degree
+* The vertical and horizontal velocity or altitude changes
+* The flight metadata (Flight number, status, on ground status, special or squawk codes) changes
+
+Location updates can be read from an AMQP connection and fed back onto the same but to the `reducer-out` topic.
+
+```
+NAME:
+   Plane Watch Reducer (pwreducer) - Reads location updates from AMQP and publishes only significant updates.
+
+USAGE:
+   pwreducer [global options] command [command options] [arguments...]
+
+VERSION:
+   1.0.0
+
+DESCRIPTION:
+   This program takes a stream of plane tracking data (location updates) from an AMQP message bus  and filters messages and only returns significant changes for each aircraft.
+
+   example: ./pwreducer --rabbitmq="amqp://guest:guest@localhost:5672" --source-queue-name=location-updates --num-workers=8 --prom-metrics-port=9601
+
+COMMANDS:
+   help, h  Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --rabbitmq value               Rabbitmq URL for reaching and publishing updates. (default: "amqp://guest:guest@localhost:5672") [$RABBITMQ]
+   --source-route-key value       Name of the routing key to read location updates from. (default: "location-updates") [$SOURCE_ROUTE_KEY]
+   --destination-route-key value  Name of the routing key to publish significant updates to. (default: "location-updates-reduced") [$DEST_ROUTE_KEY]
+   --num-workers value            Number of workers to process updates. (default: 8) [$NUM_WORKERS]
+   --debug                        Show Extra Debug Information (default: false) [$DEBUG]
+   --quiet                        Only show important messages (default: false) [$QUIET]
+   --prom-metrics-port value      Port to listen on for prometheus app metrics. (default: 9601) [$PROM_METRICS_PORT]
+   --help, -h                     show help (default: false)
+   --version, -v                  print the version (default: false)
+   ```
