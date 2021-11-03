@@ -177,6 +177,7 @@ func run(c *cli.Context) error {
 		Port:     url.Port(),
 		User:     url.User.Username(),
 		Password: rabbitPassword,
+		Vhost:    url.Path,
 		Ssl:      rabbitmq.ConfigSSL{},
 	}
 
