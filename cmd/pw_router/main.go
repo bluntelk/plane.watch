@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"plane.watch/lib/tile_grid"
 	"sync"
 	"time"
 
@@ -144,12 +145,31 @@ func (r *rabbit) connect(config rabbitmq.Config, timeout time.Duration) error {
 	}
 }
 
-func (r *rabbit) makeQueue(name string) error {
+func (r *rabbit) makeQueue(name, bindRouteKey string) error {
 	q, err := r.rmq.QueueDeclare(name, 60000) // 60sec TTL
 	if nil != err {
+		log.Error().Err(err).Msgf("Failed to create queue '%s'", name)
 		return err
 	}
 	r.queues[name] = &q
+
+	if err = r.rmq.QueueBind("reducer-in", bindRouteKey, "plane.watch.data"); nil != err {
+		log.Error().Err(err).Msgf("Failed to QueueBind to route-key:%s to queue %s", bindRouteKey, name)
+		return err
+	}
+	return nil
+}
+
+func (r *rabbit) setupAllQueues() error {
+	// we need a _low and a _high for each tile
+	suffixes := []string{"_low", "_high"}
+	for _, name := range tile_grid.GridLocationNames() {
+		for _, suffix := range suffixes {
+			if err := r.makeQueue(name+suffix, name+suffix); nil != err {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -172,7 +192,6 @@ func run(c *cli.Context) error {
 	}
 
 	rabbitUrl, err := url.Parse(c.String("rabbitmq"))
-
 	if err != nil {
 		return err
 	}
@@ -193,13 +212,10 @@ func run(c *cli.Context) error {
 		return err
 	}
 
-	if err = r.makeQueue("reducer-in"); nil != err {
-		log.Info().Msg("Failed to makeQueue reducer-in")
+	if err = r.makeQueue("reducer-in", c.String("source-route-key")); nil != err {
 		return err
 	}
-
-	if err = r.rmq.QueueBind("reducer-in", c.String("source-route-key"), "plane.watch.data"); nil != err {
-		log.Info().Msg("Failed to QueueBind to input queue")
+	if err = r.setupAllQueues(); nil != err {
 		return err
 	}
 
@@ -221,8 +237,10 @@ func run(c *cli.Context) error {
 			destRoutingKey: c.String("destination-route-key"),
 		}
 		wg.Add(1)
-
-		go worker.run(ctx, ch, &wg)
+		go func() {
+			worker.run(ctx, ch)
+			wg.Done()
+		}()
 	}
 
 	wg.Wait()

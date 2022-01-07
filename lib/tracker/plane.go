@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"plane.watch/lib/tile_grid"
 	"strings"
 	"sync"
 	"time"
@@ -103,7 +104,7 @@ var (
 func newPlane(icao uint32) *Plane {
 	p := &Plane{
 		location: &PlaneLocation{},
-		special: map[string]string{},
+		special:  map[string]string{},
 	}
 	p.setIcaoIdentifier(icao)
 	p.resetLocationHistory()
@@ -603,12 +604,12 @@ func (p *Plane) addLatLong(lat, lon float64, ts time.Time) (warn error) {
 
 	needsLookup := true
 	if "" != p.location.gridTileLocation {
-		if InGridLocation(lat, lon, p.location.gridTileLocation) {
+		if tile_grid.InGridLocation(lat, lon, p.location.gridTileLocation) {
 			needsLookup = false
 		}
 	}
 	if needsLookup {
-		p.location.gridTileLocation = lookupTile(lat, lon)
+		p.location.gridTileLocation = tile_grid.LookupTile(lat, lon)
 	}
 	p.locationHistory = append(p.locationHistory, p.location.Copy())
 	return

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -147,9 +146,7 @@ func (w *worker) logUpdate(update export.PlaneLocation) string {
 	return s
 }
 
-func (w *worker) run(ctx context.Context, ch <-chan amqp.Delivery, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (w *worker) run(ctx context.Context, ch <-chan amqp.Delivery) {
 	for {
 		select {
 		case msg, ok := <-ch:

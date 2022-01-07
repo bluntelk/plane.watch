@@ -1,4 +1,4 @@
-package tracker
+package tile_grid
 
 import "testing"
 
@@ -21,44 +21,44 @@ func TestGlobeIndexSpecialTile_contains(t1 *testing.T) {
 	}{
 		{
 			"contains centre",
-			fields{North: 20, East:  -20, South: -20, West:  20},
+			fields{North: 20, East: -20, South: -20, West: 20},
 			args{lat: 0, long: 0},
 			true,
 		},
 		{
 			"world contains Perth",
-			fields{North: 90, East:  -180, South: -90, West:  180},
+			fields{North: 90, East: -180, South: -90, West: 180},
 			args{lat: -31.952162, long: 115.943482},
 			true,
 		},
 		{
 			"tile contains Perth",
-			fields{North: -31, East:  115, South: -32, West:  116},
+			fields{North: -31, East: 115, South: -32, West: 116},
 			args{lat: -31.952162, long: 115.943482},
 			true,
 		},
 		{
 			"northern hemisphere does not contain Perth",
-			fields{North: 90, East:  -180, South: 0, West:  180},
+			fields{North: 90, East: -180, South: 0, West: 180},
 			args{lat: -31.952162, long: 115.943482},
 			false,
 		},
 		{
 			"southern hemisphere does not contain london",
-			fields{North: 0, East:  -180, South: -90, West:  180},
+			fields{North: 0, East: -180, South: -90, West: 180},
 			args{lat: 51.5, long: 10},
 			false,
 		},
 
 		{
 			"longitude 0-180 does contain perth",
-			fields{North: 90, East:  0, South: -90, West:  180},
+			fields{North: 90, East: 0, South: -90, West: 180},
 			args{lat: -31.952162, long: 115.943482},
 			true,
 		},
 		{
 			"longitude -180-0 does not contain perth",
-			fields{North: 90, East:  -180, South: -90, West:  0},
+			fields{North: 90, East: -180, South: -90, West: 0},
 			args{lat: -31.952162, long: 115.943482},
 			false,
 		},
@@ -78,7 +78,7 @@ func TestGlobeIndexSpecialTile_contains(t1 *testing.T) {
 	}
 }
 
-func Test_lookupTile(t *testing.T) {
+func Test_LookupTile(t *testing.T) {
 	type args struct {
 		lat float64
 		lon float64
@@ -101,9 +101,23 @@ func Test_lookupTile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := lookupTile(tt.args.lat, tt.args.lon); got != tt.want {
-				t.Errorf("lookupTile() = %v, want %v", got, tt.want)
+			if got := LookupTile(tt.args.lat, tt.args.lon); got != tt.want {
+				t.Errorf("LookupTile() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestGridLocationNames(t *testing.T) {
+	if 0 == len(GridLocationNames()) {
+		t.Errorf("Do not have a world")
+	}
+	if len(worldGrid) != len(GridLocationNames()) {
+		t.Errorf("Failed to get the correct number of grid location names")
+	}
+	for _, name := range GridLocationNames() {
+		if "" == name {
+			t.Errorf("Got an empty name for tile")
+		}
 	}
 }
