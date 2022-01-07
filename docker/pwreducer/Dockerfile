@@ -14,7 +14,7 @@ WORKDIR /app
 COPY . /app
 
 # Build the application
-RUN go build /app/cmd/pwreducer
+RUN go build /app/cmd/pw_router
 
 # Command to run
 CMD ["/app/docker/pwreducer/entrypoint.sh"]

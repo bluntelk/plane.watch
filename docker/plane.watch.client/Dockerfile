@@ -14,7 +14,7 @@ WORKDIR /app
 COPY . /app
 
 # Build the application
-RUN go build /app/cmd/plane.watch.client
+RUN go build /app/cmd/pw_ingest
 
 # Command to run
 CMD ["/app/docker/plane.watch.client/entrypoint.sh"]

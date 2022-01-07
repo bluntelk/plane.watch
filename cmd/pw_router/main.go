@@ -66,13 +66,13 @@ func main() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
 	app.Version = "1.0.0"
-	app.Name = "Plane Watch Reducer (pwreducer)"
+	app.Name = "Plane Watch Router (pw_router)"
 	app.Usage = "Reads location updates from AMQP and publishes only significant updates."
 
 	app.Description = `This program takes a stream of plane tracking data (location updates) from an AMQP message bus  ` +
 		`and filters messages and only returns significant changes for each aircraft.` +
 		"\n\n" +
-		`example: ./pwreducer --rabbitmq="amqp://guest:guest@localhost:5672" --source-route-key=location-updates --num-workers=8 --prom-metrics-port=9601`
+		`example: ./pw_router --rabbitmq="amqp://guest:guest@localhost:5672" --source-route-key=location-updates --num-workers=8 --prom-metrics-port=9601`
 
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{

@@ -26,7 +26,7 @@ func main() {
 	app.Description = `This program takes a stream of plane tracking info (beast/avr/sbs1), tracks the planes and ` +
 		`outputs all sorts if interesting information to the configured sink, including decoded and tracked planes in JSON format.` +
 		"\n\n" +
-		`example: plane.watch.client --fetch=beast://crawled.mapwithlove.com:3004 --sink=amqp://guest:guest@localhost:5672/pw?queues=location-updates --tag="cool-stuff" --quiet simple`
+		`example: pw_ingest --fetch=beast://crawled.mapwithlove.com:3004 --sink=amqp://guest:guest@localhost:5672/pw?queues=location-updates --tag="cool-stuff" --quiet simple`
 
 	app.Flags = []cli.Flag{
 		&cli.StringSliceFlag{
