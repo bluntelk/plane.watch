@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -29,7 +30,7 @@ type (
 
 		queues map[string]*amqp.Queue
 
-		sync_samples sync.Map
+		syncSamples sync.Map
 	}
 
 	planeLocationLast struct {
@@ -39,24 +40,24 @@ type (
 )
 
 var (
-	updatesProccessed = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pwreducer_updates_processed_total",
+	updatesProcessed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pw_router_updates_processed_total",
 		Help: "The total number of messages processed.",
 	})
 	updatesSignificant = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pwreducer_updates_significant_total",
+		Name: "pw_router_updates_significant_total",
 		Help: "The total number of messages determined to be significant.",
 	})
 	updatesIgnored = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pwreducer_updates_ignored_total",
+		Name: "pw_router_updates_ignored_total",
 		Help: "The total number of messages determined to be insignificant and thus ignored.",
 	})
 	updatesPublished = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pwreducer_updates_published_total",
+		Name: "pw_router_updates_published_total",
 		Help: "The total number of messages published to the output queue.",
 	})
 	updatesError = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pwreducer_updates_error_total",
+		Name: "pw_router_updates_error_total",
 		Help: "The total number of messages that could not be processed due to an error.",
 	})
 )
@@ -154,30 +155,36 @@ func (r *rabbit) makeQueue(name string) error {
 
 func run(c *cli.Context) error {
 	// setup and start the prom exporter
-	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(fmt.Sprintf(":%d", c.Int("prom-metrics-port")), nil)
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		_ = http.ListenAndServe(fmt.Sprintf(":%d", c.Int("prom-metrics-port")), nil)
+	}()
 
 	var err error
 	// connect to rabbitmq, create ourselves 2 queues
 	r := rabbit{
-		queues:       map[string]*amqp.Queue{},
-		sync_samples: sync.Map{},
+		queues:      map[string]*amqp.Queue{},
+		syncSamples: sync.Map{},
 	}
 
-	url, err := url.Parse(c.String("rabbitmq"))
+	if "" == c.String("rabbitmq") {
+		return errors.New("please specify the --rabbitmq parameter")
+	}
+
+	rabbitUrl, err := url.Parse(c.String("rabbitmq"))
 
 	if err != nil {
 		return err
 	}
 
-	rabbitPassword, _ := url.User.Password()
+	rabbitPassword, _ := rabbitUrl.User.Password()
 
 	rabbitConfig := rabbitmq.Config{
-		Host:     url.Hostname(),
-		Port:     url.Port(),
-		User:     url.User.Username(),
+		Host:     rabbitUrl.Hostname(),
+		Port:     rabbitUrl.Port(),
+		User:     rabbitUrl.User.Username(),
 		Password: rabbitPassword,
-		Vhost:    url.Path,
+		Vhost:    rabbitUrl.Path,
 		Ssl:      rabbitmq.ConfigSSL{},
 	}
 

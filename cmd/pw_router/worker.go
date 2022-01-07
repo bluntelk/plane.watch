@@ -20,7 +20,7 @@ type (
 	}
 )
 
-const SIG_HEADING_CHANGE = 1.0 // at least 1.0 degrees change.
+const SigHeadingChange = 1.0 // at least 1.0 degrees change.
 
 func (w *worker) isSignificant(history planeLocationLast) bool {
 	// check the currentUpdate vs lastUpdate, if any of the following have changed,
@@ -30,7 +30,7 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	last := history.lastSignificantUpdate
 
 	// if any of these fields differ, indicate this update is significant
-	if candidate.HasHeading && last.HasHeading && math.Abs(candidate.Heading-last.Heading) > SIG_HEADING_CHANGE {
+	if candidate.HasHeading && last.HasHeading && math.Abs(candidate.Heading-last.Heading) > SigHeadingChange {
 		log.Debug().
 			Str("aircraft", candidate.Icao).
 			Float64("last", last.Heading).
@@ -190,12 +190,12 @@ func (w *worker) handleMsg(msg []byte, r *rabbit) error {
 		return nil
 	}
 
-	updatesProccessed.Inc()
+	updatesProcessed.Inc()
 
 	// if this is the first time in a while we've seen this Icao
-	if _, ok := r.sync_samples.Load(update.Icao); !ok {
+	if _, ok := r.syncSamples.Load(update.Icao); !ok {
 
-		r.sync_samples.Store(update.Icao, planeLocationLast{
+		r.syncSamples.Store(update.Icao, planeLocationLast{
 			lastSignificantUpdate: update,
 		})
 
@@ -206,36 +206,39 @@ func (w *worker) handleMsg(msg []byte, r *rabbit) error {
 		return nil // can't check this for significance
 	} else {
 		// we have existing data, check to make sure we
-		record, _ := r.sync_samples.Load(update.Icao)
-		t_record := record.(planeLocationLast)
-		t_record.candidateUpdate = update
-		r.sync_samples.Store(update.Icao, t_record)
+		record, _ := r.syncSamples.Load(update.Icao)
+		tRecord := record.(planeLocationLast)
+		tRecord.candidateUpdate = update
+		r.syncSamples.Store(update.Icao, tRecord)
 	}
 
-	plane_record, _ := r.sync_samples.Load(update.Icao)
+	planeRecord, _ := r.syncSamples.Load(update.Icao)
 
-	if w.isSignificant(plane_record.(planeLocationLast)) {
+	if w.isSignificant(planeRecord.(planeLocationLast)) {
 		updatesSignificant.Inc()
 
 		// if it's significant, roll the values through and emit an event.
-		sig_record, _ := r.sync_samples.Load(update.Icao)
-		t_sig_record := sig_record.(planeLocationLast)
-		t_sig_record.lastSignificantUpdate = t_sig_record.candidateUpdate
-		r.sync_samples.Store(update.Icao, t_sig_record)
+		sigRecord, _ := r.syncSamples.Load(update.Icao)
+		tSigRecord := sigRecord.(planeLocationLast)
+		tSigRecord.lastSignificantUpdate = tSigRecord.candidateUpdate
+		r.syncSamples.Store(update.Icao, tSigRecord)
 
-		sig_plane_record, _ := r.sync_samples.Load(update.Icao)
-		t_sig_plane_record := sig_plane_record.(planeLocationLast)
+		sigPlaneRecord, _ := r.syncSamples.Load(update.Icao)
+		tSigPlaneRecord := sigPlaneRecord.(planeLocationLast)
 
-		jsonBuf, err := json.MarshalIndent(&t_sig_plane_record.lastSignificantUpdate, "", " ")
+		jsonBuf, err := json.MarshalIndent(&tSigPlaneRecord.lastSignificantUpdate, "", " ")
 
 		if err == nil {
 			// emit the new lastSignificant
-			r.rmq.Publish("plane.watch.data", w.destRoutingKey, amqp.Publishing{
+			err = r.rmq.Publish("plane.watch.data", w.destRoutingKey, amqp.Publishing{
 				ContentType:     "application/json",
 				ContentEncoding: "utf-8",
 				Timestamp:       time.Now(),
 				Body:            jsonBuf,
 			})
+			if nil != err {
+				log.Warn().Err(err).Msg("Failed to send update to rabbit")
+			}
 
 			updatesPublished.Inc()
 		} else {
