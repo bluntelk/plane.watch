@@ -30,13 +30,11 @@ type (
 		export.PlaneLocation
 		original []byte
 	}
-
 )
 
 func main() {
 	app := cli.NewApp()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-
 
 	app.Flags = []cli.Flag{
 		&cli.BoolFlag{Name: "debug"},
@@ -66,7 +64,7 @@ func (r *rabbit) connect(timeout time.Duration) error {
 	}
 
 	log.Info().Str("host", rabbitConfig.String()).Msg("Connecting to RabbitMQ")
-	r.rmq = rabbitmq.New(rabbitConfig)
+	r.rmq = rabbitmq.New(&rabbitConfig)
 	connected := make(chan bool)
 	go r.rmq.Connect(connected)
 	select {
@@ -156,7 +154,6 @@ func (r *rabbit) analyze(list planeLocations) {
 		Int("Duplicate Count", dupCount).
 		Msgf("Found %d duplicates", dupCount)
 
-
 	dedupeList := make([]planeLocation, len(noDupeNumbers))
 	for i, idx := range noDupeNumbers {
 		dedupeList[i] = list[idx]
@@ -183,7 +180,7 @@ func run(c *cli.Context) error {
 	//if err = r.makeQueue("filter-out"); nil != err {
 	//	return err
 	//}
-	if err = r.subscribe("plane.watch.data", "filter-in"); nil != err {
+	if err = r.subscribe(rabbitmq.PlaneWatchExchange, "filter-in"); nil != err {
 		return err
 	}
 	ch, err := r.rmq.Consume("filter-in", "plane.filter")

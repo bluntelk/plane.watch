@@ -142,17 +142,9 @@ func main() {
 }
 
 func (r *rabbit) connect(config rabbitmq.Config, timeout time.Duration) error {
-
 	log.Info().Str("host", config.String()).Msg("Connecting to RabbitMQ")
-	r.rmq = rabbitmq.New(config)
-	connected := make(chan bool)
-	go r.rmq.Connect(connected)
-	select {
-	case <-connected:
-		return nil
-	case <-time.After(timeout):
-		return fmt.Errorf("failed to connect to rabbit in a timely manner")
-	}
+	r.rmq = rabbitmq.New(&config)
+	return r.rmq.ConnectAndWait(timeout)
 }
 
 func (r *rabbit) makeQueue(name, bindRouteKey string) error {
@@ -163,7 +155,7 @@ func (r *rabbit) makeQueue(name, bindRouteKey string) error {
 	}
 	r.queues[name] = &q
 
-	if err = r.rmq.QueueBind(name, bindRouteKey, "plane.watch.data"); nil != err {
+	if err = r.rmq.QueueBind(name, bindRouteKey, rabbitmq.PlaneWatchExchange); nil != err {
 		log.Error().Err(err).Msgf("Failed to QueueBind to route-key:%s to queue %s", bindRouteKey, name)
 		return err
 	}

@@ -70,7 +70,7 @@ func stripAnsi(str string) string {
 }
 func NewRabbitMqSink(opts ...Option) (*RabbitMqSink, error) {
 	r := &RabbitMqSink{
-		exchange: "plane.watch.data",
+		exchange: rabbitmq.PlaneWatchExchange,
 		fsm:      dedupe.NewForgetfulSyncMap(),
 	}
 	r.queue = map[string]string{}
@@ -291,7 +291,7 @@ func (r *RabbitMqSink) connect(timeout time.Duration) (*rabbitmq.RabbitMQ, error
 	rabbitConfig.Vhost = r.vhost
 
 	log.Info().Str("host", rabbitConfig.String()).Msg("Connecting to RabbitMQ")
-	rabbit := rabbitmq.New(rabbitConfig)
+	rabbit := rabbitmq.New(&rabbitConfig)
 	connected := make(chan bool)
 	go rabbit.Connect(connected)
 	select {

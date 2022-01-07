@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"plane.watch/lib/rabbitmq"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -237,7 +238,7 @@ func (w *worker) handleMsg(msg []byte) error {
 }
 
 func (w *worker) publishLocationUpdate(routingKey string, msg []byte) {
-	err := w.rabbit.rmq.Publish("plane.watch.data", routingKey, amqp.Publishing{
+	err := w.rabbit.rmq.Publish(rabbitmq.PlaneWatchExchange, routingKey, amqp.Publishing{
 		ContentType:     "application/json",
 		ContentEncoding: "utf-8",
 		Timestamp:       time.Now(),

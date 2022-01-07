@@ -2,6 +2,7 @@ package rabbitmq
 
 import (
 	"fmt"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
 	"net"
@@ -13,6 +14,7 @@ import (
 // back off logic
 const rabbitmqRetryInterval = 2
 const rabbitmqRetryIntervalMax = 120
+const PlaneWatchExchange = "plane.watch.data"
 
 type RabbitMQ struct {
 	uri          string
@@ -20,6 +22,7 @@ type RabbitMQ struct {
 	channel      *amqp.Channel
 	disconnected chan *amqp.Error
 	connected    bool
+	log          zerolog.Logger
 }
 
 type ConfigSSL struct {
@@ -36,13 +39,44 @@ type Config struct {
 	Ssl      ConfigSSL `json:"ssl"`
 }
 
-func (c Config) String() string {
-	return createRabbitmqUri(c)
+func NewConfigFromUrl(connectUrl string) (*Config, error) {
+	rabbitUrl, err := url.Parse(connectUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	rabbitPassword, _ := rabbitUrl.User.Password()
+
+	rabbitConfig := Config{
+		Host:     rabbitUrl.Hostname(),
+		Port:     rabbitUrl.Port(),
+		User:     rabbitUrl.User.Username(),
+		Password: rabbitPassword,
+		Vhost:    rabbitUrl.Path,
+		Ssl:      ConfigSSL{},
+	}
+
+	return &rabbitConfig, nil
 }
 
-func New(cfg Config) *RabbitMQ {
-	uri := createRabbitmqUri(cfg)
-	return &RabbitMQ{uri: uri}
+func (cfg Config) String() string {
+	u := url.URL{
+		Scheme: "amqp",
+		Host:   net.JoinHostPort(cfg.Host, cfg.Port),
+		Path:   strings.TrimLeft(fmt.Sprintf("/%s", cfg.Vhost), "/"),
+		User:   url.UserPassword(cfg.User, cfg.Password),
+	}
+	return u.String()
+}
+
+func New(cfg *Config) *RabbitMQ {
+	if nil == cfg {
+		return nil
+	}
+	return &RabbitMQ{
+		uri: cfg.String(),
+		log: log.With().Str("Service", "RabbitMQ").Logger(),
+	}
 }
 
 func (r *RabbitMQ) Connect(connected chan bool) {
@@ -86,8 +120,21 @@ func (r *RabbitMQ) Connect(connected chan bool) {
 		}
 	}
 }
+func (r *RabbitMQ) ConnectAndWait(timeout time.Duration) error {
+	r.log.Info().Str("Url", r.uri).Dur("Timeout MS", timeout).Msg("Connecting")
+	connected := make(chan bool)
+	go r.Connect(connected)
+	select {
+	case <-connected:
+		log.Info().Str("Service", "RabbitMQ").Msg("Connected")
+		return nil
+	case <-time.After(timeout):
+		return fmt.Errorf("failed to connect to rabbit in a timely manner")
+	}
+}
 
 func (r *RabbitMQ) Disconnect() {
+	log.Info().Msg("Disconnecting")
 	if r.connected {
 		_ = r.conn.Close()
 	}
@@ -99,6 +146,7 @@ func (r *RabbitMQ) Disconnected() chan *amqp.Error {
 }
 
 func (r *RabbitMQ) ExchangeDeclare(name, kind string) error {
+	log.Debug().Str("Exchange", name).Str("type", kind).Msg("Declaring Exchange")
 	return r.channel.ExchangeDeclare(
 		name,
 		kind,
@@ -113,6 +161,7 @@ func (r *RabbitMQ) ExchangeDeclare(name, kind string) error {
 // QueueDeclare makes sure we have our queue setup with a default message expiry
 // ttlMs is the number of seconds we will wait before expiring a message, in MilliSeconds
 func (r *RabbitMQ) QueueDeclare(name string, ttlMs int) (amqp.Queue, error) {
+	log.Debug().Str("Queue", name).Int("TTL (ms)", ttlMs).Msg("Declaring Queue")
 	return r.channel.QueueDeclare(
 		name,
 		false,
@@ -126,6 +175,11 @@ func (r *RabbitMQ) QueueDeclare(name string, ttlMs int) (amqp.Queue, error) {
 }
 
 func (r *RabbitMQ) QueueBind(name, routingKey, sourceExchange string) error {
+	log.Debug().
+		Str("Queue", name).
+		Str("Routing Key", routingKey).
+		Str("Exchange", sourceExchange).
+		Msg("Binding Queue")
 	return r.channel.QueueBind(
 		name,
 		routingKey,
@@ -135,7 +189,26 @@ func (r *RabbitMQ) QueueBind(name, routingKey, sourceExchange string) error {
 	)
 }
 
+func (r *RabbitMQ) QueueRemove(name string) error {
+	log.Debug().
+		Str("Queue", name).
+		Msg("Removing Queue")
+	n, err := r.channel.QueueDelete(
+		name,
+		false,
+		false,
+		false,
+	)
+	log.Debug().Int("Num Messages Lost", n).Msg("Queue Removed")
+
+	return err
+}
+
 func (r *RabbitMQ) Consume(name, consumer string) (<-chan amqp.Delivery, error) {
+	log.Debug().
+		Str("Queue", name).
+		Str("Consumer", consumer).
+		Msg("Consuming Queue Messages")
 	return r.channel.Consume(
 		name,
 		consumer,
@@ -160,17 +233,17 @@ func (r *RabbitMQ) Publish(exchange, key string, msg amqp.Publishing) error {
 func (r *RabbitMQ) connect(uri string, done chan bool) {
 	var err error
 
-	log.Debug().Msgf("Dialing %q", uri)
+	log.Debug().Str("Url", uri).Msg("Dialing")
 	r.conn, err = amqp.Dial(uri)
 	if err != nil {
 		log.Printf("Dial: %s", err)
 		return
 	}
 
-	log.Debug().Msgf("Config established, getting Channel")
+	log.Debug().Msg("Config established, getting Channel")
 	r.channel, err = r.conn.Channel()
 	if err != nil {
-		log.Error().Msgf("Channel: %s", err)
+		log.Error().Err(err).Msg("Channel Error")
 		return
 	}
 
@@ -179,14 +252,4 @@ func (r *RabbitMQ) connect(uri string, done chan bool) {
 	r.channel.NotifyClose(r.disconnected)
 
 	done <- true
-}
-
-func createRabbitmqUri(cfg Config) string {
-	u := url.URL{
-		Scheme: "amqp",
-		Host:   net.JoinHostPort(cfg.Host, cfg.Port),
-		Path:   strings.TrimLeft(fmt.Sprintf("/%s", cfg.Vhost), "/"),
-		User:   url.UserPassword(cfg.User, cfg.Password),
-	}
-	return u.String()
 }
