@@ -24,6 +24,12 @@ import (
 	"plane.watch/lib/rabbitmq"
 )
 
+// queue suffixes for a low (only significant) and high (every message) tile queues
+const (
+	qSuffixLow  = "_low"
+	qSuffixHigh = "_high"
+)
+
 type (
 	rabbit struct {
 		rmq  *rabbitmq.RabbitMQ
@@ -116,6 +122,10 @@ func main() {
 			Value:   9601,
 			EnvVars: []string{"PROM_METRICS_PORT"},
 		},
+		&cli.BoolFlag{
+			Name:  "register-test-queues",
+			Usage: "Subscribes a bunch of queues to our routing keys",
+		},
 	}
 
 	app.Action = run
@@ -153,16 +163,18 @@ func (r *rabbit) makeQueue(name, bindRouteKey string) error {
 	}
 	r.queues[name] = &q
 
-	if err = r.rmq.QueueBind("reducer-in", bindRouteKey, "plane.watch.data"); nil != err {
+	if err = r.rmq.QueueBind(name, bindRouteKey, "plane.watch.data"); nil != err {
 		log.Error().Err(err).Msgf("Failed to QueueBind to route-key:%s to queue %s", bindRouteKey, name)
 		return err
 	}
+	log.Debug().Str("queue", name).Str("route-key", bindRouteKey).Msg("Setup Queue")
 	return nil
 }
 
-func (r *rabbit) setupAllQueues() error {
+func (r *rabbit) setupTestQueues() error {
+	log.Info().Msg("Setting up test queues")
 	// we need a _low and a _high for each tile
-	suffixes := []string{"_low", "_high"}
+	suffixes := []string{qSuffixLow, qSuffixHigh}
 	for _, name := range tile_grid.GridLocationNames() {
 		for _, suffix := range suffixes {
 			if err := r.makeQueue(name+suffix, name+suffix); nil != err {
@@ -215,8 +227,11 @@ func run(c *cli.Context) error {
 	if err = r.makeQueue("reducer-in", c.String("source-route-key")); nil != err {
 		return err
 	}
-	if err = r.setupAllQueues(); nil != err {
-		return err
+
+	if c.Bool("register-test-queues") {
+		if err = r.setupTestQueues(); nil != err {
+			return err
+		}
 	}
 
 	ch, err := r.rmq.Consume("reducer-in", "pw-reducer")
