@@ -40,20 +40,26 @@ func main() {
 			EnvVars: []string{"LISTEN"},
 		},
 		&cli.StringSliceFlag{
-			Name:    "sink",
-			Usage:   "The place to send decoded JSON in URL Form. [redis|amqp]://user:pass@host:port/vhost?ttl=60",
-			EnvVars: []string{"SINK"},
-		},
-		&cli.StringSliceFlag{
 			Name:    "file",
 			Usage:   "The Source in URL Form. [avr|beast|sbs1]:///path/to/file?tag=MYTAG&refLat=-31.0&refLon=115.0",
 			EnvVars: []string{"FILE"},
 		},
 		&cli.StringSliceFlag{
-			Name:    "rabbit-queue",
-			Usage:   fmt.Sprintf("The types of output we want from this binary. Valid options are %v", sink.AllQueues),
-			EnvVars: []string{"QUEUES"},
+			Name:    "sink",
+			Usage:   "The place to send decoded JSON in URL Form. [redis|amqp]://user:pass@host:port/vhost?ttl=60",
+			EnvVars: []string{"SINK"},
 		},
+		&cli.StringSliceFlag{
+			Name:    "publish-types",
+			Usage:   fmt.Sprintf("The types of output we want to publish from this binary. Default: All Types. Valid options are %v", sink.AllQueues),
+			EnvVars: []string{"PUBLISH"},
+		},
+		&cli.BoolFlag{
+			Name:    "rabbitmq-test-queues",
+			Usage:   fmt.Sprintf("Create a queue (named after the publishing routing key) and bind it. This allows you to see the messages being published."),
+			EnvVars: []string{"PUBLISH"},
+		},
+
 		&cli.StringFlag{
 			Name:    "tag",
 			Usage:   "A value that is included in the payloads output to the Sinks. Useful for knowing where something came from",
@@ -136,7 +142,7 @@ func getRef(parsedUrl *url.URL, what string, defaultRef float64) float64 {
 	return defaultRef
 }
 
-func handleSink(urlSink, defaultTag string, defaultTtl int, defaultQueues []string) (tracker.Sink, error) {
+func handleSink(urlSink, defaultTag string, defaultTtl int, defaultQueues []string, rabbitmqTestQueues bool) (tracker.Sink, error) {
 	parsedUrl, err := url.Parse(urlSink)
 	if nil != err {
 		return nil, err
@@ -169,6 +175,7 @@ func handleSink(urlSink, defaultTag string, defaultTtl int, defaultQueues []stri
 			sink.WithRabbitQueues(rabbitQueues),
 			sink.WithSourceTag(getTag(parsedUrl, defaultTag)),
 			sink.WithMessageTtl(messageTtl),
+			sink.WithRabbitTestQueues(rabbitmqTestQueues),
 		)
 
 	default:
@@ -259,7 +266,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 
 	for _, sinkUrl := range c.StringSlice("sink") {
 		log.Debug().Str("sink-url", sinkUrl).Send()
-		p, err := handleSink(sinkUrl, defaultTag, defaultTTl, defaultQueues)
+		p, err := handleSink(sinkUrl, defaultTag, defaultTTl, defaultQueues, c.Bool("rabbitmq-test-queues"))
 		if nil != err {
 			log.Error().Err(err).Str("url", sinkUrl).Msgf("Failed to understand URL: %s", err)
 		} else {

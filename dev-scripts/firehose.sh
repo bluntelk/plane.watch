@@ -1,6 +1,6 @@
-bin/plane.watch.client \
+bin/pw_ingest \
   --fetch=beast://crawled.mapwithlove.com:3004 \
   --sink=amqp://guest:guest@localhost:5672/pw \
-  --rabbit-queue=location-updates \
   --debug \
-  daemon
+  --rabbitmq-test-queues \
+  simple

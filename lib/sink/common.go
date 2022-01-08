@@ -21,6 +21,8 @@ type (
 		logLocation       bool
 		sourceTag         string
 		messageTtlSeconds int
+
+		createTestQueues bool
 	}
 	Option func(*Config)
 )

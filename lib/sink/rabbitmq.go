@@ -71,7 +71,7 @@ func stripAnsi(str string) string {
 func NewRabbitMqSink(opts ...Option) (*RabbitMqSink, error) {
 	r := &RabbitMqSink{
 		exchange: "plane.watch.data",
-		fsm: dedupe.NewForgetfulSyncMap(),
+		fsm:      dedupe.NewForgetfulSyncMap(),
 	}
 	r.queue = map[string]string{}
 	r.sendFrameAll = r.sendFrameEvent(QueueTypeAvrAll, QueueTypeBeastAll, QueueTypeSbs1All)
@@ -150,11 +150,17 @@ func WithAllRabbitQueues() Option {
 	}
 }
 
+func WithRabbitTestQueues(value bool) Option {
+	return func(conf *Config) {
+		conf.createTestQueues = value
+	}
+}
+
 func (r *RabbitMqSink) Stop() {
 	r.mq.Disconnect()
 }
 
-func (r *RabbitMqSink) sendLocationEventToQueue(queue string, le *tracker.PlaneLocationEvent) error {
+func (r *RabbitMqSink) sendLocationEventToExchange(routingKey string, le *tracker.PlaneLocationEvent) error {
 	var err error
 	plane := le.Plane()
 	if nil != plane {
@@ -196,7 +202,7 @@ func (r *RabbitMqSink) sendLocationEventToQueue(queue string, le *tracker.PlaneL
 		r.fsm.AddKey(string(jsonBuf))
 
 		if nil == err {
-			err = r.mq.Publish(r.exchange, queue, amqp.Publishing{
+			err = r.mq.Publish(r.exchange, routingKey, amqp.Publishing{
 				ContentType:     "application/json",
 				ContentEncoding: "utf-8",
 				Timestamp:       time.Now(),
@@ -257,7 +263,7 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 		})
 	case *tracker.PlaneLocationEvent:
 		le := e.(*tracker.PlaneLocationEvent)
-		err = r.sendLocationEventToQueue(QueueLocationUpdates, le)
+		err = r.sendLocationEventToExchange(QueueLocationUpdates, le)
 
 	case *tracker.FrameEvent:
 		//println("Got a Frame!")
@@ -303,13 +309,16 @@ func (r *RabbitMqSink) setup() error {
 	if err = r.mq.ExchangeDeclare(r.exchange, amqp.ExchangeDirect); nil != err {
 		return err
 	}
-	for t, q := range r.queue {
-		if _, err = r.mq.QueueDeclare(q, r.messageTtlSeconds*1000); nil != err {
-			return err
-		}
+	if r.Config.createTestQueues {
+		for t, q := range r.queue {
+			log.Debug().Str("Queue", q).Msg("Creating Test Queue")
+			if _, err = r.mq.QueueDeclare(q, r.messageTtlSeconds*1000); nil != err {
+				return err
+			}
 
-		if err = r.mq.QueueBind(q, t, r.exchange); nil != err {
-			return err
+			if err = r.mq.QueueBind(q, t, r.exchange); nil != err {
+				return err
+			}
 		}
 	}
 
