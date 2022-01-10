@@ -226,7 +226,7 @@ func run(c *cli.Context) error {
 		}
 	}
 
-	ch, err := r.rmq.Consume("reducer-in", "pw-reducer")
+	ch, err := r.rmq.Consume("reducer-in", "pw-router")
 	if nil != err {
 		log.Info().Msg("Failed to consume reducer-in")
 		return err

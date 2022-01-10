@@ -9,6 +9,7 @@ import (
 	"nhooyr.io/websocket"
 	"plane.watch/lib/export"
 	"plane.watch/lib/tile_grid"
+	"sync"
 	"time"
 )
 
@@ -22,6 +23,9 @@ const (
 	RequestTypeUnsubscribe   = "unsub"
 
 	ResponseTypeError         = "error"
+	ResponseTypeAckSub        = "ack-sub"
+	ResponseTypeAckUnsub      = "ack-unsub"
+	ResponseTypeSubTiles      = "sub-list"
 	ResponseTypePlaneLocation = "plane-location"
 )
 
@@ -33,14 +37,24 @@ type (
 		serveMux   http.ServeMux
 		httpServer http.Server
 	}
+	WsClient struct {
+		conn *websocket.Conn
+
+		subLock sync.RWMutex
+		subs    map[string]bool
+
+		outChan chan WsResponse
+	}
+
 	WsRequest struct {
-		Type     string
-		GridTile string
+		Type     string `json:"type"`
+		GridTile string `json:"gridTile"`
 	}
 	WsResponse struct {
-		Type     string
-		Message  string
-		location *export.PlaneLocation
+		Type     string                `json:"type"`
+		Message  string                `json:"message,omitempty"`
+		Tiles    []string              `json:"tiles,omitempty"`
+		Location *export.PlaneLocation `json:"location,omitempty"`
 	}
 )
 
@@ -108,16 +122,8 @@ func (bw *PwWsBrokerWeb) servePlanes(w http.ResponseWriter, r *http.Request) {
 
 	switch conn.Subprotocol() {
 	case WsProtocolPlanes:
-		for {
-			err = bw.planeProtocolHandler(r.Context(), conn)
-			if websocket.CloseStatus(err) == websocket.StatusNormalClosure || websocket.CloseStatus(err) == websocket.StatusGoingAway {
-				return
-			}
-			if nil != err {
-				log.Error().Err(err).Msg("Failure in protocol handler")
-				return
-			}
-		}
+		client := NewWsClient(conn)
+		client.Handle(r.Context())
 	default:
 		_ = conn.Close(websocket.StatusPolicyViolation, "Unknown Subprotocol")
 		log.Debug().Str("proto", conn.Subprotocol()).Msg("Bad connection, could not speak protocol")
@@ -125,9 +131,48 @@ func (bw *PwWsBrokerWeb) servePlanes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (bw *PwWsBrokerWeb) planeProtocolHandler(ctx context.Context, conn *websocket.Conn) error {
-	outMessages := make(chan WsResponse)
+func NewWsClient(conn *websocket.Conn) *WsClient {
+	client := WsClient{
+		conn:    conn,
+		subs:    map[string]bool{},
+		outChan: make(chan WsResponse),
+	}
+	return &client
+}
 
+func (c *WsClient) Handle(ctx context.Context) {
+	err := c.planeProtocolHandler(ctx, c.conn)
+	if websocket.CloseStatus(err) == websocket.StatusNormalClosure || websocket.CloseStatus(err) == websocket.StatusGoingAway {
+		return
+	}
+	if nil != err {
+		log.Error().Err(err).Msg("Failure in protocol handler")
+		return
+	}
+}
+func (c *WsClient) AddSub(tileName string) {
+	c.subLock.Lock()
+	defer c.subLock.Unlock()
+	c.subs[tileName] = true
+}
+func (c *WsClient) UnSub(tileName string) {
+	c.subLock.Lock()
+	defer c.subLock.Unlock()
+	c.subs[tileName] = false
+}
+func (c *WsClient) SubTiles() []string {
+	c.subLock.RLock()
+	defer c.subLock.RUnlock()
+	tiles := make([]string, 0, len(c.subs))
+	for k, v := range c.subs {
+		if v {
+			tiles = append(tiles, k)
+		}
+	}
+	return tiles
+}
+
+func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Conn) error {
 	// read from the connection for commands
 	go func() {
 		for {
@@ -145,51 +190,67 @@ func (bw *PwWsBrokerWeb) planeProtocolHandler(ctx context.Context, conn *websock
 				}
 				switch rq.Type {
 				case RequestTypeSubscribe:
+					c.AddSub(rq.GridTile)
+					_ = c.sendAck(ctx, ResponseTypeAckSub, rq.GridTile)
 				case RequestTypeSubscribeList:
+					_ = c.sendPlaneMessage(ctx, &WsResponse{
+						Type:  ResponseTypeSubTiles,
+						Tiles: c.SubTiles(),
+					})
 				case RequestTypeUnsubscribe:
+					c.UnSub(rq.GridTile)
+					_ = c.sendAck(ctx, ResponseTypeAckUnsub, rq.GridTile)
 				default:
-					_ = bw.sendError(ctx, conn, "Unknown request type")
+					_ = c.sendError(ctx, "Unknown request type")
 				}
 
 			case websocket.MessageBinary:
-				_ = bw.sendError(ctx, conn, "Please speak text")
+				_ = c.sendError(ctx, "Please speak text")
 			}
 		}
 	}()
 
 	// write a stream of location information
 
-	for planeMsg := range outMessages {
-		_ = bw.sendPlaneMessage(ctx, conn, &planeMsg)
+	for planeMsg := range c.outChan {
+		_ = c.sendPlaneMessage(ctx, &planeMsg)
 	}
 
 	return nil
 }
 
-func (bw *PwWsBrokerWeb) sendError(ctx context.Context, conn *websocket.Conn, msg string) error {
+func (c *WsClient) sendAck(ctx context.Context, ackType, tile string) error {
+	rs := WsResponse{
+		Type:  ackType,
+		Tiles: []string{tile},
+	}
+	return c.sendPlaneMessage(ctx, &rs)
+}
+
+func (c *WsClient) sendError(ctx context.Context, msg string) error {
 	rs := WsResponse{
 		Type:    ResponseTypeError,
 		Message: msg,
 	}
-	return bw.sendPlaneMessage(ctx, conn, &rs)
+	return c.sendPlaneMessage(ctx, &rs)
 }
 
-func (bw *PwWsBrokerWeb) sendPlaneMessage(ctx context.Context, conn *websocket.Conn, planeMsg *WsResponse) error {
+func (c *WsClient) sendPlaneMessage(ctx context.Context, planeMsg *WsResponse) error {
 	buf, err := json.MarshalIndent(planeMsg, "", "  ")
 	if nil != err {
 		log.Debug().Err(err).Str("type", planeMsg.Type).Msg("Failed to marshal plane msg to send to client")
 		return err
 	}
-	if err = bw.writeTimeout(ctx, conn, 3*time.Second, buf); nil != err {
+	if err = c.writeTimeout(ctx, 3*time.Second, buf); nil != err {
 		log.Debug().Err(err).Str("type", planeMsg.Type).Msg("Failed to send message to client")
 		return err
 	}
 	return nil
 }
 
-func (bw *PwWsBrokerWeb) writeTimeout(ctx context.Context, conn *websocket.Conn, timeout time.Duration, msg []byte) error {
+func (c *WsClient) writeTimeout(ctx context.Context, timeout time.Duration, msg []byte) error {
 	ctxW, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	return conn.Write(ctxW, websocket.MessageText, msg)
+	return c.conn.Write(ctxW, websocket.MessageText, msg)
 }

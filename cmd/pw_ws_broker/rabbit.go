@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"github.com/rs/zerolog/log"
+	"plane.watch/lib/export"
 	"plane.watch/lib/rabbitmq"
 	"time"
 )
@@ -42,4 +45,29 @@ func (br *PwWsBrokerRabbit) configureRabbitMq() error {
 		return err
 	}
 	return nil
+}
+
+func (br *PwWsBrokerRabbit) processMessage(what string, msg []byte) {
+	planeLoc := export.PlaneLocation{}
+	err := json.Unmarshal(msg, &planeLoc)
+	if nil != err {
+		log.Debug().Err(err).Msg("did not understand msg")
+	}
+
+}
+
+func (br *PwWsBrokerRabbit) consume(queue, what string) {
+	ch, err := br.rabbit.Consume(queue, "pw_ws_broker"+what)
+	if nil != err {
+		log.Error().Err(err).Msg("Failed to consume")
+		return
+	}
+
+	for msg := range ch {
+		br.processMessage(what, msg.Body)
+	}
+}
+func (br *PwWsBrokerRabbit) consumeAll() {
+	go br.consume(br.queueLow, "_low")
+	go br.consume(br.queueHigh, "_high")
 }
