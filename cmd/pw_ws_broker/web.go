@@ -36,6 +36,8 @@ type (
 
 		serveMux   http.ServeMux
 		httpServer http.Server
+
+		clients ClientList
 	}
 	WsClient struct {
 		conn *websocket.Conn
@@ -56,9 +58,17 @@ type (
 		Tiles    []string              `json:"tiles,omitempty"`
 		Location *export.PlaneLocation `json:"location,omitempty"`
 	}
+
+	ClientList struct {
+		clients     map[*WsClient]chan WsResponse
+		clientsLock sync.RWMutex
+	}
 )
 
 func (bw *PwWsBrokerWeb) configureWeb() error {
+	bw.clients = ClientList{
+		clients: make(map[*WsClient]chan WsResponse),
+	}
 	bw.serveMux.HandleFunc("/", bw.indexPage)
 	bw.serveMux.HandleFunc("/grid", bw.jsonGrid)
 	bw.serveMux.HandleFunc("/planes", bw.servePlanes)
@@ -123,7 +133,9 @@ func (bw *PwWsBrokerWeb) servePlanes(w http.ResponseWriter, r *http.Request) {
 	switch conn.Subprotocol() {
 	case WsProtocolPlanes:
 		client := NewWsClient(conn)
+		bw.clients.addClient(client, client.outChan)
 		client.Handle(r.Context())
+		bw.clients.removeClient(client)
 	default:
 		_ = conn.Close(websocket.StatusPolicyViolation, "Unknown Subprotocol")
 		log.Debug().Str("proto", conn.Subprotocol()).Msg("Bad connection, could not speak protocol")
@@ -170,6 +182,12 @@ func (c *WsClient) SubTiles() []string {
 		}
 	}
 	return tiles
+}
+func (c *WsClient) HasSub(tileName string) bool {
+	c.subLock.RLock()
+	defer c.subLock.RUnlock()
+	val, ok := c.subs[tileName]
+	return val && ok
 }
 
 func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Conn) error {
@@ -253,4 +271,30 @@ func (c *WsClient) writeTimeout(ctx context.Context, timeout time.Duration, msg 
 	defer cancel()
 
 	return c.conn.Write(ctxW, websocket.MessageText, msg)
+}
+
+func (cl *ClientList) addClient(c *WsClient, out chan WsResponse) {
+	cl.clientsLock.Lock()
+	defer cl.clientsLock.Unlock()
+	cl.clients[c] = out
+}
+
+func (cl *ClientList) removeClient(c *WsClient) {
+	cl.clientsLock.Lock()
+	defer cl.clientsLock.Unlock()
+	delete(cl.clients, c)
+}
+
+func (cl *ClientList) SendLocationUpdate(tile string, loc *export.PlaneLocation) {
+	cl.clientsLock.RLock()
+	defer cl.clientsLock.RUnlock()
+
+	for client, outChan := range cl.clients {
+		if client.HasSub(tile) || client.HasSub("all") {
+			outChan <- WsResponse{
+				Type:     ResponseTypePlaneLocation,
+				Location: loc,
+			}
+		}
+	}
 }

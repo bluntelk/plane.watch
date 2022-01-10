@@ -17,6 +17,8 @@ type (
 		queueHigh   string
 		routeLow    string
 		routeHigh   string
+
+		processMessage func(highLow string, loc *export.PlaneLocation)
 	}
 )
 
@@ -47,15 +49,6 @@ func (br *PwWsBrokerRabbit) configureRabbitMq() error {
 	return nil
 }
 
-func (br *PwWsBrokerRabbit) processMessage(what string, msg []byte) {
-	planeLoc := export.PlaneLocation{}
-	err := json.Unmarshal(msg, &planeLoc)
-	if nil != err {
-		log.Debug().Err(err).Msg("did not understand msg")
-	}
-
-}
-
 func (br *PwWsBrokerRabbit) consume(queue, what string) {
 	ch, err := br.rabbit.Consume(queue, "pw_ws_broker"+what)
 	if nil != err {
@@ -64,7 +57,13 @@ func (br *PwWsBrokerRabbit) consume(queue, what string) {
 	}
 
 	for msg := range ch {
-		br.processMessage(what, msg.Body)
+		planeLoc := export.PlaneLocation{}
+		errJson := json.Unmarshal(msg.Body, &planeLoc)
+		if nil != errJson {
+			log.Debug().Err(err).Msg("did not understand msg")
+			continue
+		}
+		br.processMessage(what, &planeLoc)
 	}
 }
 func (br *PwWsBrokerRabbit) consumeAll() {

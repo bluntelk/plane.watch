@@ -4,6 +4,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"os"
 	"os/signal"
+	"plane.watch/lib/export"
 	"plane.watch/lib/rabbitmq"
 	"plane.watch/lib/randstr"
 	"syscall"
@@ -45,15 +46,21 @@ func (b *PwWsBroker) Setup() error {
 	if err := b.configureWeb(); nil != err {
 		return err
 	}
+
+	b.processMessage = func(highLow string, loc *export.PlaneLocation) {
+		tile := loc.TileLocation + highLow
+		b.clients.SendLocationUpdate(tile, loc)
+	}
 	return nil
 }
 
 func (b *PwWsBroker) Run() {
+	go b.consumeAll()
+
 	log.Info().Str("HttpAddr", b.httpServer.Addr).Msg("HTTP Listening on")
 	if err := b.httpServer.ListenAndServe(); nil != err {
 		log.Error().Err(err).Send()
 	}
-
 }
 
 func (b *PwWsBroker) Wait() {
