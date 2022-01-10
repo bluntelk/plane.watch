@@ -1,68 +1,58 @@
 package main
 
 import (
-	"errors"
 	"github.com/rs/zerolog/log"
 	"os"
 	"os/signal"
 	"plane.watch/lib/rabbitmq"
 	"plane.watch/lib/randstr"
 	"syscall"
-	"time"
 )
 
 type (
 	PwWsBroker struct {
-		rabbit      *rabbitmq.RabbitMQ
-		queuePrefix string
-		queueLow    string
-		queueHigh   string
+		PwWsBrokerRabbit
+		PwWsBrokerWeb
 	}
 )
 
-func NewPlaneWatchWebSocketBroker(rabbitUrl string) (*PwWsBroker, error) {
+func NewPlaneWatchWebSocketBroker(rabbitUrl, routeLow, routeHigh, httpAddr string, serveTestWeb bool) (*PwWsBroker, error) {
 	rabbitCfg, err := rabbitmq.NewConfigFromUrl(rabbitUrl)
 	if nil != err {
 		return nil, err
 	}
 	prefix := "broker_" + randstr.RandString(10) + "_"
 	return &PwWsBroker{
-		rabbit:      rabbitmq.New(rabbitCfg),
-		queuePrefix: prefix,
-		queueLow:    prefix + "low",
-		queueHigh:   prefix + "high",
+		PwWsBrokerRabbit{
+			rabbit:      rabbitmq.New(rabbitCfg),
+			queuePrefix: prefix,
+			queueLow:    prefix + "low",
+			queueHigh:   prefix + "high",
+			routeLow:    routeLow,
+			routeHigh:   routeHigh,
+		},
+		PwWsBrokerWeb{
+			Addr:      httpAddr,
+			ServeTest: serveTestWeb,
+		},
 	}, nil
 }
 
-func (b *PwWsBroker) Start(routeLow, routeHigh string) error {
-	if nil == b.rabbit {
-		return errors.New("you need to configure the rabbit client")
-	}
-	if err := b.rabbit.ConnectAndWait(5 * time.Second); nil != err {
+func (b *PwWsBroker) Setup() error {
+	if err := b.configureRabbitMq(); nil != err {
 		return err
 	}
-
-	if _, err := b.rabbit.QueueDeclare(b.queuePrefix+"high", 60000); nil != err {
-		return err
-	}
-
-	if _, err := b.rabbit.QueueDeclare(b.queuePrefix+"low", 60000); nil != err {
-		return err
-	}
-
-	// bind routing keys to our queues
-	if err := b.rabbit.QueueBind(b.queueLow, routeLow, rabbitmq.PlaneWatchExchange); nil != err {
-		return err
-	}
-
-	if err := b.rabbit.QueueBind(b.queueHigh, routeHigh, rabbitmq.PlaneWatchExchange); nil != err {
+	if err := b.configureWeb(); nil != err {
 		return err
 	}
 	return nil
 }
 
 func (b *PwWsBroker) Run() {
-	log.Debug().Msg("RUN")
+	log.Info().Str("HttpAddr", b.httpServer.Addr).Msg("HTTP Listening on")
+	if err := b.httpServer.ListenAndServe(); nil != err {
+		log.Error().Err(err).Send()
+	}
 
 }
 
@@ -73,6 +63,9 @@ func (b *PwWsBroker) Wait() {
 }
 
 func (b *PwWsBroker) Close() {
+	if err := b.httpServer.Close(); nil != err {
+		log.Error().Err(err).Msg("Failed to close web server cleanly")
+	}
 	if err := b.rabbit.QueueRemove(b.queueLow); nil != err {
 		log.Error().Err(err).Str("Queue", b.queueLow).Msg("Removing Queue")
 	}

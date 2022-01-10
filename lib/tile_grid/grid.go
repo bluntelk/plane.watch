@@ -99,3 +99,7 @@ func (t GlobeIndexSpecialTile) contains(lat, lon float64) bool {
 
 	return (lat <= t.North && lat >= t.South) && (lon >= t.East && lon <= t.West)
 }
+
+func GetGrid() GridLocations {
+	return worldGrid
+}

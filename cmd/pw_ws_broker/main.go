@@ -11,6 +11,7 @@ import (
 func main() {
 	app := cli.NewApp()
 	app.Name = "Plane.Watch WebSocket Broker (pw_ws_broker)"
+	app.Usage = "Websocket Broker"
 	app.Description = "Acts as a go between external display elements our the data pipeline"
 	app.Authors = []*cli.Author{
 		{
@@ -49,6 +50,16 @@ func main() {
 			Usage:   "The routing key that has all of the flight update events",
 			Value:   "location-updates",
 			EnvVars: []string{"ROUTE_KEY1_HIGH"},
+		},
+		&cli.StringFlag{
+			Name:    "http-addr",
+			Usage:   "What the HTTP server listens on",
+			Value:   ":80",
+			EnvVars: []string{"HTTP_ADDR"},
+		},
+		&cli.BoolFlag{
+			Name:  "serve-test-web",
+			Usage: "Serve up a test website for websocket testing",
 		},
 		&cli.BoolFlag{
 			Name:    "debug",
@@ -103,13 +114,19 @@ func run(c *cli.Context) error {
 		return errors.New("invalid configuration")
 	}
 
-	broker, err := NewPlaneWatchWebSocketBroker(source)
+	broker, err := NewPlaneWatchWebSocketBroker(
+		source,
+		lowRoute,
+		highRoute,
+		c.String("http-addr"),
+		c.Bool("serve-test-web"),
+	)
 	if nil != err {
 		return err
 	}
 	defer broker.Close()
 
-	if err = broker.Start(lowRoute, highRoute); nil != err {
+	if err = broker.Setup(); nil != err {
 		return err
 	}
 	go broker.Run()
