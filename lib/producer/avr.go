@@ -11,6 +11,9 @@ func (p *producer) avrScanner(scan *bufio.Scanner) error {
 		line := scan.Text()
 		p.addFrame(mode_s.NewFrame(line, time.Now()), &p.FrameSource)
 		p.addDebug("AVR Frame: %s", line)
+		if nil != p.stats.avr {
+			p.stats.avr.Inc()
+		}
 	}
 	return scan.Err()
 }

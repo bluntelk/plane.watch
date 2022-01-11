@@ -3,6 +3,7 @@ package tracker
 import (
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"plane.watch/lib/tracker/beast"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
@@ -65,6 +66,11 @@ func WithPruneTiming(pruneTick, pruneAfter time.Duration) Option {
 	return func(t *Tracker) {
 		t.pruneTick = pruneTick
 		t.pruneAfter = pruneAfter
+	}
+}
+func WithPrometheusCounters(currentPlanes prometheus.Gauge) Option {
+	return func(t *Tracker) {
+		t.stats.currentPlanes = currentPlanes
 	}
 }
 

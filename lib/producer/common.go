@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"io"
 	"math/rand"
@@ -40,6 +41,10 @@ type (
 		beastDelay bool
 
 		run func()
+
+		stats struct {
+			avr, beast, sbs1 prometheus.Counter
+		}
 	}
 
 	Option func(*producer)
@@ -158,6 +163,14 @@ func WithType(producerType int) Option {
 		default:
 			log.Error().Msgf("Unknown Producer Type")
 		}
+	}
+}
+
+func WithPrometheusCounters(avr, beast, sbs1 prometheus.Counter) Option {
+	return func(p *producer) {
+		p.stats.avr = avr
+		p.stats.beast = beast
+		p.stats.sbs1 = sbs1
 	}
 }
 

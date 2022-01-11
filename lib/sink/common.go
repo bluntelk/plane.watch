@@ -1,6 +1,7 @@
 package sink
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"os"
@@ -23,6 +24,10 @@ type (
 		messageTtlSeconds int
 
 		createTestQueues bool
+
+		stats struct {
+			dedupeFrame, frame, planeLoc prometheus.Counter
+		}
 	}
 	Option func(*Config)
 )

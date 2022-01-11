@@ -3,17 +3,15 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
-	"net/http"
 	"net/url"
 	"os"
+	"plane.watch/lib/stats"
 	"plane.watch/lib/tile_grid"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
@@ -132,17 +130,12 @@ func main() {
 			Usage:   "Only show important messages",
 			EnvVars: []string{"QUIET"},
 		},
-		&cli.IntFlag{
-			Name:    "prom-metrics-port",
-			Usage:   "Port to listen on for prometheus app metrics.",
-			Value:   9601,
-			EnvVars: []string{"PROM_METRICS_PORT"},
-		},
 		&cli.BoolFlag{
 			Name:  "register-test-queues",
 			Usage: "Subscribes a bunch of queues to our routing keys",
 		},
 	}
+	stats.IncludePrometheusFlags(app, 9601)
 
 	app.Before = func(c *cli.Context) error {
 		logging.SetVerboseOrQuiet(c.Bool("debug"), c.Bool("quiet"))
@@ -200,10 +193,7 @@ func (r *pwRouter) setupTestQueues() error {
 
 func run(c *cli.Context) error {
 	// setup and start the prom exporter
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		_ = http.ListenAndServe(fmt.Sprintf(":%d", c.Int("prom-metrics-port")), nil)
-	}()
+	stats.RunPrometheusWebServer(c)
 
 	var err error
 	// connect to rabbitmq, create ourselves 2 queues

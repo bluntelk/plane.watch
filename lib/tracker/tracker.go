@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
@@ -40,6 +41,10 @@ type (
 
 		startTime time.Time
 		numFrames uint64
+
+		stats struct {
+			currentPlanes prometheus.Gauge
+		}
 	}
 )
 
@@ -103,6 +108,9 @@ func (t *Tracker) GetPlane(icao uint32) *Plane {
 		return plane.(*Plane)
 	}
 	t.infoMessage("Plane %06X has made an appearance", icao)
+	if nil != t.stats.currentPlanes {
+		t.stats.currentPlanes.Inc()
+	}
 
 	p := newPlane(icao)
 	p.tracker = t
@@ -399,6 +407,9 @@ func (t *Tracker) prunePlanes() {
 			t.EachPlane(func(p *Plane) bool {
 				if p.LastSeen().Before(oldest) {
 					t.planeList.Delete(p.icaoIdentifier)
+					if nil != t.stats.currentPlanes {
+						t.stats.currentPlanes.Dec()
+					}
 
 					// now send an event
 					t.AddEvent(newPlaneActionEvent(p, false, true))

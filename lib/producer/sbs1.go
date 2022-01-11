@@ -10,6 +10,9 @@ func (p *producer) sbsScanner(scan *bufio.Scanner) error {
 		line := scan.Text()
 		p.addFrame(sbs1.NewFrame(scan.Text()), &p.FrameSource)
 		p.addDebug("SBS Frame: %s", line)
+		if nil != p.stats.sbs1 {
+			p.stats.sbs1.Inc()
+		}
 	}
 	return scan.Err()
 }

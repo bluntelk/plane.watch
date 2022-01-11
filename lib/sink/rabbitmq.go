@@ -3,6 +3,7 @@ package sink
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
 	"plane.watch/lib/dedupe"
@@ -158,6 +159,14 @@ func WithRabbitTestQueues(value bool) Option {
 	}
 }
 
+func WithPrometheusCounters(frame, dedupeFrame, planeLoc prometheus.Counter) Option {
+	return func(conf *Config) {
+		conf.stats.frame = frame
+		conf.stats.dedupeFrame = dedupeFrame
+		conf.stats.planeLoc = planeLoc
+	}
+}
+
 func (r *RabbitMqSink) Stop() {
 	r.mq.Disconnect()
 }
@@ -266,17 +275,26 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 	case *tracker.PlaneLocationEvent:
 		le := e.(*tracker.PlaneLocationEvent)
 		err = r.sendLocationEventToExchange(QueueLocationUpdates, le)
+		if nil != r.stats.planeLoc && nil != le.Plane() {
+			r.stats.planeLoc.Inc()
+		}
 
 	case *tracker.FrameEvent:
 		//println("Got a Frame!")
 		ourFrame := e.(*tracker.FrameEvent).Frame()
 		source := e.(*tracker.FrameEvent).Source()
 		err = r.sendFrameAll(ourFrame, source)
+		if nil != r.stats.frame {
+			r.stats.frame.Inc()
+		}
 
 	case *tracker.DedupedFrameEvent:
 		ourFrame := e.(*tracker.DedupedFrameEvent).Frame()
 		source := e.(*tracker.DedupedFrameEvent).Source()
 		err = r.sendFrameDedupe(ourFrame, source)
+		if nil != r.stats.dedupeFrame {
+			r.stats.dedupeFrame.Inc()
+		}
 	}
 
 	if nil != err {

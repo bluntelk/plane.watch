@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"math"
@@ -11,9 +13,42 @@ import (
 	"plane.watch/lib/logging"
 	"plane.watch/lib/producer"
 	"plane.watch/lib/sink"
+	"plane.watch/lib/stats"
 	"plane.watch/lib/tracker"
 	"strconv"
 	"strings"
+)
+
+var (
+	prometheusInputBeastFrames = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pw_ingest_input_beast_total",
+		Help: "The total number of beast frames processed.",
+	})
+	prometheusInputAvrFrames = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pw_ingest_input_avr_total",
+		Help: "The total number of AVR frames processed.",
+	})
+	prometheusInputSbs1Frames = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pw_ingest_input_sbs1_total",
+		Help: "The total number of SBS1 frames processed.",
+	})
+
+	prometheusOutputFrame = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pw_ingest_output_frame_total",
+		Help: "The total number of raw frames output. (no dedupe)",
+	})
+	prometheusOutputFrameDedupe = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pw_ingest_output_frame_dedupe_total",
+		Help: "The total number of deduped frames output.",
+	})
+	prometheusOutputPlaneLocation = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pw_ingest_output_location_update_total",
+		Help: "The total number of plane location events output.",
+	})
+	prometheusGaugeCurrentPlanes = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "pw_ingest_current_tracked_planes_count",
+		Help: "The number of planes this instance is currently tracking",
+	})
 )
 
 func main() {
@@ -89,6 +124,7 @@ func main() {
 			EnvVars: []string{"QUIET"},
 		},
 	}
+	stats.IncludePrometheusFlags(app, 9602)
 
 	app.Commands = []*cli.Command{
 		{
@@ -176,6 +212,7 @@ func handleSink(urlSink, defaultTag string, defaultTtl int, defaultQueues []stri
 			sink.WithSourceTag(getTag(parsedUrl, defaultTag)),
 			sink.WithMessageTtl(messageTtl),
 			sink.WithRabbitTestQueues(rabbitmqTestQueues),
+			sink.WithPrometheusCounters(prometheusOutputFrame, prometheusOutputFrameDedupe, prometheusOutputPlaneLocation),
 		)
 
 	default:
@@ -190,7 +227,7 @@ func handleSource(urlSource, defaultTag string, defaultRefLat, defaultRefLon flo
 		return nil, err
 	}
 
-	producerOpts := make([]producer.Option, 2)
+	producerOpts := make([]producer.Option, 3)
 	producerOpts[0] = producer.WithSourceTag(getTag(parsedUrl, defaultTag))
 
 	switch strings.ToLower(parsedUrl.Scheme) {
@@ -203,6 +240,7 @@ func handleSource(urlSource, defaultTag string, defaultRefLat, defaultRefLon flo
 	default:
 		return nil, fmt.Errorf("unknown scheme: %s, expected one of [avr|beast|sbs1]", parsedUrl.Scheme)
 	}
+	producerOpts[2] = producer.WithPrometheusCounters(prometheusInputAvrFrames, prometheusInputBeastFrames, prometheusInputSbs1Frames)
 
 	refLat := getRef(parsedUrl, "refLat", defaultRefLat)
 	refLon := getRef(parsedUrl, "refLon", defaultRefLon)
@@ -251,6 +289,7 @@ func handleFileSource(urlFile, defaultTag string, defaultRefLat, defaultRefLon f
 }
 
 func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
+	stats.RunPrometheusWebServer(c)
 	refLat := c.Float64("refLat")
 	refLon := c.Float64("refLon")
 
@@ -260,6 +299,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	defaultQueues := c.StringSlice("publish-types")
 
 	trackerOpts := make([]tracker.Option, 0)
+	trackerOpts = append(trackerOpts, tracker.WithPrometheusCounters(prometheusGaugeCurrentPlanes))
 	trk := tracker.NewTracker(trackerOpts...)
 
 	trk.AddMiddleware(dedupe.NewFilter())
@@ -337,7 +377,7 @@ func run(c *cli.Context) error {
 	return err
 }
 
-// run is our method for running things
+// runDaemon does not have pretty cli output (just JSON from logging)
 func runDaemon(c *cli.Context) error {
 	logging.SetVerboseOrQuiet(false, true)
 	trk, err := commonSetup(c)

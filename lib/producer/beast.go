@@ -27,6 +27,9 @@ func (p *producer) beastScanner(scan *bufio.Scanner) error {
 		}
 
 		p.AddEvent(tracker.NewFrameEvent(frame, &p.FrameSource))
+		if nil != p.stats.beast {
+			p.stats.beast.Inc()
+		}
 	}
 	return scan.Err()
 }
