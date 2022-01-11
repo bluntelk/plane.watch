@@ -17,8 +17,32 @@ Some Links for More Information
 * https://mode-s.org/decode/content/mode-s/6-els.html
 * https://www.eurocontrol.int/sites/default/files/content/documents/nm/asterix/archives/asterix-cat062-system-track-data-part9-v1.10-122009.pdf
 
+## Building
 
-## plane.watch.client
+### Development
+
+    make
+
+That's it. It runs the tests and builds the binaries and puts them into `bin/`
+
+If you want to build a specific binary
+
+    go build plane.watch/cmd/pw_ingest
+
+or you can run it with
+
+    go run plane.watch/cmd/pw_ingest
+
+### Building Docker Containers
+
+    docker build -t plane.watch/pw_ws_broker:latest -f docker/pw_ws_broker/Dockerfile .
+    docker build -t plane.watch/pw_router:latest -f docker/pw_router/Dockerfile .
+    docker build -t plane.watch/pw_ingest:latest -f docker/pw_ingest/Dockerfile .
+
+## Commands
+This repo contains many commands that can be run
+
+### pw_ingest
 
 This binary is used to accepts many different feeds and put them onto a message bus.
 
@@ -43,7 +67,7 @@ Examples:
 * --listen=beast://0.0.0.0:3005?tag=rando
 * --sink=amqp://guest:guest@localhost:5672/pw
 
-## pwreducer
+### pw_router
 
 This binary is used to reduce the incoming feed of location updates down to only updates that indicate a "significant" change. 
 A significant change is where:
@@ -82,3 +106,6 @@ GLOBAL OPTIONS:
    --help, -h                     show help (default: false)
    --version, -v                  print the version (default: false)
    ```
+
+### pw_ws_broker
+This is our plane.watch websocket broker. Connect to it and speak its language to get your location information

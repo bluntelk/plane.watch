@@ -1,4 +1,4 @@
-FROM golang:1.17-alpine
+FROM golang:1.17-alpine AS build
 
 # Set necessary environmet variables needed for our image
 ENV GO111MODULE=on \
@@ -6,15 +6,20 @@ ENV GO111MODULE=on \
     GOOS=linux \
     GOARCH=amd64
 
-ENV SOURCE SINK LISTEN TAG
-
 WORKDIR /app
 
 # Copy the code into the container
-COPY . /app
+COPY . /app/
 
 # Build the application
-RUN go build /app/cmd/pw_ingest
+RUN go build plane.watch/cmd/pw_ingest
+
+FROM alpine:latest
+ENV SOURCE SINK LISTEN TAG
+WORKDIR /app
+COPY --from=build /app/pw_ingest /app
+COPY docker/pw_ingest/entrypoint.sh /app
+EXPOSE 9602
 
 # Command to run
-CMD ["/app/docker/pw_ingest/entrypoint.sh"]
+CMD ["/app/entrypoint.sh"]

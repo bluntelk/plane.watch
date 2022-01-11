@@ -9,17 +9,18 @@ ENV GO111MODULE=on \
 WORKDIR /app
 
 # Copy the code into the container
-COPY . /app/
+COPY . /app
 
 # Build the application
-RUN go build plane.watch/cmd/pw_router
+RUN go build plane.watch/cmd/pw_ws_broker
 
 FROM alpine:latest
-ENV RABBITMQ SOURCE_ROUTE_KEY DEST_ROUTE_KEY NUM_WORKERS PROM_METRICS_PORT
+ENV SOURCE ROUTE_KEY_LOW ROUTE_KEY_HIGH TEST_WEB
 WORKDIR /app
-COPY --from=build /app/pw_router /app
-COPY docker/pw_router/entrypoint.sh /app
-EXPOSE 9601
+COPY --from=build /app/pw_ws_broker /app
+COPY docker/pw_ws_broker/entrypoint.sh /app
+EXPOSE 80
+EXPOSE 9603
 
 # Command to run
 CMD ["/app/entrypoint.sh"]

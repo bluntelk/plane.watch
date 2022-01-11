@@ -1,0 +1,5 @@
+# no need for our inputs
+inputs/*
+
+# no need for dev scripts
+dev-scripts/*

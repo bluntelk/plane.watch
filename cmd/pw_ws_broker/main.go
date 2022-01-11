@@ -68,8 +68,9 @@ func main() {
 			EnvVars: []string{"HTTP_ADDR"},
 		},
 		&cli.BoolFlag{
-			Name:  "serve-test-web",
-			Usage: "Serve up a test website for websocket testing",
+			Name:    "serve-test-web",
+			Usage:   "Serve up a test website for websocket testing",
+			EnvVars: []string{"TEST_WEB"},
 		},
 		&cli.BoolFlag{
 			Name:    "debug",
