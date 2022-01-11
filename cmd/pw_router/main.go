@@ -16,7 +16,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/streadway/amqp"
 	"github.com/urfave/cli/v2"
 
 	"plane.watch/lib/export"
@@ -31,18 +30,16 @@ const (
 )
 
 type (
-	rabbit struct {
+	pwRouter struct {
 		rmq  *rabbitmq.RabbitMQ
 		conf *rabbitmq.Config
-
-		queues map[string]*amqp.Queue
 
 		syncSamples sync.Map
 	}
 
 	planeLocationLast struct {
-		lastSignificantUpdate export.PlaneLocation
-		candidateUpdate       export.PlaneLocation
+		lastSignificantUpdate export.EnrichedPlaneLocation
+		candidateUpdate       export.EnrichedPlaneLocation
 	}
 )
 
@@ -82,22 +79,36 @@ func main() {
 		"\n\n" +
 		`example: ./pw_router --rabbitmq="amqp://guest:guest@localhost:5672" --source-route-key=location-updates --num-workers=8 --prom-metrics-port=9601`
 
+	app.Commands = cli.Commands{
+		{
+			Name:        "daemon",
+			Description: "For prod, Logging is JSON formatted",
+			Action:      runDaemon,
+		},
+		{
+			Name:        "cli",
+			Description: "Runs in your terminal with human readable output",
+			Action:      runCli,
+		},
+	}
+
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:    "rabbitmq",
 			Usage:   "Rabbitmq URL for reaching and publishing updates.",
+			Value:   "amqp://guest:guest@rabbitmq:5672/pw",
 			EnvVars: []string{"RABBITMQ"},
 		},
 		&cli.StringFlag{
 			Name:    "source-route-key",
 			Usage:   "Name of the routing key to read location updates from.",
-			Value:   "location-updates",
+			Value:   "location-updates-enriched",
 			EnvVars: []string{"SOURCE_ROUTE_KEY"},
 		},
 		&cli.StringFlag{
 			Name:    "destination-route-key",
 			Usage:   "Name of the routing key to publish significant updates to.",
-			Value:   "location-updates-reduced",
+			Value:   "location-updates-enriched-reduced",
 			EnvVars: []string{"DEST_ROUTE_KEY"},
 		},
 		&cli.IntFlag{
@@ -105,6 +116,11 @@ func main() {
 			Usage:   "Number of workers to process updates.",
 			Value:   4,
 			EnvVars: []string{"NUM_WORKERS"},
+		},
+		&cli.BoolFlag{
+			Name:    "spread-updates",
+			Usage:   "publish location updates to their respective tileXX_high and tileXX_low routing keys as well",
+			EnvVars: []string{"DEBUG"},
 		},
 		&cli.BoolFlag{
 			Name:    "debug",
@@ -128,10 +144,7 @@ func main() {
 		},
 	}
 
-	app.Action = run
-
 	app.Before = func(c *cli.Context) error {
-		logging.ConfigureForCli()
 		logging.SetVerboseOrQuiet(c.Bool("debug"), c.Bool("quiet"))
 		return nil
 	}
@@ -141,19 +154,27 @@ func main() {
 	}
 }
 
-func (r *rabbit) connect(config rabbitmq.Config, timeout time.Duration) error {
+func runDaemon(c *cli.Context) error {
+	return run(c)
+}
+
+func runCli(c *cli.Context) error {
+	logging.ConfigureForCli()
+	return run(c)
+}
+
+func (r *pwRouter) connect(config rabbitmq.Config, timeout time.Duration) error {
 	log.Info().Str("host", config.String()).Msg("Connecting to RabbitMQ")
 	r.rmq = rabbitmq.New(&config)
 	return r.rmq.ConnectAndWait(timeout)
 }
 
-func (r *rabbit) makeQueue(name, bindRouteKey string) error {
-	q, err := r.rmq.QueueDeclare(name, 60000) // 60sec TTL
+func (r *pwRouter) makeQueue(name, bindRouteKey string) error {
+	_, err := r.rmq.QueueDeclare(name, 60000) // 60sec TTL
 	if nil != err {
 		log.Error().Err(err).Msgf("Failed to create queue '%s'", name)
 		return err
 	}
-	r.queues[name] = &q
 
 	if err = r.rmq.QueueBind(name, bindRouteKey, rabbitmq.PlaneWatchExchange); nil != err {
 		log.Error().Err(err).Msgf("Failed to QueueBind to route-key:%s to queue %s", bindRouteKey, name)
@@ -163,7 +184,7 @@ func (r *rabbit) makeQueue(name, bindRouteKey string) error {
 	return nil
 }
 
-func (r *rabbit) setupTestQueues() error {
+func (r *pwRouter) setupTestQueues() error {
 	log.Info().Msg("Setting up test queues")
 	// we need a _low and a _high for each tile
 	suffixes := []string{qSuffixLow, qSuffixHigh}
@@ -186,8 +207,7 @@ func run(c *cli.Context) error {
 
 	var err error
 	// connect to rabbitmq, create ourselves 2 queues
-	r := rabbit{
-		queues:      map[string]*amqp.Queue{},
+	r := pwRouter{
 		syncSamples: sync.Map{},
 	}
 
@@ -234,18 +254,19 @@ func run(c *cli.Context) error {
 
 	var wg sync.WaitGroup
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	log.Info().Msgf("Starting with %d workers...", c.Int("num-workers"))
 	for i := 0; i < c.Int("num-workers"); i++ {
-		worker := worker{
+		wkr := worker{
 			rabbit:         &r,
 			destRoutingKey: c.String("destination-route-key"),
+			spreadUpdates:  c.Bool("spread-updates"),
 		}
 		wg.Add(1)
 		go func() {
-			worker.run(ctx, ch)
+			wkr.run(ctx, ch)
 			wg.Done()
 		}()
 	}

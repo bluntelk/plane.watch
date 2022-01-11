@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/rs/zerolog/log"
+	"math/rand"
 	"plane.watch/lib/export"
 	"plane.watch/lib/rabbitmq"
 	"time"
@@ -18,9 +19,13 @@ type (
 		routeLow    string
 		routeHigh   string
 
-		processMessage func(highLow string, loc *export.PlaneLocation)
+		processMessage func(highLow string, loc *export.EnrichedPlaneLocation)
 	}
 )
+
+func init() {
+	rand.Seed(time.Now().Unix())
+}
 
 func (br *PwWsBrokerRabbit) configureRabbitMq() error {
 	if nil == br.rabbit {
@@ -57,13 +62,14 @@ func (br *PwWsBrokerRabbit) consume(queue, what string) {
 	}
 
 	for msg := range ch {
-		planeLoc := export.PlaneLocation{}
-		errJson := json.Unmarshal(msg.Body, &planeLoc)
+		planeData := export.EnrichedPlaneLocation{}
+		errJson := json.Unmarshal(msg.Body, &planeData)
 		if nil != errJson {
 			log.Debug().Err(err).Msg("did not understand msg")
 			continue
 		}
-		br.processMessage(what, &planeLoc)
+		br.processMessage(what, &planeData)
+
 	}
 }
 func (br *PwWsBrokerRabbit) consumeAll() {

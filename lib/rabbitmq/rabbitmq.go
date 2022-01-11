@@ -212,7 +212,7 @@ func (r *RabbitMQ) Consume(name, consumer string) (<-chan amqp.Delivery, error) 
 	return r.channel.Consume(
 		name,
 		consumer,
-		false,
+		true,
 		false,
 		false,
 		false,

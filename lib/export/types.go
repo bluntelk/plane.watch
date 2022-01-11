@@ -3,6 +3,13 @@ package export
 import "time"
 
 type (
+	// EnrichedPlaneLocation is our representation of what the enrichment centre outputs
+	EnrichedPlaneLocation struct {
+		PlaneLocation  PlaneLocation  `json:"LocationInformation"`
+		EnrichmentData EnrichmentData `json:"EnrichmentData"`
+	}
+
+	// PlaneLocation is what pw_ingest outputs for its location-updates
 	PlaneLocation struct {
 		New, Removed      bool
 		Icao              string
@@ -26,5 +33,19 @@ type (
 		TileLocation      string
 		TrackedSince      time.Time
 		LastMsg           time.Time
+	}
+
+	EnrichmentData struct {
+		Aircraft *Aircraft `json:"aircraft,omitempty"`
+	}
+
+	Aircraft struct {
+		CofaOwner       *string `json:"cofa_owner"`
+		FlagCode        *string `json:"flag_code"`
+		IcaoCode        *string `json:"icao_code"`
+		RegisteredOwner *string `json:"registered_owner"`
+		Registration    *string `json:"registration"`
+		Serial          *string `json:"serial"`
+		TypeCode        *string `json:"type_code"`
 	}
 )

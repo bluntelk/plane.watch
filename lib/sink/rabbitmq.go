@@ -118,6 +118,7 @@ func WithRabbitQueues(queues []string) Option {
 	return func(conf *Config) {
 		if 0 == len(queues) {
 			WithAllRabbitQueues()(conf)
+			log.Debug().Msg("With all output types")
 			return
 		}
 
@@ -125,6 +126,7 @@ func WithRabbitQueues(queues []string) Option {
 			found := false
 			for _, validQueue := range AllQueues {
 				if requestedQueue == validQueue {
+					log.Debug().Str("publish-type", requestedQueue).Msg("With publish type")
 					conf.queue[validQueue] = validQueue
 					found = true
 					break

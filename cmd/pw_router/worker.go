@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math"
 	"plane.watch/lib/rabbitmq"
 	"time"
@@ -15,8 +14,9 @@ import (
 
 type (
 	worker struct {
-		rabbit         *rabbit
+		rabbit         *pwRouter
 		destRoutingKey string
+		spreadUpdates  bool
 	}
 )
 
@@ -26,8 +26,8 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	// check the currentUpdate vs lastUpdate, if any of the following have changed,
 	// then emit an event onto the locate-updates-reduced queue.
 	// - Heading, VerticalRate, Velocity, Altitude, FlightNumber, FlightStatus, OnGround, Special, Squawk
-	candidate := history.candidateUpdate
-	last := history.lastSignificantUpdate
+	candidate := history.candidateUpdate.PlaneLocation
+	last := history.lastSignificantUpdate.PlaneLocation
 
 	// if any of these fields differ, indicate this update is significant
 	if candidate.HasHeading && last.HasHeading && math.Abs(candidate.Heading-last.Heading) > SigHeadingChange {
@@ -142,11 +142,6 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	return false
 }
 
-func (w *worker) logUpdate(update export.PlaneLocation) string {
-	s := fmt.Sprint("(", update.Icao, ",", update.Heading, ",", update.Velocity, ",", update.VerticalRate, ",", update.Altitude, ",", update.FlightNumber, ",", update.FlightStatus, ",", update.OnGround, ",", update.Special, ",", update.Squawk, ")")
-	return s
-}
-
 func (w *worker) run(ctx context.Context, ch <-chan amqp.Delivery) {
 	for {
 		select {
@@ -159,14 +154,6 @@ func (w *worker) run(ctx context.Context, ch <-chan amqp.Delivery) {
 			var gErr error
 			if gErr = w.handleMsg(msg.Body); nil != gErr {
 				log.Error().Err(gErr).Send()
-
-				if gErr = msg.Nack(false, false); nil != gErr {
-					log.Error().Err(gErr).Send()
-				}
-			} else {
-				if gErr = msg.Ack(false); nil != gErr {
-					log.Error().Err(gErr).Send()
-				}
 			}
 		case <-ctx.Done():
 			return
@@ -177,13 +164,14 @@ func (w *worker) run(ctx context.Context, ch <-chan amqp.Delivery) {
 func (w *worker) handleMsg(msg []byte) error {
 	var err error
 
-	update := export.PlaneLocation{}
+	update := export.EnrichedPlaneLocation{}
 	if err = json.Unmarshal(msg, &update); nil != err {
 		updatesError.Inc()
 		return err
 	}
 
-	if "" == update.Icao {
+	if "" == update.PlaneLocation.Icao {
+		log.Debug().Str("payload", string(msg)).Msg("empty ICAO")
 		updatesError.Inc()
 		return nil
 	}
@@ -191,53 +179,58 @@ func (w *worker) handleMsg(msg []byte) error {
 	updatesProcessed.Inc()
 
 	// if this is the first time in a while we've seen this Icao
-	if _, ok := w.rabbit.syncSamples.Load(update.Icao); !ok {
+	if _, ok := w.rabbit.syncSamples.Load(update.PlaneLocation.Icao); !ok {
 
-		w.rabbit.syncSamples.Store(update.Icao, planeLocationLast{
+		w.rabbit.syncSamples.Store(update.PlaneLocation.Icao, planeLocationLast{
 			lastSignificantUpdate: update,
 		})
 
 		log.Debug().
-			Str("aircraft", update.Icao).
+			Str("aircraft", update.PlaneLocation.Icao).
 			Msg("First time seeing aircraft.")
 
 		return nil // can't check this for significance
 	} else {
 		// we have existing data, check to make sure we
-		record, _ := w.rabbit.syncSamples.Load(update.Icao)
+		record, _ := w.rabbit.syncSamples.Load(update.PlaneLocation.Icao)
 		tRecord := record.(planeLocationLast)
 		tRecord.candidateUpdate = update
-		w.rabbit.syncSamples.Store(update.Icao, tRecord)
+		w.rabbit.syncSamples.Store(update.PlaneLocation.Icao, tRecord)
 	}
 
-	planeRecord, _ := w.rabbit.syncSamples.Load(update.Icao)
+	planeRecord, _ := w.rabbit.syncSamples.Load(update.PlaneLocation.Icao)
 
 	if w.isSignificant(planeRecord.(planeLocationLast)) {
 		updatesSignificant.Inc()
 
 		// if it's significant, roll the values through and emit an event.
-		sigRecord, _ := w.rabbit.syncSamples.Load(update.Icao)
+		sigRecord, _ := w.rabbit.syncSamples.Load(update.PlaneLocation.Icao)
 		tSigRecord := sigRecord.(planeLocationLast)
 		tSigRecord.lastSignificantUpdate = tSigRecord.candidateUpdate
-		w.rabbit.syncSamples.Store(update.Icao, tSigRecord)
+		w.rabbit.syncSamples.Store(update.PlaneLocation.Icao, tSigRecord)
 
 		if err == nil {
 			// emit the new lastSignificant
-			w.publishLocationUpdate(w.destRoutingKey, msg)               // all low speed messages
-			w.publishLocationUpdate(update.TileLocation+qSuffixLow, msg) // tile based low speed messages
+			w.publishLocationUpdate(w.destRoutingKey, msg) // all low speed messages
+			if w.spreadUpdates {
+				w.publishLocationUpdate(update.PlaneLocation.TileLocation+qSuffixLow, msg) // tile based low speed messages
+			}
 			updatesPublished.Inc()
 		} else {
 			log.Info().Msg("Error Marshalling update to JSON.")
 		}
 	}
 
-	// send this to the tile HIGH queue
-	w.publishLocationUpdate(update.TileLocation+qSuffixHigh, msg) // tile based low speed messages
+	// publish this to the tile HIGH queue
+	if w.spreadUpdates {
+		w.publishLocationUpdate(update.PlaneLocation.TileLocation+qSuffixHigh, msg) // tile based low speed messages
+	}
 
 	return nil
 }
 
 func (w *worker) publishLocationUpdate(routingKey string, msg []byte) {
+	log.Debug().Str("routing-key", routingKey).Bytes("Location", msg).Msg("Publish")
 	err := w.rabbit.rmq.Publish(rabbitmq.PlaneWatchExchange, routingKey, amqp.Publishing{
 		ContentType:     "application/json",
 		ContentEncoding: "utf-8",

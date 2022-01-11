@@ -103,7 +103,8 @@
         })
 
         const divAll = document.getElementById("grid-btns-all")
-        divAll.append(mkBtn("all"))
+        divAll.append(mkBtn("all_low"))
+        divAll.append(mkBtn("all_high"))
         let list = mkBtn("list")
         list.setAttribute("data-state", "list")
         divAll.append(list)

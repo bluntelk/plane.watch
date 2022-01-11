@@ -47,9 +47,9 @@ func (b *PwWsBroker) Setup() error {
 		return err
 	}
 
-	b.processMessage = func(highLow string, loc *export.PlaneLocation) {
-		tile := loc.TileLocation + highLow
-		b.clients.SendLocationUpdate(tile, loc)
+	b.processMessage = func(highLow string, loc *export.EnrichedPlaneLocation) {
+		tile := loc.PlaneLocation.TileLocation + highLow
+		b.clients.SendLocationUpdate(highLow, tile, loc)
 	}
 	return nil
 }

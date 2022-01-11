@@ -42,13 +42,13 @@ func main() {
 		&cli.StringFlag{
 			Name:    "route-key-low",
 			Usage:   "The routing key that has only the significant flight update events",
-			Value:   "location-updates-reduced",
+			Value:   "location-updates-enriched-reduced",
 			EnvVars: []string{"ROUTE_KEY_LOW"},
 		},
 		&cli.StringFlag{
 			Name:    "route-key-high",
 			Usage:   "The routing key that has all of the flight update events",
-			Value:   "location-updates",
+			Value:   "location-updates-enriched",
 			EnvVars: []string{"ROUTE_KEY1_HIGH"},
 		},
 		&cli.StringFlag{

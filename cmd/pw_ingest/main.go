@@ -257,7 +257,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	// let's parse our URL forms
 	defaultTTl := c.Int("sink-message-ttl")
 	defaultTag := c.String("tag")
-	defaultQueues := c.StringSlice("rabbit-queue")
+	defaultQueues := c.StringSlice("publish-types")
 
 	trackerOpts := make([]tracker.Option, 0)
 	trk := tracker.NewTracker(trackerOpts...)

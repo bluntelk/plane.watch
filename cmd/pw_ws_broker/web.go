@@ -53,10 +53,10 @@ type (
 		GridTile string `json:"gridTile"`
 	}
 	WsResponse struct {
-		Type     string                `json:"type"`
-		Message  string                `json:"message,omitempty"`
-		Tiles    []string              `json:"tiles,omitempty"`
-		Location *export.PlaneLocation `json:"location,omitempty"`
+		Type     string                        `json:"type"`
+		Message  string                        `json:"message,omitempty"`
+		Tiles    []string                      `json:"tiles,omitempty"`
+		Location *export.EnrichedPlaneLocation `json:"location,omitempty"`
 	}
 
 	ClientList struct {
@@ -285,12 +285,12 @@ func (cl *ClientList) removeClient(c *WsClient) {
 	delete(cl.clients, c)
 }
 
-func (cl *ClientList) SendLocationUpdate(tile string, loc *export.PlaneLocation) {
+func (cl *ClientList) SendLocationUpdate(highLow, tile string, loc *export.EnrichedPlaneLocation) {
 	cl.clientsLock.RLock()
 	defer cl.clientsLock.RUnlock()
 
 	for client, outChan := range cl.clients {
-		if client.HasSub(tile) || client.HasSub("all") {
+		if client.HasSub(tile) || client.HasSub("all"+highLow) {
 			outChan <- WsResponse{
 				Type:     ResponseTypePlaneLocation,
 				Location: loc,
