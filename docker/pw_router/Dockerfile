@@ -15,7 +15,7 @@ COPY . /app/
 RUN go build plane.watch/cmd/pw_router
 
 FROM alpine:latest
-ENV RABBITMQ SOURCE_ROUTE_KEY DEST_ROUTE_KEY NUM_WORKERS PROM_METRICS_PORT
+ENV RABBITMQ SOURCE_ROUTE_KEY DEST_ROUTE_KEY NUM_WORKERS PROM_METRICS_PORT DEBUG QUIET
 WORKDIR /app
 COPY --from=build /app/pw_router /app
 COPY docker/pw_router/entrypoint.sh /app
