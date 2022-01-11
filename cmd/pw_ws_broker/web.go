@@ -277,12 +277,14 @@ func (cl *ClientList) addClient(c *WsClient, out chan WsResponse) {
 	cl.clientsLock.Lock()
 	defer cl.clientsLock.Unlock()
 	cl.clients[c] = out
+	prometheusNumClients.Inc()
 }
 
 func (cl *ClientList) removeClient(c *WsClient) {
 	cl.clientsLock.Lock()
 	defer cl.clientsLock.Unlock()
 	delete(cl.clients, c)
+	prometheusNumClients.Dec()
 }
 
 func (cl *ClientList) SendLocationUpdate(highLow, tile string, loc *export.EnrichedPlaneLocation) {

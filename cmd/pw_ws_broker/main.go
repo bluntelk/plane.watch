@@ -2,10 +2,20 @@ package main
 
 import (
 	"errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"os"
 	"plane.watch/lib/logging"
+	"plane.watch/lib/stats"
+)
+
+var (
+	prometheusNumClients = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "pw_ws_broker_num_clients",
+		Help: "The current number of websocket clients we are currently serving",
+	})
 )
 
 func main() {
@@ -49,7 +59,7 @@ func main() {
 			Name:    "route-key-high",
 			Usage:   "The routing key that has all of the flight update events",
 			Value:   "location-updates-enriched",
-			EnvVars: []string{"ROUTE_KEY1_HIGH"},
+			EnvVars: []string{"ROUTE_KEY_HIGH"},
 		},
 		&cli.StringFlag{
 			Name:    "http-addr",
@@ -73,6 +83,8 @@ func main() {
 		},
 	}
 
+	stats.IncludePrometheusFlags(app, 9603)
+
 	app.Before = func(c *cli.Context) error {
 		logging.SetVerboseOrQuiet(c.Bool("debug"), c.Bool("quiet"))
 		return nil
@@ -93,6 +105,7 @@ func runCli(c *cli.Context) error {
 }
 
 func run(c *cli.Context) error {
+	stats.RunPrometheusWebServer(c)
 	source := c.String("source")
 	lowRoute := c.String("route-key-low")
 	highRoute := c.String("route-key-high")
