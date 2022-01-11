@@ -1,6 +1,7 @@
 package rabbitmq
 
 import (
+	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -38,6 +39,10 @@ type Config struct {
 	Password string    `json:"password"`
 	Ssl      ConfigSSL `json:"ssl"`
 }
+
+var (
+	ErrNilChannel = errors.New("trying to use a nil channel")
+)
 
 func NewConfigFromUrl(connectUrl string) (*Config, error) {
 	rabbitUrl, err := url.Parse(connectUrl)
@@ -93,7 +98,7 @@ func (r *RabbitMQ) Connect(connected chan bool) {
 	for {
 		select {
 		case <-done:
-			log.Debug().Msg("RabbitMQ connected and channel established")
+			r.log.Debug().Msg("RabbitMQ connected and channel established")
 			r.connected = true
 			connected <- true
 			backoffIntervalCounter = 0
@@ -112,7 +117,7 @@ func (r *RabbitMQ) Connect(connected chan bool) {
 				backoffInterval = rabbitmqRetryIntervalMax
 			}
 
-			log.Error().
+			r.log.Error().
 				Int64("attempt", backoffIntervalCounter).
 				Msgf("Failed to connect, attempt %d, Retrying in %d seconds", backoffIntervalCounter, backoffInterval)
 
@@ -126,7 +131,7 @@ func (r *RabbitMQ) ConnectAndWait(timeout time.Duration) error {
 	go r.Connect(connected)
 	select {
 	case <-connected:
-		log.Info().Str("Service", "RabbitMQ").Msg("Connected")
+		r.log.Info().Str("Service", "RabbitMQ").Msg("Connected")
 		return nil
 	case <-time.After(timeout):
 		return fmt.Errorf("failed to connect to rabbit in a timely manner")
@@ -134,7 +139,7 @@ func (r *RabbitMQ) ConnectAndWait(timeout time.Duration) error {
 }
 
 func (r *RabbitMQ) Disconnect() {
-	log.Info().Msg("Disconnecting")
+	r.log.Info().Msg("Disconnecting")
 	if r.connected {
 		_ = r.conn.Close()
 	}
@@ -146,101 +151,126 @@ func (r *RabbitMQ) Disconnected() chan *amqp.Error {
 }
 
 func (r *RabbitMQ) ExchangeDeclare(name, kind string) error {
-	log.Debug().Str("Exchange", name).Str("type", kind).Msg("Declaring Exchange")
-	return r.channel.ExchangeDeclare(
-		name,
-		kind,
-		true,  // All exchanges are not declared durable
-		false, // auto-deleted
-		false, // internal
-		false, // no-wait
-		nil,   // arguments
-	)
+	r.log.Debug().Str("Exchange", name).Str("type", kind).Msg("Declaring Exchange")
+	if nil != r.channel {
+		return r.channel.ExchangeDeclare(
+			name,
+			kind,
+			true,  // All exchanges are not declared durable
+			false, // auto-deleted
+			false, // internal
+			false, // no-wait
+			nil,   // arguments
+		)
+	}
+
+	r.log.Warn().Err(ErrNilChannel).Str("what", "ExchangeDeclare").Send()
+	return ErrNilChannel
 }
 
 // QueueDeclare makes sure we have our queue setup with a default message expiry
 // ttlMs is the number of seconds we will wait before expiring a message, in MilliSeconds
 func (r *RabbitMQ) QueueDeclare(name string, ttlMs int) (amqp.Queue, error) {
-	log.Debug().Str("Queue", name).Int("TTL (ms)", ttlMs).Msg("Declaring Queue")
-	return r.channel.QueueDeclare(
-		name,
-		false,
-		true,
-		false,
-		false,
-		map[string]interface{}{
-			"x-message-ttl": ttlMs,
-		},
-	)
+	r.log.Debug().Str("Queue", name).Int("TTL (ms)", ttlMs).Msg("Declaring Queue")
+	if nil != r.channel {
+		return r.channel.QueueDeclare(
+			name,
+			false,
+			true,
+			false,
+			false,
+			map[string]interface{}{
+				"x-message-ttl": ttlMs,
+			},
+		)
+	}
+	r.log.Warn().Err(ErrNilChannel).Str("what", "QueueDeclare").Send()
+	return amqp.Queue{}, ErrNilChannel
 }
 
 func (r *RabbitMQ) QueueBind(name, routingKey, sourceExchange string) error {
-	log.Debug().
+	r.log.Debug().
 		Str("Queue", name).
 		Str("Routing Key", routingKey).
 		Str("Exchange", sourceExchange).
 		Msg("Binding Queue")
-	return r.channel.QueueBind(
-		name,
-		routingKey,
-		sourceExchange,
-		false,
-		nil,
-	)
+	if nil != r.channel {
+		return r.channel.QueueBind(
+			name,
+			routingKey,
+			sourceExchange,
+			false,
+			nil,
+		)
+	}
+	r.log.Warn().Err(ErrNilChannel).Str("what", "QueueBind").Send()
+	return ErrNilChannel
 }
 
 func (r *RabbitMQ) QueueRemove(name string) error {
-	log.Debug().
+	r.log.Debug().
 		Str("Queue", name).
 		Msg("Removing Queue")
-	n, err := r.channel.QueueDelete(
-		name,
-		false,
-		false,
-		false,
-	)
-	log.Debug().Int("Num Messages Lost", n).Msg("Queue Removed")
+	if nil != r.channel {
+		n, err := r.channel.QueueDelete(
+			name,
+			false,
+			false,
+			false,
+		)
+		r.log.Debug().Int("Num Messages Lost", n).Msg("Queue Removed")
+		return err
+	}
+	r.log.Warn().Err(ErrNilChannel).Str("what", "QueueRemove").Send()
 
-	return err
+	return ErrNilChannel
 }
 
 func (r *RabbitMQ) Consume(name, consumer string) (<-chan amqp.Delivery, error) {
-	log.Debug().
+	r.log.Debug().
 		Str("Queue", name).
 		Str("Consumer", consumer).
 		Msg("Consuming Queue Messages")
-	return r.channel.Consume(
-		name,
-		consumer,
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
+	if nil != r.channel {
+		return r.channel.Consume(
+			name,
+			consumer,
+			true,
+			false,
+			false,
+			false,
+			nil,
+		)
+	}
+	r.log.Warn().Err(ErrNilChannel).Str("what", "Consume").Send()
+	return nil, ErrNilChannel
 }
 
 func (r *RabbitMQ) Publish(exchange, key string, msg amqp.Publishing) error {
-	return r.channel.Publish(
-		exchange,
-		key,
-		false,
-		false,
-		msg,
-	)
+	if nil != r.channel {
+		return r.channel.Publish(
+			exchange,
+			key,
+			false,
+			false,
+			msg,
+		)
+	}
+	r.log.Warn().Err(ErrNilChannel).Str("what", "Publish").Send()
+	return ErrNilChannel
 }
 
 func (r *RabbitMQ) connect(uri string, done chan bool) {
 	var err error
 
-	log.Debug().Str("Url", uri).Msg("Dialing")
+	r.log.Debug().Str("Url", uri).Msg("Dialing")
 	r.conn, err = amqp.Dial(uri)
 	if err != nil {
-		log.Printf("Dial: %s", err)
+		r.log.Error().Err(err).Msg("Cannot Connect")
 		return
 	}
 
-	log.Debug().Msg("Config established, getting Channel")
+	r.log.Debug().Msg("Config established, getting Channel")
 	r.channel, err = r.conn.Channel()
 	if err != nil {
 		log.Error().Err(err).Msg("Channel Error")
