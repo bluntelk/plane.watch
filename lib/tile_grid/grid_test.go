@@ -1,6 +1,9 @@
 package tile_grid
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestGlobeIndexSpecialTile_contains(t1 *testing.T) {
 	type fields struct {
@@ -118,6 +121,47 @@ func TestGridLocationNames(t *testing.T) {
 	for _, name := range GridLocationNames() {
 		if "" == name {
 			t.Errorf("Got an empty name for tile")
+		}
+	}
+}
+
+func TestTileLookupsSame(t *testing.T) {
+	var count, failed int
+	for lat := -90.0; lat < 90.0; lat += 1 {
+		for lon := -180.0; lon < 180.0; lon += 1 {
+			count++
+			name := fmt.Sprintf("lookup_%0.2f_%0.2f", lat, lon)
+			t.Run(name, func(tt *testing.T) {
+				manual := lookupTileManual(lat, lon)
+				preCalc := lookupTilePreCalc(lat, lon)
+				if manual != preCalc {
+					failed++
+					tt.Errorf("Lookup Difference. Precalc: %s, manual: %s", preCalc, manual)
+				}
+			})
+		}
+	}
+	if failed > 0 {
+		t.Errorf("%d/%d failed", failed, count)
+	}
+}
+
+func BenchmarkLookupTileManual(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for lat := -90.0; lat < 90.0; lat += 1 {
+			for lon := -180.0; lon < 180.0; lon += 1 {
+				lookupTileManual(lat, lon)
+			}
+		}
+	}
+}
+
+func BenchmarkLookupTilePreCalc(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for lat := -90.0; lat < 90.0; lat += 1 {
+			for lon := -180.0; lon < 180.0; lon += 1 {
+				lookupTilePreCalc(lat, lon)
+			}
 		}
 	}
 }
