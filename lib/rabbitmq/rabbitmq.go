@@ -199,7 +199,7 @@ func (r *RabbitMQ) QueueBind(name, routingKey, sourceExchange string) error {
 			name,
 			routingKey,
 			sourceExchange,
-			false,
+			true,
 			nil,
 		)
 	}
