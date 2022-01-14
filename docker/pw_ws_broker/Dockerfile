@@ -15,7 +15,6 @@ COPY . /app
 RUN go build plane.watch/cmd/pw_ws_broker
 
 FROM alpine:latest
-ENV SOURCE ROUTE_KEY_LOW ROUTE_KEY_HIGH TEST_WEB DEBUG QUIET
 WORKDIR /app
 COPY --from=build /app/pw_ws_broker /app
 COPY docker/pw_ws_broker/entrypoint.sh /app

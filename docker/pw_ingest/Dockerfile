@@ -15,7 +15,6 @@ COPY . /app/
 RUN go build plane.watch/cmd/pw_ingest
 
 FROM alpine:latest
-ENV SOURCE SINK LISTEN TAG DEBUG QUIET
 WORKDIR /app
 COPY --from=build /app/pw_ingest /app
 COPY docker/pw_ingest/entrypoint.sh /app

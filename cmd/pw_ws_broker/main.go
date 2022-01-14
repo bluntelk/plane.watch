@@ -125,7 +125,7 @@ func run(c *cli.Context) error {
 		isValid = false
 	}
 	if !isValid {
-		return errors.New("invalid configuration")
+		return errors.New("invalid configuration. You need rabbitmq, route low and, route high configured")
 	}
 
 	broker, err := NewPlaneWatchWebSocketBroker(

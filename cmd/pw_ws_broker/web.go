@@ -4,30 +4,20 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"github.com/rs/zerolog/log"
+	"io"
 	"net/http"
 	"nhooyr.io/websocket"
 	"plane.watch/lib/export"
 	"plane.watch/lib/tile_grid"
+	"plane.watch/lib/ws_protocol"
 	"sync"
 	"time"
 )
 
 //go:embed test-web
 var testWebDir embed.FS
-
-const (
-	WsProtocolPlanes         = "planes"
-	RequestTypeSubscribe     = "sub"
-	RequestTypeSubscribeList = "sub-list"
-	RequestTypeUnsubscribe   = "unsub"
-
-	ResponseTypeError         = "error"
-	ResponseTypeAckSub        = "ack-sub"
-	ResponseTypeAckUnsub      = "ack-unsub"
-	ResponseTypeSubTiles      = "sub-list"
-	ResponseTypePlaneLocation = "plane-location"
-)
 
 type (
 	PwWsBrokerWeb struct {
@@ -45,29 +35,18 @@ type (
 		subLock sync.RWMutex
 		subs    map[string]bool
 
-		outChan chan WsResponse
-	}
-
-	WsRequest struct {
-		Type     string `json:"type"`
-		GridTile string `json:"gridTile"`
-	}
-	WsResponse struct {
-		Type     string                        `json:"type"`
-		Message  string                        `json:"message,omitempty"`
-		Tiles    []string                      `json:"tiles,omitempty"`
-		Location *export.EnrichedPlaneLocation `json:"location,omitempty"`
+		outChan chan ws_protocol.WsResponse
 	}
 
 	ClientList struct {
-		clients     map[*WsClient]chan WsResponse
+		clients     map[*WsClient]chan ws_protocol.WsResponse
 		clientsLock sync.RWMutex
 	}
 )
 
 func (bw *PwWsBrokerWeb) configureWeb() error {
 	bw.clients = ClientList{
-		clients: make(map[*WsClient]chan WsResponse),
+		clients: make(map[*WsClient]chan ws_protocol.WsResponse),
 	}
 	bw.serveMux.HandleFunc("/", bw.indexPage)
 	bw.serveMux.HandleFunc("/grid", bw.jsonGrid)
@@ -117,8 +96,9 @@ func (bw *PwWsBrokerWeb) jsonGrid(w http.ResponseWriter, r *http.Request) {
 }
 
 func (bw *PwWsBrokerWeb) servePlanes(w http.ResponseWriter, r *http.Request) {
+	log.Debug().Str("New Connection", r.RemoteAddr).Msg("New /planes WS")
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		Subprotocols:       []string{WsProtocolPlanes},
+		Subprotocols:       []string{ws_protocol.WsProtocolPlanes},
 		InsecureSkipVerify: false,
 		//		OriginPatterns:       nil, // maybe set this for plane.watch?
 		CompressionMode: websocket.CompressionContextTakeover,
@@ -131,7 +111,7 @@ func (bw *PwWsBrokerWeb) servePlanes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch conn.Subprotocol() {
-	case WsProtocolPlanes:
+	case ws_protocol.WsProtocolPlanes:
 		client := NewWsClient(conn)
 		bw.clients.addClient(client, client.outChan)
 		client.Handle(r.Context())
@@ -147,7 +127,7 @@ func NewWsClient(conn *websocket.Conn) *WsClient {
 	client := WsClient{
 		conn:    conn,
 		subs:    map[string]bool{},
-		outChan: make(chan WsResponse),
+		outChan: make(chan ws_protocol.WsResponse),
 	}
 	return &client
 }
@@ -158,7 +138,9 @@ func (c *WsClient) Handle(ctx context.Context) {
 		return
 	}
 	if nil != err {
-		log.Error().Err(err).Msg("Failure in protocol handler")
+		if -1 == websocket.CloseStatus(err) {
+			log.Error().Err(err).Msg("Failure in protocol handler")
+		}
 		return
 	}
 }
@@ -196,28 +178,34 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 		for {
 			mt, frame, err := conn.Read(ctx)
 			if nil != err {
-				log.Debug().Err(err).Msg("Error from reading")
+				if errors.Is(err, io.EOF) || websocket.CloseStatus(err) >= 0 {
+					return
+				}
+				log.Debug().Err(err).Int("Close Status", int(websocket.CloseStatus(err))).Msg("Error from reading")
 				return
 			}
 			switch mt {
 			case websocket.MessageText:
 				log.Debug().Bytes("Client Msg", frame).Msg("From Client")
-				rq := WsRequest{}
+				rq := ws_protocol.WsRequest{}
 				if err = json.Unmarshal(frame, &rq); nil != err {
 					log.Warn().Err(err).Msg("Failed to understand message from client")
 				}
 				switch rq.Type {
-				case RequestTypeSubscribe:
+				case ws_protocol.RequestTypeSubscribe:
 					c.AddSub(rq.GridTile)
-					_ = c.sendAck(ctx, ResponseTypeAckSub, rq.GridTile)
-				case RequestTypeSubscribeList:
-					_ = c.sendPlaneMessage(ctx, &WsResponse{
-						Type:  ResponseTypeSubTiles,
+					_ = c.sendAck(ctx, ws_protocol.ResponseTypeAckSub, rq.GridTile)
+				case ws_protocol.RequestTypeSubscribeList:
+					err = c.sendPlaneMessage(ctx, &ws_protocol.WsResponse{
+						Type:  ws_protocol.ResponseTypeSubTiles,
 						Tiles: c.SubTiles(),
 					})
-				case RequestTypeUnsubscribe:
+					if nil != err {
+						return
+					}
+				case ws_protocol.RequestTypeUnsubscribe:
 					c.UnSub(rq.GridTile)
-					_ = c.sendAck(ctx, ResponseTypeAckUnsub, rq.GridTile)
+					_ = c.sendAck(ctx, ws_protocol.ResponseTypeAckUnsub, rq.GridTile)
 				default:
 					_ = c.sendError(ctx, "Unknown request type")
 				}
@@ -231,14 +219,16 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 	// write a stream of location information
 
 	for planeMsg := range c.outChan {
-		_ = c.sendPlaneMessage(ctx, &planeMsg)
+		if err := c.sendPlaneMessage(ctx, &planeMsg); nil != err {
+			return err
+		}
 	}
 
 	return nil
 }
 
 func (c *WsClient) sendAck(ctx context.Context, ackType, tile string) error {
-	rs := WsResponse{
+	rs := ws_protocol.WsResponse{
 		Type:  ackType,
 		Tiles: []string{tile},
 	}
@@ -246,21 +236,24 @@ func (c *WsClient) sendAck(ctx context.Context, ackType, tile string) error {
 }
 
 func (c *WsClient) sendError(ctx context.Context, msg string) error {
-	rs := WsResponse{
-		Type:    ResponseTypeError,
+	rs := ws_protocol.WsResponse{
+		Type:    ws_protocol.ResponseTypeError,
 		Message: msg,
 	}
 	return c.sendPlaneMessage(ctx, &rs)
 }
 
-func (c *WsClient) sendPlaneMessage(ctx context.Context, planeMsg *WsResponse) error {
+func (c *WsClient) sendPlaneMessage(ctx context.Context, planeMsg *ws_protocol.WsResponse) error {
 	buf, err := json.MarshalIndent(planeMsg, "", "  ")
 	if nil != err {
 		log.Debug().Err(err).Str("type", planeMsg.Type).Msg("Failed to marshal plane msg to send to client")
 		return err
 	}
 	if err = c.writeTimeout(ctx, 3*time.Second, buf); nil != err {
-		log.Debug().Err(err).Str("type", planeMsg.Type).Msg("Failed to send message to client")
+		log.Debug().
+			Err(err).
+			Str("type", planeMsg.Type).
+			Msgf("Failed to send message to client. %+v", err)
 		return err
 	}
 	return nil
@@ -273,7 +266,7 @@ func (c *WsClient) writeTimeout(ctx context.Context, timeout time.Duration, msg 
 	return c.conn.Write(ctxW, websocket.MessageText, msg)
 }
 
-func (cl *ClientList) addClient(c *WsClient, out chan WsResponse) {
+func (cl *ClientList) addClient(c *WsClient, out chan ws_protocol.WsResponse) {
 	cl.clientsLock.Lock()
 	defer cl.clientsLock.Unlock()
 	cl.clients[c] = out
@@ -293,8 +286,8 @@ func (cl *ClientList) SendLocationUpdate(highLow, tile string, loc *export.Enric
 
 	for client, outChan := range cl.clients {
 		if client.HasSub(tile) || client.HasSub("all"+highLow) {
-			outChan <- WsResponse{
-				Type:     ResponseTypePlaneLocation,
+			outChan <- ws_protocol.WsResponse{
+				Type:     ws_protocol.ResponseTypePlaneLocation,
 				Location: loc,
 			}
 		}

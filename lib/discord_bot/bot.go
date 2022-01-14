@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/olekukonko/tablewriter"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
-	"log"
 	"os"
 	"os/signal"
 	"strings"
@@ -17,12 +18,15 @@ import (
 
 type (
 	PwBot struct {
+		wsc
 		botId    string
 		session  *discordgo.Session
 		user     *discordgo.User
 		commands map[string]*discordgo.ApplicationCommand
 
 		userDms sync.Map
+
+		log zerolog.Logger
 	}
 )
 
@@ -36,7 +40,9 @@ const (
 func NewBot(token string) (*PwBot, error) {
 	b := PwBot{
 		commands: make(map[string]*discordgo.ApplicationCommand),
+		log:      log.With().Str("Service", "PW Bot").Logger(),
 	}
+	b.wsc.wsLog = log.With().Str("Service", "WS Handler").Logger()
 	var err error
 
 	b.session, err = discordgo.New("Bot " + token)
@@ -49,7 +55,7 @@ func NewBot(token string) (*PwBot, error) {
 		return nil, fmt.Errorf("failed to get my own user information: %s", err)
 	}
 	b.botId = b.user.ID
-	log.Printf("I am %s", b.user)
+	b.log.Info().Str("User", b.user.String()).Msg("Bot User")
 
 	b.session.AddHandler(b.handleMessageCreate)
 	//MessageReactionAdd, MessageReactionRemove, MessageUpdate, MessageDelete
@@ -59,7 +65,10 @@ func NewBot(token string) (*PwBot, error) {
 }
 
 func (b *PwBot) RegisterCommandsForGuild(guild *discordgo.UserGuild, nukeExisting bool) {
-	log.Printf("Registering slash commands for %s", guild.Name)
+	b.log.Info().
+		Str("Guild", guild.Name).
+		Str("GuildID", guild.ID).
+		Msgf("Registering slash commands for %s", guild.Name)
 	b.commands[slashCmdRegisterAddress] = &discordgo.ApplicationCommand{
 		Name:        slashCmdRegisterAddress,
 		Description: "We use the address you give to do a lookup to get your geo location",
@@ -125,13 +134,13 @@ func (b *PwBot) RegisterCommandsForGuild(guild *discordgo.UserGuild, nukeExistin
 
 	existingCommands, err := b.session.ApplicationCommands(b.session.State.User.ID, guild.ID)
 	if nil != err {
-		log.Printf("Unable to list existing slash commands: %s", err)
+		b.log.Info().Msgf("Unable to list existing slash commands: %s", err)
 	}
 	if nukeExisting {
-		log.Printf("Nuking Existing Commands")
+		b.log.Info().Msgf("Nuking Existing Commands")
 		for _, existingCommand := range existingCommands {
 			if err = b.session.ApplicationCommandDelete(b.session.State.User.ID, guild.ID, existingCommand.ID); nil != err {
-				log.Printf("Failed to remove command %s - %s", existingCommand.Name, err)
+				b.log.Info().Msgf("Failed to remove command %s - %s", existingCommand.Name, err)
 			}
 		}
 		existingCommands = []*discordgo.ApplicationCommand{}
@@ -142,7 +151,7 @@ func (b *PwBot) RegisterCommandsForGuild(guild *discordgo.UserGuild, nukeExistin
 		for _, existingCommand := range existingCommands {
 			if existingCommand.Name == cmd.Name {
 				//b.session.ApplicationCommandDelete(b.session.State.User.ID, guild.ID, existingCommand.ID)
-				log.Printf("[%s] Command exists: %s - no need to create", guild.Name, cmd.Name)
+				b.log.Info().Msgf("[%s] Command exists: %s - no need to create", guild.Name, cmd.Name)
 				exists = true
 				break
 			}
@@ -150,9 +159,9 @@ func (b *PwBot) RegisterCommandsForGuild(guild *discordgo.UserGuild, nukeExistin
 		if !exists {
 			_, err := b.session.ApplicationCommandCreate(b.session.State.User.ID, guild.ID, cmd)
 			if nil != err {
-				log.Printf("[%s] Failed to register command %s: %s", guild.Name, cmd.Name, err)
+				b.log.Info().Msgf("[%s] Failed to register command %s: %s", guild.Name, cmd.Name, err)
 			} else {
-				log.Printf("[%s] Registered Command: %s", guild.Name, cmd.Name)
+				b.log.Info().Msgf("[%s] Registered Command: %s", guild.Name, cmd.Name)
 			}
 		}
 	}
@@ -173,7 +182,7 @@ func (b *PwBot) RegisterCommands(nukeExisting bool) {
 func (b *PwBot) GuildList() []*discordgo.UserGuild {
 	list, err := b.session.UserGuilds(200, "", "")
 	if nil != err {
-		log.Printf("Failed to get list of user guilds for bot: %s", err)
+		b.log.Info().Msgf("Failed to get list of user guilds for bot: %s", err)
 		return []*discordgo.UserGuild{}
 	}
 	return list
@@ -196,7 +205,7 @@ func (b *PwBot) handleMessageCreate(s *discordgo.Session, m *discordgo.MessageCr
 	case "hi", "hai", "omg", "omghai", "yo", "sup", "wassup":
 		_, err := s.ChannelMessageSend(m.ChannelID, "Hello there.")
 		if nil != err {
-			log.Printf("Failed to send message. %s", err)
+			b.log.Info().Msgf("Failed to send message. %s", err)
 		}
 	default:
 		var buf strings.Builder
@@ -212,7 +221,7 @@ func (b *PwBot) handleMessageCreate(s *discordgo.Session, m *discordgo.MessageCr
 
 		_, err := s.ChannelMessageSend(m.ChannelID, buf.String())
 		if nil != err {
-			log.Printf("Failed to send message. %s", err)
+			b.log.Info().Msgf("Failed to send message. %s", err)
 		}
 	}
 }
@@ -226,17 +235,17 @@ func (b *PwBot) handleSlashCommands(s *discordgo.Session, i *discordgo.Interacti
 		discordUserId = i.Member.User.ID
 		discordUserName = i.Member.User.Username
 	} else {
-		log.Printf("Failed to determine who I am interacting with")
+		b.log.Info().Msgf("Failed to determine who I am interacting with")
 		return
 	}
 
 	userChan, err := s.UserChannelCreate(discordUserId)
 	if nil != err {
-		log.Printf("Failed to create DM channel for user: %s", err)
+		b.log.Info().Msgf("Failed to create DM channel for user: %s", err)
 	}
 	sendPm := func(msg string) {
 		if nil == userChan {
-			log.Printf("No User Channel - would have said: %s", msg)
+			b.log.Info().Msgf("No User Channel - would have said: %s", msg)
 			return
 		}
 		_, err = s.ChannelMessageSend(userChan.ID, msg)
@@ -253,7 +262,7 @@ func (b *PwBot) handleSlashCommands(s *discordgo.Session, i *discordgo.Interacti
 			},
 		})
 		if nil != err {
-			log.Printf("Failed to respond to interaction. %s", err)
+			b.log.Info().Msgf("Failed to respond to interaction. %s", err)
 		}
 
 	}
@@ -262,12 +271,12 @@ func (b *PwBot) handleSlashCommands(s *discordgo.Session, i *discordgo.Interacti
 	case slashCmdRegisterAddress:
 		name := i.ApplicationCommandData().Options[0].StringValue()
 		addr := i.ApplicationCommandData().Options[1].StringValue()
-		log.Printf("User %s is registering address %s: %s", discordUserName, name, addr)
+		b.log.Info().Msgf("User %s is registering address %s: %s", discordUserName, name, addr)
 		sendPm(fmt.Sprintf("You are registering address for `%s` ```%s```", name, addr))
 		lat, lon, err := geoCodeAddress(addr)
 		if nil != err {
 			sendPm(err.Error())
-			log.Printf("Geolocation failed %s", err)
+			b.log.Info().Msgf("Geolocation failed %s", err)
 			respondToInteraction("Geolocation failed, See PM")
 		} else {
 			if err = addAlertLocation(discordUserId, discordUserName, name, lat, lon); nil != err {
@@ -276,7 +285,7 @@ func (b *PwBot) handleSlashCommands(s *discordgo.Session, i *discordgo.Interacti
 			} else {
 				sendPm("We have setup your alert")
 				if err = setLocationAddress(discordUserId, name, addr); nil != err {
-					log.Printf("Failed to update user address: %s", err)
+					b.log.Info().Msgf("Failed to update user address: %s", err)
 					respondToInteraction("Saving Partially Failed, See PM")
 					sendPm("Failed to set alert locations address")
 				} else {
@@ -289,7 +298,7 @@ func (b *PwBot) handleSlashCommands(s *discordgo.Session, i *discordgo.Interacti
 		lat := i.ApplicationCommandData().Options[1].FloatValue()
 		lon := i.ApplicationCommandData().Options[2].FloatValue()
 
-		log.Printf("user %s is registering %s: %0.5f,%0.5f", discordUserName, name, lat, lon)
+		b.log.Info().Msgf("user %s is registering %s: %0.5f,%0.5f", discordUserName, name, lat, lon)
 		sendPm(fmt.Sprintf("Adding Location `%s` ```Lat: %0.5f, Lon: %0.5f```", name, lat, lon))
 
 		if err = addAlertLocation(discordUserId, discordUserName, name, lat, lon); nil != err {
@@ -305,7 +314,7 @@ func (b *PwBot) handleSlashCommands(s *discordgo.Session, i *discordgo.Interacti
 		case discordgo.InteractionApplicationCommand:
 			name := i.ApplicationCommandData().Options[0].StringValue()
 
-			log.Printf("user %s is removing location %s", discordUserName, name)
+			b.log.Info().Msgf("user %s is removing location %s", discordUserName, name)
 			sendPm(fmt.Sprintf("Removing Location `%s`", name))
 
 			if err = removeAlertLocation(discordUserId, name); nil != err {
@@ -328,7 +337,7 @@ func (b *PwBot) handleSlashCommands(s *discordgo.Session, i *discordgo.Interacti
 				Data: &discordgo.InteractionResponseData{Choices: choices},
 			})
 			if err != nil {
-				log.Printf("Failed to respond to interaction. %s", err)
+				b.log.Info().Msgf("Failed to respond to interaction. %s", err)
 			}
 		}
 	case slashCmdListLocations:
@@ -344,8 +353,8 @@ func (b *PwBot) sendDirectMessage(discordUserId, message string) {
 		// need to create a user channel
 		userChan, err := b.session.UserChannelCreate(discordUserId)
 		if nil != err {
-			log.Printf("Failed to create DM channel for user: %s", err)
-			log.Printf("Would have told user [%s] %s", discordUserId, message)
+			b.log.Info().Msgf("Failed to create DM channel for user: %s", err)
+			b.log.Info().Msgf("Would have told user [%s] %s", discordUserId, message)
 			return
 		}
 		b.userDms.Store(discordUserId, userChan)
@@ -353,23 +362,23 @@ func (b *PwBot) sendDirectMessage(discordUserId, message string) {
 
 	userChanInterface, ok := b.userDms.Load(discordUserId)
 	if !ok {
-		log.Printf("Failed to get the user DM channel from the map")
-		log.Printf("Would have told user [%s] %s", discordUserId, message)
+		b.log.Info().Msgf("Failed to get the user DM channel from the map")
+		b.log.Info().Msgf("Would have told user [%s] %s", discordUserId, message)
 		return
 	}
 
 	userChan, ok := userChanInterface.(*discordgo.Channel)
 	if !ok {
 		b.userDms.Delete(discordUserId)
-		log.Printf("What I got from the map was not the right thing!")
-		log.Printf("Would have told user [%s] %s", discordUserId, message)
+		b.log.Info().Msgf("What I got from the map was not the right thing!")
+		b.log.Info().Msgf("Would have told user [%s] %s", discordUserId, message)
 		return
 	}
 
 	_, err := b.session.ChannelMessageSend(userChan.ID, message)
 	if nil != err {
-		log.Printf("Failed to send message: %s", err)
-		log.Printf("Would have told user [%s] %s", discordUserId, message)
+		b.log.Info().Msgf("Failed to send message: %s", err)
+		b.log.Info().Msgf("Would have told user [%s] %s", discordUserId, message)
 		// if we are failing on sending, let's just nuke what we have and start again
 		b.userDms.Delete(discordUserId)
 	}
@@ -397,12 +406,15 @@ func (b *PwBot) sendUserLocationList(discordUserId string) {
 }
 
 func (b *PwBot) Run(c *cli.Context) error {
-	log.Println("Running...")
+	b.log.Info().Msg("Running...")
 	// load our existing alert config
 	loadLocationsList()
 
+	go b.handleWebsocketClient(c.String("host"), c.Bool("insecure"))
+
 	b.session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
-		log.Println("Bot is up!")
+		b.log.Info().Msg("Bot is up!")
+		b.RegisterCommands(c.Bool("nuke-commands"))
 	})
 
 	err := b.session.Open()
@@ -410,18 +422,16 @@ func (b *PwBot) Run(c *cli.Context) error {
 		return err
 	}
 
-	b.RegisterCommands(c.Bool("nuke-commands"))
-
 	if err = b.session.UpdateListeningStatus("ADSB"); nil != err {
-		log.Printf("Unable to update listening to: %s", err)
+		b.log.Info().Msgf("Unable to update listening to: %s", err)
 	}
 
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-sc
-	log.Println("Closing...")
+	b.log.Info().Msg("Closing...")
 	if err = saveLocationsList(); nil != err {
-		log.Printf("Failed when saving locations list. %s", err)
+		b.log.Info().Msgf("Failed when saving locations list. %s", err)
 	}
 	return b.session.Close()
 }
