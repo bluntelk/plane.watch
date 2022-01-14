@@ -1,0 +1,4274 @@
+openapi: 3.0.0
+info:
+  description: This document describes the Geocoding and Search API.
+  title: Geocoding and Search API v7
+  version: "7.78"
+  x-document-meta-data:
+    copyright: © 2021 HERE Europe B.V.
+    document-id: d4eeab41-ea2b-41c9-9b4e-ba3d40e3b8b5
+    date-created: 2021-12-17T21:01:44+00:00
+servers:
+- url: /
+security:
+- Bearer: []
+- ApiKey: []
+paths:
+  /geocode:
+    get:
+      description: This endpoint allows to find the geo-coordinates of a known address,
+        place, locality or administrative area, even if the query is incomplete or
+        partly incorrect. It also returns a complete postal address string and address
+        details. It supports structured, unstructured and hybrid queries - combinations
+        of structured and unstructured query elements.
+      parameters:
+      - description: |
+          Specify the center of the search context expressed as coordinates.
+
+          Format: `{latitude},{longitude}`
+
+          Type: `{decimal},{decimal}`
+
+          Example: `-13.163068,-72.545128` (Machu Picchu Mountain, Peru)
+        explode: true
+        in: query
+        name: at
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: |+
+          Search within a geographic area. This is a hard filter. Results will be returned if they are located within the specified area.
+
+          A geographic area can be
+
+           * a country (or multiple countries), provided as comma-separated [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country codes
+
+             The country codes are to be provided in all uppercase.
+
+             Format: `countryCode:{countryCode}[,{countryCode}]*`
+
+             Examples:
+              * `countryCode:USA`
+              * `countryCode:CAN,MEX,USA`
+
+        explode: true
+        in: query
+        name: in
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Maximum number of results to be returned.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          default: 20
+          format: int32
+          maximum: 100
+          minimum: 1
+          type: integer
+        style: form
+      - description: |
+          Enter a free-text query
+
+          Examples:
+           * `125, Berliner, berlin`
+           * `Beacon, Boston, Hospital`
+           * `Schnurrbart German Pub and Restaurant, Hong Kong`
+
+          _Note: Either `q` or `qq`-parameter is required on this endpoint. Both parameters can be provided in the same request._
+        explode: true
+        in: query
+        name: q
+        required: false
+        schema:
+          example: Invalidenstraße 116 Berlin
+          type: string
+        style: form
+      - description: |
+          Enter a qualified query. A qualified query is similar to a free-text query, but in a structured manner.
+           It can take multiple _sub-parameters_, separated by semicolon, allowing to specify different aspects of a query.
+
+          Currently supported _sub-parameters_ are `country`, `state`, `county`, `city`, `district`, `street`,
+           `houseNumber`, and `postalCode`.
+
+          Format: `{sub-parameter}={string}[;{sub-parameter}={string}]*`
+
+          Examples:
+           * `city=Berlin;country=Germany;street=Friedrichstr;houseNumber=20`
+           * `city=Berlin;country=Germany`
+           * `postalCode=10969`
+
+          _Note: Either `q` or `qq`-parameter is required on this endpoint. Both parameters can be provided in the same request._
+        explode: true
+        in: query
+        name: qq
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Select the language to be used for result rendering from a list
+          of [BCP 47](https://en.wikipedia.org/wiki/IETF_language_tag) compliant language
+          codes.
+        explode: false
+        in: query
+        name: lang
+        required: false
+        schema:
+          items:
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Toggle the political view.
+
+          This parameter accepts single ISO 3166-1 alpha-3 country code. The country codes are to be provided in all uppercase.
+
+          Currently the only supported political views are:
+           * RUS expressing the Russian view on Crimea
+           * SRB expressing the Serbian view on Kosovo, Vukovar and Sarengrad Islands
+           * MAR expressing the Moroccan view on Western Sahara
+           * SUR Suriname view on Courantyne Headwaters and Lawa Headwaters
+           * KEN Kenya view on Ilemi Triangle
+           * TZA Tanzania view on Lake Malawi
+           * URY Uruguay view on Rincon de Artigas
+           * EGY Egypt view on Bir Tawil
+           * SDN Sudan view on Halaib Triangle
+           * SYR Syria view on Golan Heights
+           * ARG Argentina view on Southern Patagonian Ice Field and Tierra Del Fuego, including Falkland Islands, South Georgia and South Sandwich Islands
+
+          For any valid 3 letter country code, for which GS7 does not have dedicated political view, it falls back to the default view.
+
+          For not accepted values of the politicalView parameter the GS7 responds with "400" error code.
+        explode: true
+        in: query
+        name: politicalView
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: |-
+          Select additional fields to be rendered in the response.
+          Please note that some of the fields involve additional webservice calls and can increase the overall response time.
+
+          The value is a comma-separated list of the sections to be enabled.
+          For some sections there is a long and a short ID.
+
+          Description of accepted values:
+
+          'countryInfo': For each result item renders additional block with the country info, such as [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) and [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country code.
+
+          'streetInfo': For each result item renders additional block with the street name decomposed into its parts like the base name, the street type, etc.
+
+          BETA: 'parsing'
+
+          BETA: 'tz': Renders result items with additional time zone information. Please note that this may impact latency significantly.
+        explode: false
+        in: query
+        name: show
+        required: false
+        schema:
+          items:
+            enum:
+            - countryInfo
+            - streetInfo
+            - parsing
+            - tz
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Used to correlate requests with their responses within a customer's application, for logging and error reporting.
+
+          Format: Free string, but a valid UUIDv4 is recommended.
+        explode: false
+        in: header
+        name: X-Request-ID
+        required: false
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenSearchGeocodeResponse'
+          description: The search results.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: request failed validation.'
+        "405":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: http method not supported.'
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: Rate limit exceeded.'
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Temporary server error.
+      summary: Geocode
+    servers:
+    - url: https://geocode.search.hereapi.com/v1
+  /discover:
+    get:
+      description: This endpoint processes a free-form text query for an address or
+        place, and returns results in order of relevance.
+      parameters:
+      - description: |
+          Enter a free-text query
+
+          Examples:
+           * `125, Berliner, berlin`
+           * `Beacon, Boston, Hospital`
+           * `Schnurrbart German Pub and Restaurant, Hong Kong`
+
+           _Note: Whitespace, urls, email addresses, or other out-of-scope queries will yield no results.
+        explode: true
+        in: query
+        name: q
+        required: true
+        schema:
+          example: Eismieze Berlin
+          type: string
+        style: form
+      - description: |
+          Specify the center of the search context expressed as coordinates
+
+          Format: `{latitude},{longitude}`
+
+          Type: `{decimal},{decimal}`
+
+          Example: `-13.163068,-72.545128` (Machu Picchu Mountain, Peru)
+
+          The following constraints apply:
+
+           * One of "at", "in=circle" or "in=bbox" is required.
+
+           * Parameters "at", "in=circle" and "in=bbox" are mutually exclusive. Only one of them is allowed.
+        explode: true
+        in: query
+        name: at
+        required: false
+        schema:
+          example: 52.5308,13.3856
+          type: string
+        style: form
+      - description: |
+          Search within a geographic area. This is a hard filter. Results will be returned if they are located within the specified area.
+
+          A geographic area can be
+
+           * a country (or multiple countries), provided as comma-separated [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country codes
+
+             The country codes are to be provided in all uppercase.
+
+             Format: `countryCode:{countryCode}[,{countryCode}]*`
+
+             Examples:
+              * `countryCode:USA`
+              * `countryCode:CAN,MEX,USA`
+
+
+           * a circular area, provided as latitude, longitude, and radius (in meters)
+
+             Format: `circle:{latitude},{longitude};r={radius}`
+
+             Type: `circle:{decimal},{decimal};r={integer}`
+
+             Example: `circle:52.53,13.38;r=10000`
+
+
+           * a bounding box, provided as _west longitude_, _south latitude_, _east longitude_, _north latitude_
+
+             Format: `bbox:{west longitude},{south latitude},{east longitude},{north latitude}`
+
+             Example: `bbox:13.08836,52.33812,13.761,52.6755`
+
+
+          The following constraints apply:
+
+           * Parameters "at", "in=circle" and "in=bbox" are mutually exclusive. Only one of them is allowed.
+
+            * One of "at", "in=circle" or "in=bbox" is required.
+
+           * The "in=countryCode" parameter must be accompanied by exactly one of "at", "in=circle" or "in=bbox".
+        explode: true
+        in: query
+        name: in
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Maximum number of results to be returned.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          default: 20
+          format: int32
+          maximum: 100
+          minimum: 1
+          type: integer
+        style: form
+      - description: |
+          BETA: Select within a geographic corridor. This is a hard filter. Results will be returned if they are located within the specified area.
+
+          A `route` is defined by a [Flexible Polyline Encoding](https://github.com/heremaps/flexible-polyline),
+           followed by an optional width, represented by a sub-parameter "w".
+
+          Format: `{route};w={width}`
+
+          In regular expression syntax, the values of `route` look like:
+
+          `[a-zA-Z0-9_-]+(;w=\d+)?`
+
+          "[a-zA-Z0-9._-]+" is the encoded flexible polyline.
+
+          "w=\d+" is the optional width. The width is specified in meters from the center of the path. If no width is provided, the default is 1000 meters.
+
+          Type: `{Flexible Polyline Encoding};w={integer}`
+
+          The following constraints apply:
+           * A `route` MUST NOT contain more than 2000 points.
+
+          Examples:
+           * `BFoz5xJ67i1B1B7PzIhaxL7Y`
+           * `BFoz5xJ67i1B1B7PzIhaxL7Y;w=5000`
+           * `BlD05xgKuy2xCCx9B7vUCl0OhnRC54EqSCzpEl-HCxjD3pBCiGnyGCi2CvwFCsgD3nDC4vB6eC;w=2000`
+
+          Note: The last example above can be decoded (using the Python class [here](https://github.com/heremaps/flexible-polyline/tree/master/python) as follows:
+
+          ```
+          >>> import flexpolyline
+          >>> polyline = 'BlD05xgKuy2xCCx9B7vUCl0OhnRC54EqSCzpEl-HCxjD3pBCiGnyGCi2CvwFCsgD3nDC4vB6eC'
+          >>> flexpolyline.decode(polyline)
+          [(52.51994, 13.38663, 1.0), (52.51009, 13.28169, 2.0), (52.43518, 13.19352, 3.0), (52.41073, 13.19645, 4.0), (52.38871, 13.15578, 5.0), (52.37278, 13.1491, 6.0), (52.37375, 13.11546, 7.0), (52.38752, 13.08722, 8.0), (52.40294, 13.07062, 9.0), (52.41058, 13.07555, 10.0)]
+          ```
+        explode: true
+        in: query
+        name: route
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Select the language to be used for result rendering from a list
+          of [BCP 47](https://en.wikipedia.org/wiki/IETF_language_tag) compliant language
+          codes.
+        explode: false
+        in: query
+        name: lang
+        required: false
+        schema:
+          items:
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Toggle the political view.
+
+          This parameter accepts single ISO 3166-1 alpha-3 country code. The country codes are to be provided in all uppercase.
+
+          Currently the only supported political views are:
+           * RUS expressing the Russian view on Crimea
+           * SRB expressing the Serbian view on Kosovo, Vukovar and Sarengrad Islands
+           * MAR expressing the Moroccan view on Western Sahara
+           * SUR Suriname view on Courantyne Headwaters and Lawa Headwaters
+           * KEN Kenya view on Ilemi Triangle
+           * TZA Tanzania view on Lake Malawi
+           * URY Uruguay view on Rincon de Artigas
+           * EGY Egypt view on Bir Tawil
+           * SDN Sudan view on Halaib Triangle
+           * SYR Syria view on Golan Heights
+           * ARG Argentina view on Southern Patagonian Ice Field and Tierra Del Fuego, including Falkland Islands, South Georgia and South Sandwich Islands
+
+          For any valid 3 letter country code, for which GS7 does not have dedicated political view, it falls back to the default view.
+
+          For not accepted values of the politicalView parameter the GS7 responds with "400" error code.
+        explode: true
+        in: query
+        name: politicalView
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: |-
+          Select additional fields to be rendered in the response.
+          Please note that some of the fields involve additional webservice calls and can increase the overall response time.
+
+          The value is a comma-separated list of the sections to be enabled.
+          For some sections there is a long and a short ID.
+
+          Description of accepted values:
+
+          'phonemes': Renders phonemes for address and place names into the results.
+
+          'streetInfo': For each result item renders additional block with the street name decomposed into its parts like the base name, the street type, etc.
+
+          BETA: 'tz': Renders result items with additional time zone information. Please note that this may impact latency significantly.
+        explode: false
+        in: query
+        name: show
+        required: false
+        schema:
+          items:
+            enum:
+            - phonemes
+            - streetInfo
+            - tz
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Used to correlate requests with their responses within a customer's application, for logging and error reporting.
+
+          Format: Free string, but a valid UUIDv4 is recommended.
+        explode: false
+        in: header
+        name: X-Request-ID
+        required: false
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenSearchSearchResponse'
+          description: The search results.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: request failed validation.'
+        "405":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: http method not supported.'
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: Rate limit exceeded.'
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Temporary server error.
+      summary: Discover
+    servers:
+    - url: https://discover.search.hereapi.com/v1
+  /autosuggest:
+    get:
+      description: |
+        This endpoint suggests address or place candidates based on an incomplete or misspelled query,
+         from which the user selects the best query to submit.
+
+        _NOTE: The response may contain **experimental** elements not documented here.
+         Any undocumented element is **subject to removal** at any time._
+      parameters:
+      - description: |
+          Enter a free-text query
+
+          Examples:
+           * `res`, `rest`, `resta`, `restau`, ...
+           * `berlin+bran`, `berlin+brand`, `berlin+branden`, ...
+           * `New+Yok+Giants`
+
+           _Note: Whitespace, urls, email addresses, or other out-of-scope queries will yield no results.
+        explode: true
+        in: query
+        name: q
+        required: true
+        schema:
+          example: Eismieze Berlin
+          type: string
+        style: form
+      - description: |
+          Specify the center of the search context expressed as coordinates
+
+          Format: `{latitude},{longitude}`
+
+          Type: `{decimal},{decimal}`
+
+          Example: `-13.163068,-72.545128` (Machu Picchu Mountain, Peru)
+
+          The following constraints apply:
+
+           * One of "at", "in=circle" or "in=bbox" is required.
+
+           * Parameters "at", "in=circle" and "in=bbox" are mutually exclusive. Only one of them is allowed.
+        explode: true
+        in: query
+        name: at
+        required: false
+        schema:
+          example: 52.5308,13.3856
+          type: string
+        style: form
+      - description: |
+          Search within a geographic area. This is a hard filter. Results will be returned if they are located within the specified area.
+
+          A geographic area can be
+
+           * a country (or multiple countries), provided as comma-separated [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country codes
+
+             The country codes are to be provided in all uppercase.
+
+             Format: `countryCode:{countryCode}[,{countryCode}]*`
+
+             Examples:
+              * `countryCode:USA`
+              * `countryCode:CAN,MEX,USA`
+
+
+           * a circular area, provided as latitude, longitude, and radius (in meters)
+
+             Format: `circle:{latitude},{longitude};r={radius}`
+
+             Type: `circle:{decimal},{decimal};r={integer}`
+
+             Example: `circle:52.53,13.38;r=10000`
+
+
+           * a bounding box, provided as _west longitude_, _south latitude_, _east longitude_, _north latitude_
+
+             Format: `bbox:{west longitude},{south latitude},{east longitude},{north latitude}`
+
+             Example: `bbox:13.08836,52.33812,13.761,52.6755`
+
+
+          The following constraints apply:
+
+           * Parameters "at", "in=circle" and "in=bbox" are mutually exclusive. Only one of them is allowed.
+
+            * One of "at", "in=circle" or "in=bbox" is required.
+
+           * The "in=countryCode" parameter must be accompanied by exactly one of "at", "in=circle" or "in=bbox".
+        explode: true
+        in: query
+        name: in
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Maximum number of results to be returned.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          default: 20
+          format: int32
+          maximum: 100
+          minimum: 1
+          type: integer
+        style: form
+      - description: |
+          BETA: Select within a geographic corridor. This is a hard filter. Results will be returned if they are located within the specified area.
+
+          A `route` is defined by a [Flexible Polyline Encoding](https://github.com/heremaps/flexible-polyline),
+           followed by an optional width, represented by a sub-parameter "w".
+
+          Format: `{route};w={width}`
+
+          In regular expression syntax, the values of `route` look like:
+
+          `[a-zA-Z0-9_-]+(;w=\d+)?`
+
+          "[a-zA-Z0-9._-]+" is the encoded flexible polyline.
+
+          "w=\d+" is the optional width. The width is specified in meters from the center of the path. If no width is provided, the default is 1000 meters.
+
+          Type: `{Flexible Polyline Encoding};w={integer}`
+
+          The following constraints apply:
+           * A `route` MUST NOT contain more than 2000 points.
+
+          Examples:
+           * `BFoz5xJ67i1B1B7PzIhaxL7Y`
+           * `BFoz5xJ67i1B1B7PzIhaxL7Y;w=5000`
+           * `BlD05xgKuy2xCCx9B7vUCl0OhnRC54EqSCzpEl-HCxjD3pBCiGnyGCi2CvwFCsgD3nDC4vB6eC;w=2000`
+
+          Note: The last example above can be decoded (using the Python class [here](https://github.com/heremaps/flexible-polyline/tree/master/python) as follows:
+
+          ```
+          >>> import flexpolyline
+          >>> polyline = 'BlD05xgKuy2xCCx9B7vUCl0OhnRC54EqSCzpEl-HCxjD3pBCiGnyGCi2CvwFCsgD3nDC4vB6eC'
+          >>> flexpolyline.decode(polyline)
+          [(52.51994, 13.38663, 1.0), (52.51009, 13.28169, 2.0), (52.43518, 13.19352, 3.0), (52.41073, 13.19645, 4.0), (52.38871, 13.15578, 5.0), (52.37278, 13.1491, 6.0), (52.37375, 13.11546, 7.0), (52.38752, 13.08722, 8.0), (52.40294, 13.07062, 9.0), (52.41058, 13.07555, 10.0)]
+          ```
+        explode: true
+        in: query
+        name: route
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Maximum number of Query Terms Suggestions to be returned.
+        explode: true
+        in: query
+        name: termsLimit
+        required: false
+        schema:
+          format: int32
+          maximum: 10
+          minimum: 0
+          type: integer
+        style: form
+      - description: Select the language to be used for result rendering from a list
+          of [BCP 47](https://en.wikipedia.org/wiki/IETF_language_tag) compliant language
+          codes.
+        explode: false
+        in: query
+        name: lang
+        required: false
+        schema:
+          items:
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Toggle the political view.
+
+          This parameter accepts single ISO 3166-1 alpha-3 country code. The country codes are to be provided in all uppercase.
+
+          Currently the only supported political views are:
+           * RUS expressing the Russian view on Crimea
+           * SRB expressing the Serbian view on Kosovo, Vukovar and Sarengrad Islands
+           * MAR expressing the Moroccan view on Western Sahara
+           * SUR Suriname view on Courantyne Headwaters and Lawa Headwaters
+           * KEN Kenya view on Ilemi Triangle
+           * TZA Tanzania view on Lake Malawi
+           * URY Uruguay view on Rincon de Artigas
+           * EGY Egypt view on Bir Tawil
+           * SDN Sudan view on Halaib Triangle
+           * SYR Syria view on Golan Heights
+           * ARG Argentina view on Southern Patagonian Ice Field and Tierra Del Fuego, including Falkland Islands, South Georgia and South Sandwich Islands
+
+          For any valid 3 letter country code, for which GS7 does not have dedicated political view, it falls back to the default view.
+
+          For not accepted values of the politicalView parameter the GS7 responds with "400" error code.
+        explode: true
+        in: query
+        name: politicalView
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: |-
+          Select additional fields to be rendered in the response.
+          Please note that some of the fields involve additional webservice calls and can increase the overall response time.
+
+          The value is a comma-separated list of the sections to be enabled.
+          For some sections there is a long and a short ID.
+
+          Description of accepted values:
+
+          'phonemes': Renders phonemes for address and place names into the results.
+
+          'streetInfo': For each result item renders additional block with the street name decomposed into its parts like the base name, the street type, etc.
+
+          BETA: 'tz': Renders result items with additional time zone information. Please note that this may impact latency significantly.
+        explode: false
+        in: query
+        name: show
+        required: false
+        schema:
+          items:
+            enum:
+            - phonemes
+            - streetInfo
+            - tz
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Used to correlate requests with their responses within a customer's application, for logging and error reporting.
+
+          Format: Free string, but a valid UUIDv4 is recommended.
+        explode: false
+        in: header
+        name: X-Request-ID
+        required: false
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenSearchAutosuggestResponse'
+          description: The search results.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: request failed validation.'
+        "405":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: http method not supported.'
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: Rate limit exceeded.'
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Temporary server error.
+      summary: Autosuggest
+    servers:
+    - url: https://autosuggest.search.hereapi.com/v1
+  /autocomplete:
+    get:
+      description: 'BETA: This endpoint completes the few entered keystrokes to the
+        valid street address or administrative area to speed-up entering the address
+        queries.'
+      parameters:
+      - description: |
+          Enter a free-text query
+
+          Examples:
+           * `ber`, `berl`, `berli`, ...
+           * `berlin+p`, `berlin+paris`, `berlin+parise`, ...
+           * `berlin+pariser+20`
+
+           _Note: Whitespace, urls, email addresses, or other out-of-scope queries will yield no results._
+        explode: true
+        in: query
+        name: q
+        required: true
+        schema:
+          example: Berlin Pariser 20
+          type: string
+        style: form
+      - description: |
+          Specify the center of the search context expressed as coordinates.
+
+          Format: `{latitude},{longitude}`
+
+          Type: `{decimal},{decimal}`
+
+          Example: `-13.163068,-72.545128` (Machu Picchu Mountain, Peru)
+        explode: true
+        in: query
+        name: at
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: |+
+          Search within a geographic area. This is a hard filter. Results will be returned if they are located within the specified area.
+
+          A geographic area can be
+
+           * a country (or multiple countries), provided as comma-separated [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country codes
+
+             The country codes are to be provided in all uppercase.
+
+             Format: `countryCode:{countryCode}[,{countryCode}]*`
+
+             Examples:
+              * `countryCode:USA`
+              * `countryCode:CAN,MEX,USA`
+
+        explode: true
+        in: query
+        name: in
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Maximum number of results to be returned.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          default: 5
+          format: int32
+          maximum: 20
+          minimum: 1
+          type: integer
+        style: form
+      - description: |-
+          BETA: Limit the result items to the specified types. Currently supported values of the type filter for Autocomplete:
+           * `city` - restricting results to result type `locality` and locality type `city`
+           * `postalCode` - restricting results to result type `locality` and locality type `postalCode`,
+           * `area` - restricting results to result types: `locality` or `administrativeArea` including all the sub-types
+
+          Provide one of the supported values or a comma separated list.
+        explode: false
+        in: query
+        name: types
+        required: false
+        schema:
+          items:
+            enum:
+            - area
+            - city
+            - postalCode
+            type: string
+          type: array
+        style: form
+      - description: |
+          Select the preferred response language for result rendering from a list of BCP47 compliant Language Codes.
+          The autocomplete endpoint tries to detect the query language based on matching name variants and then chooses the same language for the response.
+
+          Therefore the end-user can see and recognize all the entered terms in the same language as in the query.
+          The specified preferred language is used only for not matched address tokens and for matched address tokens in case of ambiguity
+        explode: false
+        in: query
+        name: lang
+        required: false
+        schema:
+          items:
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Toggle the political view.
+
+          This parameter accepts single ISO 3166-1 alpha-3 country code. The country codes are to be provided in all uppercase.
+
+          Currently the only supported political views are:
+           * RUS expressing the Russian view on Crimea
+           * SRB expressing the Serbian view on Kosovo, Vukovar and Sarengrad Islands
+           * MAR expressing the Moroccan view on Western Sahara
+           * SUR Suriname view on Courantyne Headwaters and Lawa Headwaters
+           * KEN Kenya view on Ilemi Triangle
+           * TZA Tanzania view on Lake Malawi
+           * URY Uruguay view on Rincon de Artigas
+           * EGY Egypt view on Bir Tawil
+           * SDN Sudan view on Halaib Triangle
+           * SYR Syria view on Golan Heights
+           * ARG Argentina view on Southern Patagonian Ice Field and Tierra Del Fuego, including Falkland Islands, South Georgia and South Sandwich Islands
+
+          For any valid 3 letter country code, for which GS7 does not have dedicated political view, it falls back to the default view.
+
+          For not accepted values of the politicalView parameter the GS7 responds with "400" error code.
+        explode: true
+        in: query
+        name: politicalView
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: |-
+          Select additional fields to be rendered in the response.
+          Please note that some of the fields involve additional webservice calls and can increase the overall response time.
+
+          The value is a comma-separated list of the sections to be enabled.
+          For some sections there is a long and a short ID.
+
+          Description of accepted values:
+
+          'streetInfo': For each result item renders additional block with the street name decomposed into its parts like the base name, the street type, etc.
+        explode: false
+        in: query
+        name: show
+        required: false
+        schema:
+          items:
+            enum:
+            - streetInfo
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Used to correlate requests with their responses within a customer's application, for logging and error reporting.
+
+          Format: Free string, but a valid UUIDv4 is recommended.
+        explode: false
+        in: header
+        name: X-Request-ID
+        required: false
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenSearchAutocompleteResponse'
+          description: The search results.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: request failed validation.'
+        "405":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: http method not supported.'
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: Rate limit exceeded.'
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Temporary server error.
+      summary: Autocomplete
+    servers:
+    - url: https://autocomplete.search.hereapi.com/v1
+  /browse:
+    get:
+      description: |
+        This endpoint provides search results for places based on different filters, such as categories or name, ranked by distance from a given search center.
+        The only mandatory elements exposed in the response are id and position. The other elements shown in the response samples section are only dataset attributes suggestions.
+      parameters:
+      - description: |
+          Specify the center of the search context expressed as coordinates
+
+          Required parameter for endpoints that are expected to rank results by distance from the explicitly
+           specified search center
+
+          Format: `{latitude},{longitude}`
+
+          Type: `{decimal},{decimal}`
+
+          Example: `-13.163068,-72.545128` (Machu Picchu Mountain, Peru)
+        explode: true
+        in: query
+        name: at
+        required: true
+        schema:
+          example: 52.5308,13.3856
+          type: string
+        style: form
+      - description: |
+          Category filter consisting of a comma-separated list of category-IDs for Categories defined in the HERE Places Category System, described
+          in the Appendix to the HERE Search Developer Guide. Places with any assigned categories that match any of the requested categories are
+          included in the response.
+
+          An exclamation mark "`!`" in front of a category ID causes that category to be excluded from the results.
+          It is possible to mix excluded and included categories in the request - e.g. searching for places that are restaurants but not fast food restaurants.
+          An exclusion will always win over an inclusion.
+        explode: false
+        in: query
+        name: categories
+        required: false
+        schema:
+          items:
+            type: string
+          type: array
+        style: form
+      - description: |
+          Chain filter consisting of a comma-separated list of chain-IDs for Chains defined in the HERE Places Chain System, described
+          in the Appendix to the HERE Search Developer Guide. Places with any assigned chains that match any of the requested chains are
+          included in the response.
+
+          An exclamation mark "`!`" in front of a chain ID causes that chain to be excluded from the results.
+          It is possible to mix excluded and included chains in the request - e.g. searching for places that are amazon but not wholefoods.
+          An exclusion will always win over an inclusion.
+        explode: false
+        in: query
+        name: chains
+        required: false
+        schema:
+          items:
+            type: string
+          type: array
+        style: form
+      - description: |
+          FoodType filter consisting of a comma-separated list of cuisine-IDs for FoodTypes defined in the HERE Places Cuisine System, described
+          in the Appendix to the HERE Search Developer Guide. Places with any assigned foodTypes that match any of the requested foodTypes are
+          included in the response.
+
+          An exclamation mark "`!`" in front of a cuisine ID causes that foodType to be excluded from the results.
+          It is possible to mix excluded and included foodTypes in the request - e.g. searching for places that serve italian but not chinese.
+          An exclusion will always win over an inclusion.
+        explode: false
+        in: query
+        name: foodTypes
+        required: false
+        schema:
+          items:
+            type: string
+          type: array
+        style: form
+      - description: |
+          Search within a geographic area. This is a hard filter. Results will be returned if they are located within the specified area.
+
+          A geographic area can be
+
+           * a country (or multiple countries), provided as comma-separated [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country codes
+
+             The country codes are to be provided in all uppercase.
+
+             Format: `countryCode:{countryCode}[,{countryCode}]*`
+
+             Examples:
+              * `countryCode:USA`
+              * `countryCode:CAN,MEX,USA`
+
+
+           * a circular area, provided as latitude, longitude, and radius (in meters)
+
+             Format: `circle:{latitude},{longitude};r={radius}`
+
+             Type: `circle:{decimal},{decimal};r={integer}`
+
+             Example: `circle:52.53,13.38;r=10000`
+
+
+           * a bounding box, provided as _west longitude_, _south latitude_, _east longitude_, _north latitude_
+
+             Format: `bbox:{west longitude},{south latitude},{east longitude},{north latitude}`
+
+             Example: `bbox:13.08836,52.33812,13.761,52.6755`
+
+
+          The following constraints apply:
+
+           * Parameters "in=circle" and "in=bbox" are mutually exclusive. Only one of them is allowed.
+        explode: true
+        in: query
+        name: in
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Maximum number of results to be returned.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          default: 20
+          format: int32
+          maximum: 100
+          minimum: 1
+          type: integer
+        style: form
+      - description: Full-text filter on POI names/titles. Results with a partial
+          match on the name parameter are included in the response.
+        explode: true
+        in: query
+        name: name
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: |
+          BETA: Select within a geographic corridor. This is a hard filter. Results will be returned if they are located within the specified area.
+
+          A `route` is defined by a [Flexible Polyline Encoding](https://github.com/heremaps/flexible-polyline),
+           followed by an optional width, represented by a sub-parameter "w".
+
+          Format: `{route};w={width}`
+
+          In regular expression syntax, the values of `route` look like:
+
+          `[a-zA-Z0-9_-]+(;w=\d+)?`
+
+          "[a-zA-Z0-9._-]+" is the encoded flexible polyline.
+
+          "w=\d+" is the optional width. The width is specified in meters from the center of the path. If no width is provided, the default is 1000 meters.
+
+          Type: `{Flexible Polyline Encoding};w={integer}`
+
+          The following constraints apply:
+           * A `route` MUST NOT contain more than 2000 points.
+
+          Examples:
+           * `BFoz5xJ67i1B1B7PzIhaxL7Y`
+           * `BFoz5xJ67i1B1B7PzIhaxL7Y;w=5000`
+           * `BlD05xgKuy2xCCx9B7vUCl0OhnRC54EqSCzpEl-HCxjD3pBCiGnyGCi2CvwFCsgD3nDC4vB6eC;w=2000`
+
+          Note: The last example above can be decoded (using the Python class [here](https://github.com/heremaps/flexible-polyline/tree/master/python) as follows:
+
+          ```
+          >>> import flexpolyline
+          >>> polyline = 'BlD05xgKuy2xCCx9B7vUCl0OhnRC54EqSCzpEl-HCxjD3pBCiGnyGCi2CvwFCsgD3nDC4vB6eC'
+          >>> flexpolyline.decode(polyline)
+          [(52.51994, 13.38663, 1.0), (52.51009, 13.28169, 2.0), (52.43518, 13.19352, 3.0), (52.41073, 13.19645, 4.0), (52.38871, 13.15578, 5.0), (52.37278, 13.1491, 6.0), (52.37375, 13.11546, 7.0), (52.38752, 13.08722, 8.0), (52.40294, 13.07062, 9.0), (52.41058, 13.07555, 10.0)]
+          ```
+        explode: true
+        in: query
+        name: route
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Select the language to be used for result rendering from a list
+          of [BCP 47](https://en.wikipedia.org/wiki/IETF_language_tag) compliant language
+          codes.
+        explode: false
+        in: query
+        name: lang
+        required: false
+        schema:
+          items:
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Toggle the political view.
+
+          This parameter accepts single ISO 3166-1 alpha-3 country code. The country codes are to be provided in all uppercase.
+
+          Currently the only supported political views are:
+           * RUS expressing the Russian view on Crimea
+           * SRB expressing the Serbian view on Kosovo, Vukovar and Sarengrad Islands
+           * MAR expressing the Moroccan view on Western Sahara
+           * SUR Suriname view on Courantyne Headwaters and Lawa Headwaters
+           * KEN Kenya view on Ilemi Triangle
+           * TZA Tanzania view on Lake Malawi
+           * URY Uruguay view on Rincon de Artigas
+           * EGY Egypt view on Bir Tawil
+           * SDN Sudan view on Halaib Triangle
+           * SYR Syria view on Golan Heights
+           * ARG Argentina view on Southern Patagonian Ice Field and Tierra Del Fuego, including Falkland Islands, South Georgia and South Sandwich Islands
+
+          For any valid 3 letter country code, for which GS7 does not have dedicated political view, it falls back to the default view.
+
+          For not accepted values of the politicalView parameter the GS7 responds with "400" error code.
+        explode: true
+        in: query
+        name: politicalView
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: |-
+          Select additional fields to be rendered in the response.
+          Please note that some of the fields involve additional webservice calls and can increase the overall response time.
+
+          The value is a comma-separated list of the sections to be enabled.
+          For some sections there is a long and a short ID.
+
+          Description of accepted values:
+
+          'phonemes': Renders phonemes for address and place names into the results.
+
+          'streetInfo': For each result item renders additional block with the street name decomposed into its parts like the base name, the street type, etc.
+
+          BETA: 'tz': Renders result items with additional time zone information. Please note that this may impact latency significantly.
+        explode: false
+        in: query
+        name: show
+        required: false
+        schema:
+          items:
+            enum:
+            - phonemes
+            - streetInfo
+            - tz
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Used to correlate requests with their responses within a customer's application, for logging and error reporting.
+
+          Format: Free string, but a valid UUIDv4 is recommended.
+        explode: false
+        in: header
+        name: X-Request-ID
+        required: false
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenSearchBrowseResponse'
+          description: The search results.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: request failed validation.'
+        "405":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: http method not supported.'
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: Rate limit exceeded.'
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Temporary server error.
+      summary: Browse
+    servers:
+    - url: https://browse.search.hereapi.com/v1
+  /revgeocode:
+    get:
+      description: This endpoint returns the nearest address to geo coordinates specified
+        in the request.
+      parameters:
+      - description: |
+          Specify the center of the search context expressed as coordinates.
+
+          Format: `{latitude},{longitude}`
+
+          Type: `{decimal},{decimal}`
+
+          Example: `-13.163068,-72.545128` (Machu Picchu Mountain, Peru)
+
+          The following constraints apply:
+
+           * Either "at" or "in=circle" is required.
+
+           * Parameters "at" and "in=circle" are mutually exclusive. Only one of them is allowed.
+        explode: true
+        in: query
+        name: at
+        required: false
+        schema:
+          example: 52.5308,13.3856
+          type: string
+        style: form
+      - description: |
+          Search within a geographic area. This is a hard filter. Results will be returned if they are located within the specified area.
+
+          A geographic area can be
+
+           * a circular area, provided as latitude, longitude, and radius (in meters)
+
+             Format: `circle:{latitude},{longitude};r={radius}`
+
+             Type: `circle:{decimal},{decimal};r={integer}`
+
+             Example: `circle:52.53,13.38;r=10000`
+
+
+          The following constraints apply:
+
+           * Either "at" or "in=circle" is required.
+        explode: true
+        in: query
+        name: in
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: Maximum number of results to be returned.
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          default: 1
+          format: int32
+          maximum: 100
+          minimum: 1
+          type: integer
+        style: form
+      - description: Select the language to be used for result rendering from a list
+          of [BCP 47](https://en.wikipedia.org/wiki/IETF_language_tag) compliant language
+          codes.
+        explode: false
+        in: query
+        name: lang
+        required: false
+        schema:
+          items:
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Toggle the political view.
+
+          This parameter accepts single ISO 3166-1 alpha-3 country code. The country codes are to be provided in all uppercase.
+
+          Currently the only supported political views are:
+           * RUS expressing the Russian view on Crimea
+           * SRB expressing the Serbian view on Kosovo, Vukovar and Sarengrad Islands
+           * MAR expressing the Moroccan view on Western Sahara
+           * SUR Suriname view on Courantyne Headwaters and Lawa Headwaters
+           * KEN Kenya view on Ilemi Triangle
+           * TZA Tanzania view on Lake Malawi
+           * URY Uruguay view on Rincon de Artigas
+           * EGY Egypt view on Bir Tawil
+           * SDN Sudan view on Halaib Triangle
+           * SYR Syria view on Golan Heights
+           * ARG Argentina view on Southern Patagonian Ice Field and Tierra Del Fuego, including Falkland Islands, South Georgia and South Sandwich Islands
+
+          For any valid 3 letter country code, for which GS7 does not have dedicated political view, it falls back to the default view.
+
+          For not accepted values of the politicalView parameter the GS7 responds with "400" error code.
+        explode: true
+        in: query
+        name: politicalView
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: |-
+          Select additional fields to be rendered in the response.
+          Please note that some of the fields involve additional webservice calls and can increase the overall response time.
+
+          The value is a comma-separated list of the sections to be enabled.
+          For some sections there is a long and a short ID.
+
+          Description of accepted values:
+
+          'countryInfo': For each result item renders additional block with the country info, such as [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) and [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country code.
+
+          'streetInfo': For each result item renders additional block with the street name decomposed into its parts like the base name, the street type, etc.
+
+          BETA: 'tz': Renders result items with additional time zone information. Please note that this may impact latency significantly.
+        explode: false
+        in: query
+        name: show
+        required: false
+        schema:
+          items:
+            enum:
+            - countryInfo
+            - streetInfo
+            - tz
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Used to correlate requests with their responses within a customer's application, for logging and error reporting.
+
+          Format: Free string, but a valid UUIDv4 is recommended.
+        explode: false
+        in: header
+        name: X-Request-ID
+        required: false
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenSearchReverseGeocodeResponse'
+          description: The search results.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: request failed validation.'
+        "405":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: http method not supported.'
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: Rate limit exceeded.'
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Temporary server error.
+      summary: Reverse Geocode
+    servers:
+    - url: https://revgeocode.search.hereapi.com/v1
+  /lookup:
+    get:
+      description: This endpoint looks up a known place by the HERE ID included in
+        the request.
+      parameters:
+      - description: Location ID, which is the ID of a result item eg. of a Discover
+          request
+        explode: true
+        in: query
+        name: id
+        required: true
+        schema:
+          example: here:pds:place:276u33db-8097f3194e4b411081b761ea9a366776
+          type: string
+        style: form
+      - description: Select the language to be used for result rendering from a list
+          of [BCP 47](https://en.wikipedia.org/wiki/IETF_language_tag) compliant language
+          codes.
+        explode: false
+        in: query
+        name: lang
+        required: false
+        schema:
+          items:
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Toggle the political view.
+
+          This parameter accepts single ISO 3166-1 alpha-3 country code. The country codes are to be provided in all uppercase.
+
+          Currently the only supported political views are:
+           * RUS expressing the Russian view on Crimea
+           * SRB expressing the Serbian view on Kosovo, Vukovar and Sarengrad Islands
+           * MAR expressing the Moroccan view on Western Sahara
+           * SUR Suriname view on Courantyne Headwaters and Lawa Headwaters
+           * KEN Kenya view on Ilemi Triangle
+           * TZA Tanzania view on Lake Malawi
+           * URY Uruguay view on Rincon de Artigas
+           * EGY Egypt view on Bir Tawil
+           * SDN Sudan view on Halaib Triangle
+           * SYR Syria view on Golan Heights
+           * ARG Argentina view on Southern Patagonian Ice Field and Tierra Del Fuego, including Falkland Islands, South Georgia and South Sandwich Islands
+
+          For any valid 3 letter country code, for which GS7 does not have dedicated political view, it falls back to the default view.
+
+          For not accepted values of the politicalView parameter the GS7 responds with "400" error code.
+        explode: true
+        in: query
+        name: politicalView
+        required: false
+        schema:
+          type: string
+        style: form
+      - description: |-
+          Select additional fields to be rendered in the response.
+          Please note that some of the fields involve additional webservice calls and can increase the overall response time.
+
+          The value is a comma-separated list of the sections to be enabled.
+          For some sections there is a long and a short ID.
+
+          Description of accepted values:
+
+          'countryInfo': For each result item renders additional block with the country info, such as [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) and [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country code.
+
+          'phonemes': Renders phonemes for address and place names into the results.
+
+          'streetInfo': For each result item renders additional block with the street name decomposed into its parts like the base name, the street type, etc.
+
+          BETA: 'tz': Renders result items with additional time zone information. Please note that this may impact latency significantly.
+        explode: false
+        in: query
+        name: show
+        required: false
+        schema:
+          items:
+            enum:
+            - countryInfo
+            - phonemes
+            - streetInfo
+            - tz
+            type: string
+          type: array
+        style: form
+      - description: |-
+          Used to correlate requests with their responses within a customer's application, for logging and error reporting.
+
+          Format: Free string, but a valid UUIDv4 is recommended.
+        explode: false
+        in: header
+        name: X-Request-ID
+        required: false
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LookupResponse'
+          description: The search results.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: request failed validation.'
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Requested id could not be found.
+        "405":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: http method not supported.'
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Client error: Rate limit exceeded.'
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Temporary server error.
+      summary: Lookup By ID
+    servers:
+    - url: https://lookup.search.hereapi.com/v1
+components:
+  parameters:
+    atBrowse:
+      description: |
+        Specify the center of the search context expressed as coordinates
+
+        Required parameter for endpoints that are expected to rank results by distance from the explicitly
+         specified search center
+
+        Format: `{latitude},{longitude}`
+
+        Type: `{decimal},{decimal}`
+
+        Example: `-13.163068,-72.545128` (Machu Picchu Mountain, Peru)
+      explode: true
+      in: query
+      name: at
+      required: true
+      schema:
+        example: 52.5308,13.3856
+        type: string
+      style: form
+    id:
+      description: Location ID, which is the ID of a result item eg. of a Discover
+        request
+      explode: true
+      in: query
+      name: id
+      required: true
+      schema:
+        example: here:pds:place:276u33db-8097f3194e4b411081b761ea9a366776
+        type: string
+      style: form
+    qAutocomplete:
+      description: |
+        Enter a free-text query
+
+        Examples:
+         * `ber`, `berl`, `berli`, ...
+         * `berlin+p`, `berlin+paris`, `berlin+parise`, ...
+         * `berlin+pariser+20`
+
+         _Note: Whitespace, urls, email addresses, or other out-of-scope queries will yield no results._
+      explode: true
+      in: query
+      name: q
+      required: true
+      schema:
+        example: Berlin Pariser 20
+        type: string
+      style: form
+    qAutosuggest:
+      description: |
+        Enter a free-text query
+
+        Examples:
+         * `res`, `rest`, `resta`, `restau`, ...
+         * `berlin+bran`, `berlin+brand`, `berlin+branden`, ...
+         * `New+Yok+Giants`
+
+         _Note: Whitespace, urls, email addresses, or other out-of-scope queries will yield no results.
+      explode: true
+      in: query
+      name: q
+      required: true
+      schema:
+        example: Eismieze Berlin
+        type: string
+      style: form
+    qDiscover:
+      description: |
+        Enter a free-text query
+
+        Examples:
+         * `125, Berliner, berlin`
+         * `Beacon, Boston, Hospital`
+         * `Schnurrbart German Pub and Restaurant, Hong Kong`
+
+         _Note: Whitespace, urls, email addresses, or other out-of-scope queries will yield no results.
+      explode: true
+      in: query
+      name: q
+      required: true
+      schema:
+        example: Eismieze Berlin
+        type: string
+      style: form
+    atAutocompleteGeocode:
+      description: |
+        Specify the center of the search context expressed as coordinates.
+
+        Format: `{latitude},{longitude}`
+
+        Type: `{decimal},{decimal}`
+
+        Example: `-13.163068,-72.545128` (Machu Picchu Mountain, Peru)
+      explode: true
+      in: query
+      name: at
+      required: false
+      schema:
+        type: string
+      style: form
+    atAutosuggestDiscover:
+      description: |
+        Specify the center of the search context expressed as coordinates
+
+        Format: `{latitude},{longitude}`
+
+        Type: `{decimal},{decimal}`
+
+        Example: `-13.163068,-72.545128` (Machu Picchu Mountain, Peru)
+
+        The following constraints apply:
+
+         * One of "at", "in=circle" or "in=bbox" is required.
+
+         * Parameters "at", "in=circle" and "in=bbox" are mutually exclusive. Only one of them is allowed.
+      explode: true
+      in: query
+      name: at
+      required: false
+      schema:
+        example: 52.5308,13.3856
+        type: string
+      style: form
+    atRevgeocode:
+      description: |
+        Specify the center of the search context expressed as coordinates.
+
+        Format: `{latitude},{longitude}`
+
+        Type: `{decimal},{decimal}`
+
+        Example: `-13.163068,-72.545128` (Machu Picchu Mountain, Peru)
+
+        The following constraints apply:
+
+         * Either "at" or "in=circle" is required.
+
+         * Parameters "at" and "in=circle" are mutually exclusive. Only one of them is allowed.
+      explode: true
+      in: query
+      name: at
+      required: false
+      schema:
+        example: 52.5308,13.3856
+        type: string
+      style: form
+    categories:
+      description: |
+        Category filter consisting of a comma-separated list of category-IDs for Categories defined in the HERE Places Category System, described
+        in the Appendix to the HERE Search Developer Guide. Places with any assigned categories that match any of the requested categories are
+        included in the response.
+
+        An exclamation mark "`!`" in front of a category ID causes that category to be excluded from the results.
+        It is possible to mix excluded and included categories in the request - e.g. searching for places that are restaurants but not fast food restaurants.
+        An exclusion will always win over an inclusion.
+      explode: false
+      in: query
+      name: categories
+      required: false
+      schema:
+        items:
+          type: string
+        type: array
+      style: form
+    chains:
+      description: |
+        Chain filter consisting of a comma-separated list of chain-IDs for Chains defined in the HERE Places Chain System, described
+        in the Appendix to the HERE Search Developer Guide. Places with any assigned chains that match any of the requested chains are
+        included in the response.
+
+        An exclamation mark "`!`" in front of a chain ID causes that chain to be excluded from the results.
+        It is possible to mix excluded and included chains in the request - e.g. searching for places that are amazon but not wholefoods.
+        An exclusion will always win over an inclusion.
+      explode: false
+      in: query
+      name: chains
+      required: false
+      schema:
+        items:
+          type: string
+        type: array
+      style: form
+    foodTypes:
+      description: |
+        FoodType filter consisting of a comma-separated list of cuisine-IDs for FoodTypes defined in the HERE Places Cuisine System, described
+        in the Appendix to the HERE Search Developer Guide. Places with any assigned foodTypes that match any of the requested foodTypes are
+        included in the response.
+
+        An exclamation mark "`!`" in front of a cuisine ID causes that foodType to be excluded from the results.
+        It is possible to mix excluded and included foodTypes in the request - e.g. searching for places that serve italian but not chinese.
+        An exclusion will always win over an inclusion.
+      explode: false
+      in: query
+      name: foodTypes
+      required: false
+      schema:
+        items:
+          type: string
+        type: array
+      style: form
+    inAutocompleteGeocode:
+      description: |+
+        Search within a geographic area. This is a hard filter. Results will be returned if they are located within the specified area.
+
+        A geographic area can be
+
+         * a country (or multiple countries), provided as comma-separated [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country codes
+
+           The country codes are to be provided in all uppercase.
+
+           Format: `countryCode:{countryCode}[,{countryCode}]*`
+
+           Examples:
+            * `countryCode:USA`
+            * `countryCode:CAN,MEX,USA`
+
+      explode: true
+      in: query
+      name: in
+      required: false
+      schema:
+        type: string
+      style: form
+    inAutosuggestDiscover:
+      description: |
+        Search within a geographic area. This is a hard filter. Results will be returned if they are located within the specified area.
+
+        A geographic area can be
+
+         * a country (or multiple countries), provided as comma-separated [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country codes
+
+           The country codes are to be provided in all uppercase.
+
+           Format: `countryCode:{countryCode}[,{countryCode}]*`
+
+           Examples:
+            * `countryCode:USA`
+            * `countryCode:CAN,MEX,USA`
+
+
+         * a circular area, provided as latitude, longitude, and radius (in meters)
+
+           Format: `circle:{latitude},{longitude};r={radius}`
+
+           Type: `circle:{decimal},{decimal};r={integer}`
+
+           Example: `circle:52.53,13.38;r=10000`
+
+
+         * a bounding box, provided as _west longitude_, _south latitude_, _east longitude_, _north latitude_
+
+           Format: `bbox:{west longitude},{south latitude},{east longitude},{north latitude}`
+
+           Example: `bbox:13.08836,52.33812,13.761,52.6755`
+
+
+        The following constraints apply:
+
+         * Parameters "at", "in=circle" and "in=bbox" are mutually exclusive. Only one of them is allowed.
+
+          * One of "at", "in=circle" or "in=bbox" is required.
+
+         * The "in=countryCode" parameter must be accompanied by exactly one of "at", "in=circle" or "in=bbox".
+      explode: true
+      in: query
+      name: in
+      required: false
+      schema:
+        type: string
+      style: form
+    inBrowse:
+      description: |
+        Search within a geographic area. This is a hard filter. Results will be returned if they are located within the specified area.
+
+        A geographic area can be
+
+         * a country (or multiple countries), provided as comma-separated [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country codes
+
+           The country codes are to be provided in all uppercase.
+
+           Format: `countryCode:{countryCode}[,{countryCode}]*`
+
+           Examples:
+            * `countryCode:USA`
+            * `countryCode:CAN,MEX,USA`
+
+
+         * a circular area, provided as latitude, longitude, and radius (in meters)
+
+           Format: `circle:{latitude},{longitude};r={radius}`
+
+           Type: `circle:{decimal},{decimal};r={integer}`
+
+           Example: `circle:52.53,13.38;r=10000`
+
+
+         * a bounding box, provided as _west longitude_, _south latitude_, _east longitude_, _north latitude_
+
+           Format: `bbox:{west longitude},{south latitude},{east longitude},{north latitude}`
+
+           Example: `bbox:13.08836,52.33812,13.761,52.6755`
+
+
+        The following constraints apply:
+
+         * Parameters "in=circle" and "in=bbox" are mutually exclusive. Only one of them is allowed.
+      explode: true
+      in: query
+      name: in
+      required: false
+      schema:
+        type: string
+      style: form
+    inRevgeocode:
+      description: |
+        Search within a geographic area. This is a hard filter. Results will be returned if they are located within the specified area.
+
+        A geographic area can be
+
+         * a circular area, provided as latitude, longitude, and radius (in meters)
+
+           Format: `circle:{latitude},{longitude};r={radius}`
+
+           Type: `circle:{decimal},{decimal};r={integer}`
+
+           Example: `circle:52.53,13.38;r=10000`
+
+
+        The following constraints apply:
+
+         * Either "at" or "in=circle" is required.
+      explode: true
+      in: query
+      name: in
+      required: false
+      schema:
+        type: string
+      style: form
+    limitAutocomplete:
+      description: Maximum number of results to be returned.
+      explode: true
+      in: query
+      name: limit
+      required: false
+      schema:
+        default: 5
+        format: int32
+        maximum: 20
+        minimum: 1
+        type: integer
+      style: form
+    limitAutosuggestBrowseDiscoverGeocode:
+      description: Maximum number of results to be returned.
+      explode: true
+      in: query
+      name: limit
+      required: false
+      schema:
+        default: 20
+        format: int32
+        maximum: 100
+        minimum: 1
+        type: integer
+      style: form
+    limitRevgeocode:
+      description: Maximum number of results to be returned.
+      explode: true
+      in: query
+      name: limit
+      required: false
+      schema:
+        default: 1
+        format: int32
+        maximum: 100
+        minimum: 1
+        type: integer
+      style: form
+    name:
+      description: Full-text filter on POI names/titles. Results with a partial match
+        on the name parameter are included in the response.
+      explode: true
+      in: query
+      name: name
+      required: false
+      schema:
+        type: string
+      style: form
+    qGeocode:
+      description: |
+        Enter a free-text query
+
+        Examples:
+         * `125, Berliner, berlin`
+         * `Beacon, Boston, Hospital`
+         * `Schnurrbart German Pub and Restaurant, Hong Kong`
+
+        _Note: Either `q` or `qq`-parameter is required on this endpoint. Both parameters can be provided in the same request._
+      explode: true
+      in: query
+      name: q
+      required: false
+      schema:
+        example: Invalidenstraße 116 Berlin
+        type: string
+      style: form
+    qq:
+      description: |
+        Enter a qualified query. A qualified query is similar to a free-text query, but in a structured manner.
+         It can take multiple _sub-parameters_, separated by semicolon, allowing to specify different aspects of a query.
+
+        Currently supported _sub-parameters_ are `country`, `state`, `county`, `city`, `district`, `street`,
+         `houseNumber`, and `postalCode`.
+
+        Format: `{sub-parameter}={string}[;{sub-parameter}={string}]*`
+
+        Examples:
+         * `city=Berlin;country=Germany;street=Friedrichstr;houseNumber=20`
+         * `city=Berlin;country=Germany`
+         * `postalCode=10969`
+
+        _Note: Either `q` or `qq`-parameter is required on this endpoint. Both parameters can be provided in the same request._
+      explode: true
+      in: query
+      name: qq
+      required: false
+      schema:
+        type: string
+      style: form
+    route:
+      description: |
+        BETA: Select within a geographic corridor. This is a hard filter. Results will be returned if they are located within the specified area.
+
+        A `route` is defined by a [Flexible Polyline Encoding](https://github.com/heremaps/flexible-polyline),
+         followed by an optional width, represented by a sub-parameter "w".
+
+        Format: `{route};w={width}`
+
+        In regular expression syntax, the values of `route` look like:
+
+        `[a-zA-Z0-9_-]+(;w=\d+)?`
+
+        "[a-zA-Z0-9._-]+" is the encoded flexible polyline.
+
+        "w=\d+" is the optional width. The width is specified in meters from the center of the path. If no width is provided, the default is 1000 meters.
+
+        Type: `{Flexible Polyline Encoding};w={integer}`
+
+        The following constraints apply:
+         * A `route` MUST NOT contain more than 2000 points.
+
+        Examples:
+         * `BFoz5xJ67i1B1B7PzIhaxL7Y`
+         * `BFoz5xJ67i1B1B7PzIhaxL7Y;w=5000`
+         * `BlD05xgKuy2xCCx9B7vUCl0OhnRC54EqSCzpEl-HCxjD3pBCiGnyGCi2CvwFCsgD3nDC4vB6eC;w=2000`
+
+        Note: The last example above can be decoded (using the Python class [here](https://github.com/heremaps/flexible-polyline/tree/master/python) as follows:
+
+        ```
+        >>> import flexpolyline
+        >>> polyline = 'BlD05xgKuy2xCCx9B7vUCl0OhnRC54EqSCzpEl-HCxjD3pBCiGnyGCi2CvwFCsgD3nDC4vB6eC'
+        >>> flexpolyline.decode(polyline)
+        [(52.51994, 13.38663, 1.0), (52.51009, 13.28169, 2.0), (52.43518, 13.19352, 3.0), (52.41073, 13.19645, 4.0), (52.38871, 13.15578, 5.0), (52.37278, 13.1491, 6.0), (52.37375, 13.11546, 7.0), (52.38752, 13.08722, 8.0), (52.40294, 13.07062, 9.0), (52.41058, 13.07555, 10.0)]
+        ```
+      explode: true
+      in: query
+      name: route
+      required: false
+      schema:
+        type: string
+      style: form
+    termsLimit:
+      description: Maximum number of Query Terms Suggestions to be returned.
+      explode: true
+      in: query
+      name: termsLimit
+      required: false
+      schema:
+        format: int32
+        maximum: 10
+        minimum: 0
+        type: integer
+      style: form
+    types:
+      description: |-
+        BETA: Limit the result items to the specified types. Currently supported values of the type filter for Autocomplete:
+         * `city` - restricting results to result type `locality` and locality type `city`
+         * `postalCode` - restricting results to result type `locality` and locality type `postalCode`,
+         * `area` - restricting results to result types: `locality` or `administrativeArea` including all the sub-types
+
+        Provide one of the supported values or a comma separated list.
+      explode: false
+      in: query
+      name: types
+      required: false
+      schema:
+        items:
+          enum:
+          - area
+          - city
+          - postalCode
+          type: string
+        type: array
+      style: form
+    langAutocomplete:
+      description: |
+        Select the preferred response language for result rendering from a list of BCP47 compliant Language Codes.
+        The autocomplete endpoint tries to detect the query language based on matching name variants and then chooses the same language for the response.
+
+        Therefore the end-user can see and recognize all the entered terms in the same language as in the query.
+        The specified preferred language is used only for not matched address tokens and for matched address tokens in case of ambiguity
+      explode: false
+      in: query
+      name: lang
+      required: false
+      schema:
+        items:
+          type: string
+        type: array
+      style: form
+    langAutosuggestBrowseDiscoverGeocodeLookupRevgeocode:
+      description: Select the language to be used for result rendering from a list
+        of [BCP 47](https://en.wikipedia.org/wiki/IETF_language_tag) compliant language
+        codes.
+      explode: false
+      in: query
+      name: lang
+      required: false
+      schema:
+        items:
+          type: string
+        type: array
+      style: form
+    politicalView:
+      description: |-
+        Toggle the political view.
+
+        This parameter accepts single ISO 3166-1 alpha-3 country code. The country codes are to be provided in all uppercase.
+
+        Currently the only supported political views are:
+         * RUS expressing the Russian view on Crimea
+         * SRB expressing the Serbian view on Kosovo, Vukovar and Sarengrad Islands
+         * MAR expressing the Moroccan view on Western Sahara
+         * SUR Suriname view on Courantyne Headwaters and Lawa Headwaters
+         * KEN Kenya view on Ilemi Triangle
+         * TZA Tanzania view on Lake Malawi
+         * URY Uruguay view on Rincon de Artigas
+         * EGY Egypt view on Bir Tawil
+         * SDN Sudan view on Halaib Triangle
+         * SYR Syria view on Golan Heights
+         * ARG Argentina view on Southern Patagonian Ice Field and Tierra Del Fuego, including Falkland Islands, South Georgia and South Sandwich Islands
+
+        For any valid 3 letter country code, for which GS7 does not have dedicated political view, it falls back to the default view.
+
+        For not accepted values of the politicalView parameter the GS7 responds with "400" error code.
+      explode: true
+      in: query
+      name: politicalView
+      required: false
+      schema:
+        type: string
+      style: form
+    showAutocomplete:
+      description: |-
+        Select additional fields to be rendered in the response.
+        Please note that some of the fields involve additional webservice calls and can increase the overall response time.
+
+        The value is a comma-separated list of the sections to be enabled.
+        For some sections there is a long and a short ID.
+
+        Description of accepted values:
+
+        'streetInfo': For each result item renders additional block with the street name decomposed into its parts like the base name, the street type, etc.
+      explode: false
+      in: query
+      name: show
+      required: false
+      schema:
+        items:
+          enum:
+          - streetInfo
+          type: string
+        type: array
+      style: form
+    showAutosuggestBrowseDiscover:
+      description: |-
+        Select additional fields to be rendered in the response.
+        Please note that some of the fields involve additional webservice calls and can increase the overall response time.
+
+        The value is a comma-separated list of the sections to be enabled.
+        For some sections there is a long and a short ID.
+
+        Description of accepted values:
+
+        'phonemes': Renders phonemes for address and place names into the results.
+
+        'streetInfo': For each result item renders additional block with the street name decomposed into its parts like the base name, the street type, etc.
+
+        BETA: 'tz': Renders result items with additional time zone information. Please note that this may impact latency significantly.
+      explode: false
+      in: query
+      name: show
+      required: false
+      schema:
+        items:
+          enum:
+          - phonemes
+          - streetInfo
+          - tz
+          type: string
+        type: array
+      style: form
+    showGeocode:
+      description: |-
+        Select additional fields to be rendered in the response.
+        Please note that some of the fields involve additional webservice calls and can increase the overall response time.
+
+        The value is a comma-separated list of the sections to be enabled.
+        For some sections there is a long and a short ID.
+
+        Description of accepted values:
+
+        'countryInfo': For each result item renders additional block with the country info, such as [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) and [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country code.
+
+        'streetInfo': For each result item renders additional block with the street name decomposed into its parts like the base name, the street type, etc.
+
+        BETA: 'parsing'
+
+        BETA: 'tz': Renders result items with additional time zone information. Please note that this may impact latency significantly.
+      explode: false
+      in: query
+      name: show
+      required: false
+      schema:
+        items:
+          enum:
+          - countryInfo
+          - streetInfo
+          - parsing
+          - tz
+          type: string
+        type: array
+      style: form
+    showLookup:
+      description: |-
+        Select additional fields to be rendered in the response.
+        Please note that some of the fields involve additional webservice calls and can increase the overall response time.
+
+        The value is a comma-separated list of the sections to be enabled.
+        For some sections there is a long and a short ID.
+
+        Description of accepted values:
+
+        'countryInfo': For each result item renders additional block with the country info, such as [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) and [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country code.
+
+        'phonemes': Renders phonemes for address and place names into the results.
+
+        'streetInfo': For each result item renders additional block with the street name decomposed into its parts like the base name, the street type, etc.
+
+        BETA: 'tz': Renders result items with additional time zone information. Please note that this may impact latency significantly.
+      explode: false
+      in: query
+      name: show
+      required: false
+      schema:
+        items:
+          enum:
+          - countryInfo
+          - phonemes
+          - streetInfo
+          - tz
+          type: string
+        type: array
+      style: form
+    showRevgeocode:
+      description: |-
+        Select additional fields to be rendered in the response.
+        Please note that some of the fields involve additional webservice calls and can increase the overall response time.
+
+        The value is a comma-separated list of the sections to be enabled.
+        For some sections there is a long and a short ID.
+
+        Description of accepted values:
+
+        'countryInfo': For each result item renders additional block with the country info, such as [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) and [ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3) country code.
+
+        'streetInfo': For each result item renders additional block with the street name decomposed into its parts like the base name, the street type, etc.
+
+        BETA: 'tz': Renders result items with additional time zone information. Please note that this may impact latency significantly.
+      explode: false
+      in: query
+      name: show
+      required: false
+      schema:
+        items:
+          enum:
+          - countryInfo
+          - streetInfo
+          - tz
+          type: string
+        type: array
+      style: form
+    X-Request-ID:
+      description: |-
+        Used to correlate requests with their responses within a customer's application, for logging and error reporting.
+
+        Format: Free string, but a valid UUIDv4 is recommended.
+      explode: false
+      in: header
+      name: X-Request-ID
+      required: false
+      schema:
+        type: string
+      style: simple
+  schemas:
+    OpenSearchGeocodeResponse:
+      example:
+        items:
+        - ""
+        - ""
+      properties:
+        items:
+          description: The results are presented as a JSON list of candidates in ranked
+            order (most-likely to least-likely) based on the matched location criteria.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/GeocodeResultItem'
+          type: array
+      required:
+      - items
+      type: object
+    GeocodeResultItem:
+      properties:
+        title:
+          description: The localized display name of this result item.
+          type: string
+        id:
+          description: The unique identifier for the result item. This ID can be used
+            for a Look Up by ID search as well.
+          type: string
+        politicalView:
+          description: ISO3 country code of the item political view (default for international).
+            This response element is populated when the politicalView parameter is
+            set in the query
+          type: string
+        resultType:
+          description: 'WARNING: The resultType values ''intersection'' and ''postalCodePoint''
+            are in BETA state'
+          enum:
+          - administrativeArea
+          - locality
+          - street
+          - intersection
+          - addressBlock
+          - houseNumber
+          - postalCodePoint
+          - place
+          type: string
+        houseNumberType:
+          description: |-
+            * PA - a Point Address represents an individual address as a point object. Point Addresses are coming from trusted sources.
+              We can say with high certainty that the address exists and at what position. A Point Address result contains two types of coordinates.
+              One is the access point (or navigation coordinates), which is the point to start or end a drive. The other point is the position or display point.
+              This point varies per source and country. The point can be the rooftop point, a point close to the building entry, or a point close to the building,
+              driveway or parking lot that belongs to the building.
+            * interpolated - an interpolated address. These are approximate positions as a result of a linear interpolation based on address ranges.
+              Address ranges, especially in the USA, are typical per block. For interpolated addresses, we cannot say with confidence that the address exists in reality.
+              But the interpolation provides a good location approximation that brings people in most use cases close to the target location.
+              The access point of an interpolated address result is calculated based on the address range and the road geometry.
+              The position (display) point is pre-configured offset from the street geometry.
+              Compared to Point Addresses, interpolated addresses are less accurate.
+          enum:
+          - PA
+          - interpolated
+          type: string
+        addressBlockType:
+          enum:
+          - block
+          - subblock
+          type: string
+        localityType:
+          enum:
+          - postalCode
+          - subdistrict
+          - district
+          - city
+          type: string
+        administrativeAreaType:
+          enum:
+          - county
+          - state
+          - country
+          type: string
+        address:
+          allOf:
+          - $ref: '#/components/schemas/Address'
+          description: Postal address of the result item.
+        position:
+          allOf:
+          - $ref: '#/components/schemas/DisplayResponseCoordinate'
+          description: The coordinates (latitude, longitude) of a pin on a map corresponding
+            to the searched place.
+        access:
+          description: Coordinates of the place you are navigating to (for example,
+            driving or walking). This is a point on a road or in a parking lot.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/AccessResponseCoordinate'
+          type: array
+        distance:
+          description: |-
+            The distance \"as the crow flies\" from the search center to this result item in meters. For example: \"172039\".
+
+            When searching along a route this is the distance\nalong the route plus the distance from the route polyline to this result item.
+          example: 172039
+          format: int64
+          type: integer
+        mapView:
+          allOf:
+          - $ref: '#/components/schemas/MapView'
+          description: The bounding box enclosing the geometric shape (area or line)
+            that an individual result covers. `place` typed results have no `mapView`.
+        categories:
+          description: The list of categories assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        foodTypes:
+          description: The list of food types assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        houseNumberFallback:
+          description: If true, indicates that the requested house number was corrected
+            to match the nearest known house number. This field is visible only when
+            the value is true.
+          type: boolean
+        timeZone:
+          allOf:
+          - $ref: '#/components/schemas/TimeZoneInfo'
+          description: BETA - Provides time zone information for this place. (rendered
+            only if 'show=tz' is provided.)
+        scoring:
+          allOf:
+          - $ref: '#/components/schemas/Scoring'
+          description: Indicates for each result how good the result matches to the
+            original query. This can be used by the customer application to accept
+            or reject the results depending on how "expensive" is the mistake for
+            their use case
+        parsing:
+          allOf:
+          - $ref: '#/components/schemas/Parsing'
+          description: BETA - Parsed terms and their positions in the input query
+            (only rendered if 'show=parsing' is provided.)
+        streetInfo:
+          description: Street Details (only rendered if 'show=streetInfo' is provided.)
+          items:
+            allOf:
+            - $ref: '#/components/schemas/StreetInfo'
+          type: array
+        countryInfo:
+          allOf:
+          - $ref: '#/components/schemas/CountryInfo'
+          description: Country Details (only rendered if 'show=countryInfo' is provided.)
+      required:
+      - address
+      - title
+      type: object
+    Address:
+      properties:
+        label:
+          description: 'Assembled address value built out of the address components
+            according to the regional postal rules. These are the same rules for all
+            endpoints. It may not include all the input terms. For example: "Schulstraße
+            4, 32547 Bad Oeynhausen, Germany"'
+          type: string
+        countryCode:
+          description: 'A three-letter country code. For example: "DEU"'
+          type: string
+        countryName:
+          description: 'The localised country name. For example: "Deutschland"'
+          type: string
+        stateCode:
+          description: 'A state code or state name abbreviation – country specific.
+            For example, in the United States it is the two letter state abbreviation:
+            "CA" for California.'
+          type: string
+        state:
+          description: 'The state division of a country. For example: "North Rhine-Westphalia"'
+          type: string
+        countyCode:
+          description: 'A county code or county name abbreviation – country specific.
+            For example, for Italy it is the province abbreviation: "RM" for Rome.'
+          type: string
+        county:
+          description: A division of a state; typically, a secondary-level administrative
+            division of a country or equivalent.
+          type: string
+        city:
+          description: 'The name of the primary locality of the place. For example:
+            "Bad Oyenhausen"'
+          type: string
+        district:
+          description: 'A division of city; typically an administrative unit within
+            a larger city or a customary name of a city''s neighborhood. For example:
+            "Bad Oyenhausen"'
+          type: string
+        subdistrict:
+          description: 'A subdivision of a district. For example: "Minden-Lübbecke"'
+          type: string
+        street:
+          description: 'Name of street. For example: "Schulstrasse"'
+          type: string
+        block:
+          description: Name of block.
+          type: string
+        subblock:
+          description: Name of sub-block.
+          type: string
+        postalCode:
+          description: 'An alphanumeric string included in a postal address to facilitate
+            mail sorting, such as post code, postcode, or ZIP code. For example: "32547"'
+          type: string
+        houseNumber:
+          description: 'House number. For example: "4"'
+          type: string
+        building:
+          description: Name of building.
+          type: string
+      type: object
+    DisplayResponseCoordinate:
+      properties:
+        lat:
+          description: 'Latitude of the address. For example: "52.19404"'
+          format: double
+          type: number
+        lng:
+          description: 'Longitude of the address. For example: "8.80135"'
+          format: double
+          type: number
+      required:
+      - lat
+      - lng
+      type: object
+    AccessResponseCoordinate:
+      properties:
+        lat:
+          description: 'Latitude of the address. For example: "52.19404"'
+          format: double
+          type: number
+        lng:
+          description: 'Longitude of the address. For example: "8.80135"'
+          format: double
+          type: number
+      required:
+      - lat
+      - lng
+      type: object
+    MapView:
+      properties:
+        west:
+          description: 'Longitude of the western-side of the box. For example: "8.80068"'
+          format: double
+          type: number
+        south:
+          description: 'Latitude of the southern-side of the box. For example: "52.19333"'
+          format: double
+          type: number
+        east:
+          description: 'Longitude of the eastern-side of the box. For example: "8.8167"'
+          format: double
+          type: number
+        north:
+          description: 'Latitude of the northern-side of the box. For example: "52.19555"'
+          format: double
+          type: number
+      required:
+      - east
+      - north
+      - south
+      - west
+      type: object
+    Category:
+      properties:
+        id:
+          description: 'Identifier number for an associated category. For example:
+            "900-9300-0000"'
+          type: string
+        name:
+          description: Name of the place category in the result item language.
+          type: string
+        primary:
+          description: Whether or not it is a primary category. This field is visible
+            only when the value is 'true'.
+          type: boolean
+      required:
+      - id
+      type: object
+    TimeZoneInfo:
+      properties:
+        name:
+          description: 'The name of the time zone as defined in the [tz database](https://en.wikipedia.org/wiki/Tz_database).
+            For example: "Europe/Berlin"'
+          type: string
+        utcOffset:
+          description: The UTC offset for this time zone at request time. For example
+            "+02:00"
+          type: string
+      required:
+      - name
+      - utcOffset
+      type: object
+    Scoring:
+      properties:
+        queryScore:
+          description: Indicates how good the input matches the returned address.
+            It is equal to 1 if all input tokens are recognized and matched.
+          format: double
+          type: number
+        fieldScore:
+          allOf:
+          - $ref: '#/components/schemas/FieldScore'
+          description: Indicates how good the individual result fields match to the
+            corresponding part of the query. Is included only for the result fields
+            that are actually matched to the query.
+      type: object
+    FieldScore:
+      properties:
+        country:
+          description: Indicates how good the result country name or [ISO 3166-1 alpha-3]
+            country code matches to the freeform or qualified input.
+          format: double
+          type: number
+        countryCode:
+          description: Indicates how good the result [ISO 3166-1 alpha-3] country
+            code matches to the freeform or qualified input.
+          format: double
+          type: number
+        state:
+          description: Indicates how good the result state name matches to the freeform
+            or qualified input.
+          format: double
+          type: number
+        stateCode:
+          description: Indicates how good the result state code matches to the freeform
+            or qualified input.
+          format: double
+          type: number
+        county:
+          description: Indicates how good the result county name matches to the freeform
+            or qualified input.
+          format: double
+          type: number
+        countyCode:
+          description: Indicates how good the result county code matches to the freeform
+            or qualified input.
+          format: double
+          type: number
+        city:
+          description: Indicates how good the result city name matches to the freeform
+            or qualified input.
+          format: double
+          type: number
+        district:
+          description: Indicates how good the result district name matches to the
+            freeform or qualified input.
+          format: double
+          type: number
+        subdistrict:
+          description: Indicates how good the result sub-district name matches to
+            the freeform or qualified input.
+          format: double
+          type: number
+        streets:
+          description: Indicates how good the result street names match to the freeform
+            or qualified input. If the input contains multiple street names, the field
+            score is calculated and returned for each of them individually.
+          items:
+            format: double
+            type: number
+          type: array
+        block:
+          description: Indicates how good the result block name matches to the freeform
+            or qualified input.
+          format: double
+          type: number
+        subblock:
+          description: Indicates how good the result sub-block name matches to the
+            freeform or qualified input.
+          format: double
+          type: number
+        houseNumber:
+          description: Indicates how good the result house number matches to the freeform
+            or qualified input. It may happen, that the house number, which one is
+            looking for, is not yet in the map data. For such cases, the /geocode
+            returns the nearest known house number on the same street. This represents
+            the numeric difference between the requested and the returned house numbers.
+          format: double
+          type: number
+        postalCode:
+          description: Indicates how good the result postal code matches to the freeform
+            or qualified input.
+          format: double
+          type: number
+        building:
+          description: Indicates how good the result building name matches to the
+            freeform or qualified input.
+          format: double
+          type: number
+        unit:
+          description: Indicates how good the result unit (such as a micro point address)
+            matches to the freeform or qualified input.
+          format: double
+          type: number
+        placeName:
+          description: Indicates how good the result place name matches to the freeform
+            or qualified input.
+          format: double
+          type: number
+        ontologyName:
+          description: Indicates how good the result ontology name matches to the
+            freeform or qualified input.
+          format: double
+          type: number
+      type: object
+    Parsing:
+      properties:
+        placeName:
+          description: Place name matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        country:
+          description: Country matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        state:
+          description: State matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        county:
+          description: County matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        city:
+          description: City matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        district:
+          description: District matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        subdistrict:
+          description: Subdistrict matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        street:
+          description: Street matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        block:
+          description: Block matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        subblock:
+          description: Subblock matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        houseNumber:
+          description: HouseNumber matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        postalCode:
+          description: PostalCode matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        building:
+          description: Building matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        secondaryUnits:
+          description: secondaryUnits matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+        ontologyName:
+          description: Ontology name matches
+          items:
+            allOf:
+            - $ref: '#/components/schemas/MatchInfo'
+          type: array
+      type: object
+    MatchInfo:
+      properties:
+        start:
+          description: First index of the matched range (0-based indexing, inclusive)
+          format: int32
+          type: integer
+        end:
+          description: One past the last index of the matched range (0-based indexing,
+            exclusive); The difference between end and start gives the length of the
+            term
+          format: int32
+          type: integer
+        value:
+          description: Matched term in the input string
+          type: string
+        qq:
+          description: The matched qualified query field type. If this is not returned,
+            then matched value refers to the freetext query
+          enum:
+          - country
+          - state
+          - county
+          - city
+          - district
+          - street
+          - houseNumber
+          - postalCode
+          type: string
+      required:
+      - end
+      - start
+      - value
+      type: object
+    StreetInfo:
+      properties:
+        baseName:
+          description: Base name part of the street name.
+          type: string
+        streetType:
+          description: Street type part of the street name.
+          type: string
+        streetTypePrecedes:
+          description: Defines if the street type is before or after the base name.
+          type: boolean
+        streetTypeAttached:
+          description: Defines if the street type is attached or unattached to the
+            base name.
+          type: boolean
+        prefix:
+          description: A prefix is a directional identifier that precedes, but is
+            not included in, the base name of a road.
+          type: string
+        suffix:
+          description: A suffix is a directional identifier that follows, but is not
+            included in, the base name of a road.
+          type: string
+        direction:
+          description: Indicates the official directional identifiers assigned to
+            highways, typically either "North/South" or "East/West"
+          type: string
+        language:
+          description: BCP 47 compliant language code
+          type: string
+      type: object
+    CountryInfo:
+      properties:
+        alpha2:
+          description: '[ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
+            country code'
+          type: string
+        alpha3:
+          description: '[ISO 3166-1 alpha-3](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3)
+            country code'
+          type: string
+      type: object
+    ErrorResponse:
+      properties:
+        status:
+          description: The HTTP status code
+          format: int32
+          type: integer
+        title:
+          description: Human-readable error description
+          type: string
+        code:
+          description: Error code
+          type: string
+        cause:
+          description: Human-readable explanation for the error
+          type: string
+        action:
+          description: Human-readable action for the user
+          type: string
+        correlationId:
+          description: Auto-generated ID univocally identifying this request
+          type: string
+        requestId:
+          description: Request identifier provided by the user
+          type: string
+      required:
+      - correlationId
+      - requestId
+      - status
+      - title
+      type: object
+    OpenSearchSearchResponse:
+      example:
+        items:
+        - ""
+        - ""
+      properties:
+        items:
+          description: The results are presented as a JSON list of candidates in ranked
+            order (most-likely to least-likely) based on the matched location criteria.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/OneboxSearchResultItem'
+          type: array
+      required:
+      - items
+      type: object
+    OneboxSearchResultItem:
+      properties:
+        title:
+          description: The localized display name of this result item.
+          type: string
+        id:
+          description: The unique identifier for the result item. This ID can be used
+            for a Look Up by ID search as well.
+          type: string
+        politicalView:
+          description: ISO3 country code of the item political view (default for international).
+            This response element is populated when the politicalView parameter is
+            set in the query
+          type: string
+        ontologyId:
+          description: Related ontology ID
+          type: string
+        resultType:
+          description: 'WARNING: The resultType values ''intersection'' and ''postalCodePoint''
+            are in BETA state'
+          enum:
+          - administrativeArea
+          - locality
+          - street
+          - intersection
+          - addressBlock
+          - houseNumber
+          - postalCodePoint
+          - place
+          type: string
+        houseNumberType:
+          description: |-
+            * PA - a Point Address represents an individual address as a point object. Point Addresses are coming from trusted sources.
+              We can say with high certainty that the address exists and at what position. A Point Address result contains two types of coordinates.
+              One is the access point (or navigation coordinates), which is the point to start or end a drive. The other point is the position or display point.
+              This point varies per source and country. The point can be the rooftop point, a point close to the building entry, or a point close to the building,
+              driveway or parking lot that belongs to the building.
+            * interpolated - an interpolated address. These are approximate positions as a result of a linear interpolation based on address ranges.
+              Address ranges, especially in the USA, are typical per block. For interpolated addresses, we cannot say with confidence that the address exists in reality.
+              But the interpolation provides a good location approximation that brings people in most use cases close to the target location.
+              The access point of an interpolated address result is calculated based on the address range and the road geometry.
+              The position (display) point is pre-configured offset from the street geometry.
+              Compared to Point Addresses, interpolated addresses are less accurate.
+          enum:
+          - PA
+          - interpolated
+          type: string
+        addressBlockType:
+          enum:
+          - block
+          - subblock
+          type: string
+        localityType:
+          enum:
+          - postalCode
+          - subdistrict
+          - district
+          - city
+          type: string
+        administrativeAreaType:
+          enum:
+          - county
+          - state
+          - country
+          type: string
+        address:
+          allOf:
+          - $ref: '#/components/schemas/Address'
+          description: Postal address of the result item.
+        position:
+          allOf:
+          - $ref: '#/components/schemas/DisplayResponseCoordinate'
+          description: The coordinates (latitude, longitude) of a pin on a map corresponding
+            to the searched place.
+        access:
+          description: Coordinates of the place you are navigating to (for example,
+            driving or walking). This is a point on a road or in a parking lot.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/AccessResponseCoordinate'
+          type: array
+        distance:
+          description: |-
+            The distance \"as the crow flies\" from the search center to this result item in meters. For example: \"172039\".
+
+            When searching along a route this is the distance\nalong the route plus the distance from the route polyline to this result item.
+          example: 172039
+          format: int64
+          type: integer
+        excursionDistance:
+          description: BETA - Two times the distance from the polyline to this result
+            item in meters while searching along the route
+          format: int64
+          type: integer
+        mapView:
+          allOf:
+          - $ref: '#/components/schemas/MapView'
+          description: The bounding box enclosing the geometric shape (area or line)
+            that an individual result covers. `place` typed results have no `mapView`.
+        categories:
+          description: The list of categories assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        chains:
+          description: The list of chains assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Chain'
+          type: array
+        references:
+          description: The list of supplier references available for this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/SupplierReference'
+          type: array
+        foodTypes:
+          description: The list of food types assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        houseNumberFallback:
+          description: If true, indicates that the requested house number was corrected
+            to match the nearest known house number. This field is visible only when
+            the value is true.
+          type: boolean
+        contacts:
+          description: Contact information like phone, email, WWW.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/ContactInformation'
+          type: array
+        openingHours:
+          description: |-
+            A list of hours during which the place is open for business.
+            This field is optional: When it is not present, it means that we are lacking data about the place opening hours.
+            Days without opening hours have to be considered as closed.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/OpeningHours'
+          type: array
+        timeZone:
+          allOf:
+          - $ref: '#/components/schemas/TimeZoneInfo'
+          description: BETA - Provides time zone information for this place. (rendered
+            only if 'show=tz' is provided.)
+        extended:
+          allOf:
+          - $ref: '#/components/schemas/ExtendedAttribute'
+          description: Extended attributes section to contain detailed information
+            for specific result types.
+        phonemes:
+          allOf:
+          - $ref: '#/components/schemas/PhonemesSection'
+          description: Phonemes for address and place names. (rendered only if 'show=phonemes'
+            is provided.)
+        streetInfo:
+          description: Street Details (only rendered if 'show=streetInfo' is provided.)
+          items:
+            allOf:
+            - $ref: '#/components/schemas/StreetInfo'
+          type: array
+      required:
+      - address
+      - title
+      type: object
+    Chain:
+      properties:
+        id:
+          description: 'Identifier number for an associated chain. For example: "272"'
+          type: string
+      required:
+      - id
+      type: object
+    SupplierReference:
+      properties:
+        supplier:
+          allOf:
+          - $ref: '#/components/schemas/Supplier'
+          description: Information about the supplier of this reference.
+        id:
+          description: Identifier of the place as provided by the supplier.
+          type: string
+      required:
+      - id
+      - supplier
+      type: object
+    Supplier:
+      properties:
+        id:
+          description: An identifier for the supplier.
+          enum:
+          - core
+          - yelp
+          - tripadvisor
+          - parkopedia
+          - venues
+          - vinfast
+          - ryd
+          - booking.com
+          - nsr
+          type: string
+      required:
+      - id
+      type: object
+    ContactInformation:
+      properties:
+        categories:
+          description: The list of place categories, this set of contact details refers
+            to.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        phone:
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Contact'
+          type: array
+        mobile:
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Contact'
+          type: array
+        tollFree:
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Contact'
+          type: array
+        fax:
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Contact'
+          type: array
+        www:
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Contact'
+          type: array
+        email:
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Contact'
+          type: array
+      type: object
+    Contact:
+      properties:
+        label:
+          description: Optional label for the contact string, such as "Customer Service"
+            or "Pharmacy Fax".
+          type: string
+        value:
+          description: Contact information, as specified by the contact type.
+          type: string
+      required:
+      - value
+      type: object
+    OpeningHours:
+      properties:
+        categories:
+          description: The list of place categories, this set of opening hours refers
+            to.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        text:
+          items:
+            type: string
+          type: array
+        isOpen:
+          type: boolean
+        structured:
+          description: List of iCalender-based structured representations of opening
+            hours
+          items:
+            allOf:
+            - $ref: '#/components/schemas/StructuredOpeningHours'
+          type: array
+      required:
+      - structured
+      - text
+      type: object
+    StructuredOpeningHours:
+      properties:
+        start:
+          description: |-
+            String with a modified [iCalendar DATE-TIME](https://datatracker.ietf.org/doc/html/rfc5545#section-3.3.5) value.
+            The date part is omitted, values starts with the time section maker \"T\". Example: T132000
+          type: string
+        duration:
+          description: |-
+            String with an [iCalendar DURATION](https://datatracker.ietf.org/doc/html/rfc5545#section-3.3.6) value.
+            A closed day has the value PT00:00M
+          type: string
+        recurrence:
+          description: String with a [RECUR](https://datatracker.ietf.org/doc/html/rfc5545#section-3.3.10)
+            rule
+          type: string
+      required:
+      - duration
+      - recurrence
+      - start
+      type: object
+    ExtendedAttribute:
+      properties:
+        evStation:
+          allOf:
+          - $ref: '#/components/schemas/EvChargingAttributes'
+          description: EV charging pool information
+      type: object
+    EvChargingAttributes:
+      properties:
+        connectors:
+          description: List of EV pool groups of connectors. Each group is defined
+            by a common charging connector type and max power level. The numberOfConnectors
+            field contains the number of connectors in the group.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/EvConnector'
+          type: array
+        totalNumberOfConnectors:
+          description: Total number of charging connectors in the EV charging pool
+          format: int32
+          type: integer
+      type: object
+    EvConnector:
+      properties:
+        supplierName:
+          description: The EV charge point operator
+          type: string
+        connectorType:
+          allOf:
+          - $ref: '#/components/schemas/EvNameId'
+          description: |-
+            Id and name element pair representing the connector type in the EV pool group.
+            For more information on the current connector types, see the [connectorTypes](https://developer.here.com/documentation/charging-stations/dev_guide/topics/resource-type-connector-types.html) values in the HERE EV Charge Points API.
+        powerFeedType:
+          allOf:
+          - $ref: '#/components/schemas/EvNameId'
+          description: Details on type of power feed with respect to [SAE J1772](https://en.wikipedia.org/wiki/SAE_J1772#Charging)
+            standard.
+        maxPowerLevel:
+          description: Maximum charge power (in kilowatt) of connectors in connectors
+            group.
+          format: double
+          type: number
+        chargingPoint:
+          allOf:
+          - $ref: '#/components/schemas/EvChargingPoint'
+          description: Connectors group additional charging information
+      type: object
+    EvNameId:
+      properties:
+        name:
+          description: Any string value
+          type: string
+        id:
+          description: Unique ID
+          type: string
+      type: object
+    EvChargingPoint:
+      properties:
+        numberOfConnectors:
+          description: Number of physical connectors in the connectors group
+          format: int32
+          type: integer
+        chargeMode:
+          description: Charge mode of the connectors group. For more information,
+            check the [IEC-61851-1](https://en.wikipedia.org/w/index.php?title=Charging_station&oldid=1013010605#IEC-61851-1_Charging_Modes)
+            standard.
+          type: string
+        voltsRange:
+          description: Voltage provided by the connectors group
+          example: 100-120V AC
+          type: string
+        phases:
+          description: Number of phases provided by the connectors group
+          format: int32
+          type: integer
+        ampsRange:
+          description: Amperage provided by the connectors group
+          example: 12A-80A
+          type: string
+      type: object
+    PhonemesSection:
+      properties:
+        placeName:
+          description: Phonemes for the name of the place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Phoneme'
+          type: array
+        countryName:
+          description: Phonemes for the county name.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Phoneme'
+          type: array
+        state:
+          description: Phonemes for the state name.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Phoneme'
+          type: array
+        county:
+          description: Phonemes for the county name.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Phoneme'
+          type: array
+        city:
+          description: Phonemes for the city name.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Phoneme'
+          type: array
+        district:
+          description: Phonemes for the district name.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Phoneme'
+          type: array
+        subdistrict:
+          description: Phonemes for the subdistrict name.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Phoneme'
+          type: array
+        street:
+          description: Phonemes for the street name.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Phoneme'
+          type: array
+        block:
+          description: Phonemes for the block.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Phoneme'
+          type: array
+        subblock:
+          description: Phonemes for the sub-block.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Phoneme'
+          type: array
+      type: object
+    Phoneme:
+      properties:
+        value:
+          description: The actual phonetic transcription in the NT-SAMPA format.
+          type: string
+        language:
+          description: The [BCP 47](https://en.wikipedia.org/wiki/IETF_language_tag)
+            language code.
+          type: string
+        preferred:
+          description: Whether or not it is the preferred phoneme.
+          type: boolean
+      required:
+      - value
+      type: object
+    OpenSearchAutosuggestResponse:
+      example:
+        queryTerms:
+        - ""
+        - ""
+        items:
+        - ""
+        - ""
+      properties:
+        items:
+          description: The results are presented as a JSON list of candidates in ranked
+            order (most-likely to least-likely) based on the matched location criteria.
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/AutosuggestEntityResultItem'
+            - $ref: '#/components/schemas/AutosuggestQueryResultItem'
+          type: array
+        queryTerms:
+          description: Suggestions for refining individual query terms
+          items:
+            allOf:
+            - $ref: '#/components/schemas/QueryTermResultItem'
+          type: array
+      required:
+      - items
+      - queryTerms
+      type: object
+    AutosuggestEntityResultItem:
+      properties:
+        title:
+          description: The localized display name of this result item.
+          type: string
+        id:
+          description: The unique identifier for the result item. This ID can be used
+            for a Look Up by ID search as well.
+          type: string
+        politicalView:
+          description: ISO3 country code of the item political view (default for international).
+            This response element is populated when the politicalView parameter is
+            set in the query
+          type: string
+        ontologyId:
+          description: Related ontology ID
+          type: string
+        resultType:
+          description: 'WARNING: The resultType values ''intersection'' and ''postalCodePoint''
+            are in BETA state'
+          enum:
+          - administrativeArea
+          - locality
+          - street
+          - intersection
+          - addressBlock
+          - houseNumber
+          - postalCodePoint
+          - place
+          type: string
+        houseNumberType:
+          description: |-
+            * PA - a Point Address represents an individual address as a point object. Point Addresses are coming from trusted sources.
+              We can say with high certainty that the address exists and at what position. A Point Address result contains two types of coordinates.
+              One is the access point (or navigation coordinates), which is the point to start or end a drive. The other point is the position or display point.
+              This point varies per source and country. The point can be the rooftop point, a point close to the building entry, or a point close to the building,
+              driveway or parking lot that belongs to the building.
+            * interpolated - an interpolated address. These are approximate positions as a result of a linear interpolation based on address ranges.
+              Address ranges, especially in the USA, are typical per block. For interpolated addresses, we cannot say with confidence that the address exists in reality.
+              But the interpolation provides a good location approximation that brings people in most use cases close to the target location.
+              The access point of an interpolated address result is calculated based on the address range and the road geometry.
+              The position (display) point is pre-configured offset from the street geometry.
+              Compared to Point Addresses, interpolated addresses are less accurate.
+          enum:
+          - PA
+          - interpolated
+          type: string
+        addressBlockType:
+          enum:
+          - block
+          - subblock
+          type: string
+        localityType:
+          enum:
+          - postalCode
+          - subdistrict
+          - district
+          - city
+          type: string
+        administrativeAreaType:
+          enum:
+          - county
+          - state
+          - country
+          type: string
+        address:
+          allOf:
+          - $ref: '#/components/schemas/Address'
+          description: Postal address of the result item. Detailed address fields
+            are rendered only if 'show=details' is provided.
+        position:
+          allOf:
+          - $ref: '#/components/schemas/DisplayResponseCoordinate'
+          description: The coordinates (latitude, longitude) of a pin on a map corresponding
+            to the searched place.
+        access:
+          description: Coordinates of the place you are navigating to (for example,
+            driving or walking). This is a point on a road or in a parking lot.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/AccessResponseCoordinate'
+          type: array
+        distance:
+          description: |-
+            The distance \"as the crow flies\" from the search center to this result item in meters. For example: \"172039\".
+
+            When searching along a route this is the distance\nalong the route plus the distance from the route polyline to this result item.
+          example: 172039
+          format: int64
+          type: integer
+        excursionDistance:
+          description: BETA - Two times the distance from the polyline to this result
+            item in meters while searching along the route
+          format: int64
+          type: integer
+        mapView:
+          allOf:
+          - $ref: '#/components/schemas/MapView'
+          description: The bounding box enclosing the geometric shape (area or line)
+            that an individual result covers. `place` typed results have no `mapView`.
+        categories:
+          description: The list of categories assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        chains:
+          description: The list of chains assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Chain'
+          type: array
+        references:
+          description: The list of supplier references available for this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/SupplierReference'
+          type: array
+        foodTypes:
+          description: The list of food types assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        contacts:
+          description: BETA - Contact information like phone, email, WWW. (rendered
+            only if 'show=details' is provided.)
+          items:
+            allOf:
+            - $ref: '#/components/schemas/ContactInformation'
+          type: array
+        openingHours:
+          description: BETA - A list of hours during which the place is open for business.
+            (rendered only if 'show=details' is provided.)
+          items:
+            allOf:
+            - $ref: '#/components/schemas/OpeningHours'
+          type: array
+        timeZone:
+          allOf:
+          - $ref: '#/components/schemas/TimeZoneInfo'
+          description: BETA - Provides time zone information for this place. (rendered
+            only if 'show=tz' is provided.)
+        highlights:
+          allOf:
+          - $ref: '#/components/schemas/TitleAndAddressHighlighting'
+          description: Describes how the parts of the response element matched the
+            input query
+        phonemes:
+          allOf:
+          - $ref: '#/components/schemas/PhonemesSection'
+          description: Phonemes for address and place names. (rendered only if 'show=phonemes'
+            is provided.)
+        streetInfo:
+          description: Street Details (only rendered if 'show=streetInfo' is provided.)
+          items:
+            allOf:
+            - $ref: '#/components/schemas/StreetInfo'
+          type: array
+      required:
+      - address
+      - title
+      type: object
+    TitleAndAddressHighlighting:
+      properties:
+        title:
+          description: Ranges of indexes that matched in the title attribute
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Range'
+          type: array
+      type: object
+    Range:
+      properties:
+        start:
+          description: first index of the matched range (0-based indexing, inclusive)
+          format: int32
+          type: integer
+        end:
+          description: one past the last index of the matched range (0-based indexing,
+            exclusive); The difference between end and start gives the length of the
+            term
+          format: int32
+          type: integer
+      required:
+      - end
+      - start
+      type: object
+    AutosuggestQueryResultItem:
+      properties:
+        title:
+          description: The localized display name of this result item.
+          type: string
+        id:
+          description: The unique identifier for the result item. This ID can be used
+            for a Look Up by ID search as well.
+          type: string
+        resultType:
+          description: 'WARNING: The resultType values ''intersection'' and ''postalCodePoint''
+            are in BETA state'
+          enum:
+          - categoryQuery
+          - chainQuery
+          type: string
+        href:
+          description: URL of the follow-up query
+          type: string
+        highlights:
+          allOf:
+          - $ref: '#/components/schemas/TitleHighlighting'
+          description: Describes how the parts of the response element matched the
+            input query
+      required:
+      - title
+      type: object
+    TitleHighlighting:
+      properties:
+        title:
+          description: Ranges of indexes that matched in the title attribute
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Range'
+          type: array
+      type: object
+    QueryTermResultItem:
+      properties:
+        term:
+          description: The term that will be suggested to the user.
+          type: string
+        replaces:
+          description: The sub-string of the original query that is replaced by this
+            Query Term.
+          type: string
+        start:
+          description: The start index in codepoints (inclusive) of the text replaced
+            in the original query.
+          format: int32
+          type: integer
+        end:
+          description: The end index in codepoints (exclusive) of the text replaced
+            in the original query.
+          format: int32
+          type: integer
+      required:
+      - end
+      - replaces
+      - start
+      - term
+      type: object
+    OpenSearchAutocompleteResponse:
+      example:
+        items:
+        - ""
+        - ""
+      properties:
+        items:
+          description: The results are presented as a JSON list of candidates in ranked
+            order (most-likely to least-likely) based on the matched location criteria.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/AutocompleteResultItem'
+          type: array
+      required:
+      - items
+      type: object
+    AutocompleteResultItem:
+      properties:
+        title:
+          description: 'The unified display name of this result item. The result title
+            is composed so that the customer application can use it to render the
+            suggestions with highlighting. It is build in a unified way for all the
+            countries starting from the country name and down to the address line.
+            It is build out of the address components that are important for the end-user
+            to recognize and eventually to choose a result and includes all the input
+            terms. For example: "Germany, 32547, Bad Oeynhausen, Schulstraße 4"'
+          type: string
+        id:
+          description: The unique identifier for the result item. This ID can be used
+            for a Look Up by ID search as well.
+          type: string
+        language:
+          description: The preferred language of address elements in the result.
+          type: string
+        politicalView:
+          description: ISO3 country code of the item political view (default for international).
+            This response element is populated when the politicalView parameter is
+            set in the query
+          type: string
+        resultType:
+          description: 'WARNING: The resultType values ''intersection'' and ''postalCodePoint''
+            are in BETA state'
+          enum:
+          - administrativeArea
+          - locality
+          - street
+          - intersection
+          - addressBlock
+          - houseNumber
+          - postalCodePoint
+          - place
+          type: string
+        houseNumberType:
+          enum:
+          - PA
+          - interpolated
+          type: string
+        localityType:
+          enum:
+          - postalCode
+          - subdistrict
+          - district
+          - city
+          type: string
+        administrativeAreaType:
+          enum:
+          - county
+          - state
+          - country
+          type: string
+        address:
+          allOf:
+          - $ref: '#/components/schemas/Address'
+          description: Detailed address of the result item.
+        distance:
+          description: |-
+            The distance \"as the crow flies\" from the search center to this result item in meters. For example: \"172039\".
+
+            When searching along a route this is the distance\nalong the route plus the distance from the route polyline to this result item.
+          example: 172039
+          format: int64
+          type: integer
+        highlights:
+          allOf:
+          - $ref: '#/components/schemas/TitleAndAddressHighlighting'
+          description: Describes how the parts of the response element matched the
+            input query
+        streetInfo:
+          description: Street Details (only rendered if 'show=streetInfo' is provided.)
+          items:
+            allOf:
+            - $ref: '#/components/schemas/StreetInfo'
+          type: array
+      required:
+      - address
+      - title
+      type: object
+    OpenSearchBrowseResponse:
+      example:
+        items:
+        - ""
+        - ""
+      properties:
+        items:
+          description: The results are presented as a JSON list of candidates in ranked
+            order (most-likely to least-likely) based on the matched location criteria.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/BrowseResultItem'
+          type: array
+      required:
+      - items
+      type: object
+    BrowseResultItem:
+      properties:
+        title:
+          description: The localized display name of this result item.
+          type: string
+        id:
+          description: The unique identifier for the result item. This ID can be used
+            for a Look Up by ID search as well.
+          type: string
+        politicalView:
+          description: ISO3 country code of the item political view (default for international).
+            This response element is populated when the politicalView parameter is
+            set in the query
+          type: string
+        resultType:
+          description: 'WARNING: The resultType values ''intersection'' and ''postalCodePoint''
+            are in BETA state'
+          enum:
+          - administrativeArea
+          - locality
+          - street
+          - intersection
+          - addressBlock
+          - houseNumber
+          - postalCodePoint
+          - place
+          type: string
+        houseNumberType:
+          description: |-
+            * PA - a Point Address represents an individual address as a point object. Point Addresses are coming from trusted sources.
+              We can say with high certainty that the address exists and at what position. A Point Address result contains two types of coordinates.
+              One is the access point (or navigation coordinates), which is the point to start or end a drive. The other point is the position or display point.
+              This point varies per source and country. The point can be the rooftop point, a point close to the building entry, or a point close to the building,
+              driveway or parking lot that belongs to the building.
+            * interpolated - an interpolated address. These are approximate positions as a result of a linear interpolation based on address ranges.
+              Address ranges, especially in the USA, are typical per block. For interpolated addresses, we cannot say with confidence that the address exists in reality.
+              But the interpolation provides a good location approximation that brings people in most use cases close to the target location.
+              The access point of an interpolated address result is calculated based on the address range and the road geometry.
+              The position (display) point is pre-configured offset from the street geometry.
+              Compared to Point Addresses, interpolated addresses are less accurate.
+          enum:
+          - PA
+          - interpolated
+          type: string
+        addressBlockType:
+          enum:
+          - block
+          - subblock
+          type: string
+        localityType:
+          enum:
+          - postalCode
+          - subdistrict
+          - district
+          - city
+          type: string
+        administrativeAreaType:
+          enum:
+          - county
+          - state
+          - country
+          type: string
+        houseNumberFallback:
+          description: If true, indicates that the requested house number was corrected
+            to match the nearest known house number. This field is visible only when
+            the value is true.
+          type: boolean
+        address:
+          allOf:
+          - $ref: '#/components/schemas/Address'
+          description: Postal address of the result item.
+        position:
+          allOf:
+          - $ref: '#/components/schemas/DisplayResponseCoordinate'
+          description: The coordinates (latitude, longitude) of a pin on a map corresponding
+            to the searched place.
+        access:
+          description: Coordinates of the place you are navigating to (for example,
+            driving or walking). This is a point on a road or in a parking lot.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/AccessResponseCoordinate'
+          type: array
+        distance:
+          description: |-
+            The distance \"as the crow flies\" from the search center to this result item in meters. For example: \"172039\".
+
+            When searching along a route this is the distance\nalong the route plus the distance from the route polyline to this result item.
+          example: 172039
+          format: int64
+          type: integer
+        excursionDistance:
+          description: BETA - Two times the distance from the polyline to this result
+            item in meters while searching along the route
+          format: int64
+          type: integer
+        mapView:
+          allOf:
+          - $ref: '#/components/schemas/MapView'
+          description: The bounding box enclosing the geometric shape (area or line)
+            that an individual result covers. `place` typed results have no `mapView`.
+        categories:
+          description: The list of categories assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        chains:
+          description: The list of chains assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Chain'
+          type: array
+        references:
+          description: The list of supplier references available for this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/SupplierReference'
+          type: array
+        foodTypes:
+          description: The list of food types assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        contacts:
+          description: Contact information like phone, email, WWW.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/ContactInformation'
+          type: array
+        openingHours:
+          description: |-
+            A list of hours during which the place is open for business.
+            This field is optional: When it is not present, it means that we are lacking data about the place opening hours.
+            Days without opening hours have to be considered as closed.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/OpeningHours'
+          type: array
+        timeZone:
+          allOf:
+          - $ref: '#/components/schemas/TimeZoneInfo'
+          description: BETA - Provides time zone information for this place. (rendered
+            only if 'show=tz' is provided.)
+        extended:
+          allOf:
+          - $ref: '#/components/schemas/ExtendedAttribute'
+          description: Extended attributes section to contain detailed information
+            for specific result types.
+        phonemes:
+          allOf:
+          - $ref: '#/components/schemas/PhonemesSection'
+          description: Phonemes for address and place names. (rendered only if 'show=phonemes'
+            is provided.)
+        streetInfo:
+          description: Street Details (only rendered if 'show=streetInfo' is provided.)
+          items:
+            allOf:
+            - $ref: '#/components/schemas/StreetInfo'
+          type: array
+      required:
+      - address
+      - title
+      type: object
+    OpenSearchReverseGeocodeResponse:
+      example:
+        items:
+        - ""
+        - ""
+      properties:
+        items:
+          description: The results are presented as a JSON list of candidates in ranked
+            order (most-likely to least-likely) based on the matched location criteria.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/ReverseGeocodeResultItem'
+          type: array
+      required:
+      - items
+      type: object
+    ReverseGeocodeResultItem:
+      properties:
+        title:
+          description: The localized display name of this result item.
+          type: string
+        id:
+          description: The unique identifier for the result item. This ID can be used
+            for a Look Up by ID search as well.
+          type: string
+        politicalView:
+          description: ISO3 country code of the item political view (default for international).
+            This response element is populated when the politicalView parameter is
+            set in the query
+          type: string
+        resultType:
+          description: 'WARNING: The resultType values ''intersection'' and ''postalCodePoint''
+            are in BETA state'
+          enum:
+          - administrativeArea
+          - locality
+          - street
+          - intersection
+          - addressBlock
+          - houseNumber
+          - postalCodePoint
+          - place
+          type: string
+        houseNumberType:
+          description: |-
+            * PA - a Point Address represents an individual address as a point object. Point Addresses are coming from trusted sources.
+              We can say with high certainty that the address exists and at what position. A Point Address result contains two types of coordinates.
+              One is the access point (or navigation coordinates), which is the point to start or end a drive. The other point is the position or display point.
+              This point varies per source and country. The point can be the rooftop point, a point close to the building entry, or a point close to the building,
+              driveway or parking lot that belongs to the building.
+            * interpolated - an interpolated address. These are approximate positions as a result of a linear interpolation based on address ranges.
+              Address ranges, especially in the USA, are typical per block. For interpolated addresses, we cannot say with confidence that the address exists in reality.
+              But the interpolation provides a good location approximation that brings people in most use cases close to the target location.
+              The access point of an interpolated address result is calculated based on the address range and the road geometry.
+              The position (display) point is pre-configured offset from the street geometry.
+              Compared to Point Addresses, interpolated addresses are less accurate.
+          enum:
+          - PA
+          - interpolated
+          type: string
+        addressBlockType:
+          enum:
+          - block
+          - subblock
+          type: string
+        localityType:
+          enum:
+          - postalCode
+          - subdistrict
+          - district
+          - city
+          type: string
+        administrativeAreaType:
+          enum:
+          - county
+          - state
+          - country
+          type: string
+        address:
+          allOf:
+          - $ref: '#/components/schemas/Address'
+          description: Postal address of the result item.
+        position:
+          allOf:
+          - $ref: '#/components/schemas/DisplayResponseCoordinate'
+          description: The coordinates (latitude, longitude) of a pin on a map corresponding
+            to the searched place.
+        access:
+          description: Coordinates of the place you are navigating to (for example,
+            driving or walking). This is a point on a road or in a parking lot.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/AccessResponseCoordinate'
+          type: array
+        distance:
+          description: |-
+            The distance \"as the crow flies\" from the search center to this result item in meters. For example: \"172039\".
+
+            When searching along a route this is the distance\nalong the route plus the distance from the route polyline to this result item.
+          example: 172039
+          format: int64
+          type: integer
+        mapView:
+          allOf:
+          - $ref: '#/components/schemas/MapView'
+          description: The bounding box enclosing the geometric shape (area or line)
+            that an individual result covers. `place` typed results have no `mapView`.
+        categories:
+          description: The list of categories assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        foodTypes:
+          description: The list of food types assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        houseNumberFallback:
+          description: If true, indicates that the requested house number was corrected
+            to match the nearest known house number. This field is visible only when
+            the value is true.
+          type: boolean
+        timeZone:
+          allOf:
+          - $ref: '#/components/schemas/TimeZoneInfo'
+          description: BETA - Provides time zone information for this place. (rendered
+            only if 'show=tz' is provided.)
+        streetInfo:
+          description: Street Details (only rendered if 'show=streetInfo' is provided.)
+          items:
+            allOf:
+            - $ref: '#/components/schemas/StreetInfo'
+          type: array
+        countryInfo:
+          allOf:
+          - $ref: '#/components/schemas/CountryInfo'
+          description: Country Details (only rendered if 'show=countryInfo' is provided.)
+      required:
+      - address
+      - title
+      type: object
+    LookupResponse:
+      example:
+        mapView: ""
+        address: ""
+        access:
+        - ""
+        - ""
+        references:
+        - ""
+        - ""
+        chains:
+        - ""
+        - ""
+        timeZone: ""
+        houseNumberType: PA
+        addressBlockType: block
+        administrativeAreaType: county
+        streetInfo:
+        - ""
+        - ""
+        title: title
+        foodTypes:
+        - ""
+        - ""
+        houseNumberFallback: true
+        extended: ""
+        politicalView: politicalView
+        openingHours:
+        - ""
+        - ""
+        id: id
+        position: ""
+        categories:
+        - ""
+        - ""
+        countryInfo: ""
+        resultType: administrativeArea
+        localityType: postalCode
+        contacts:
+        - ""
+        - ""
+        phonemes: ""
+      properties:
+        title:
+          description: The localized display name of this result item.
+          type: string
+        id:
+          description: The unique identifier for the result item. This ID can be used
+            for a Look Up by ID search as well.
+          type: string
+        politicalView:
+          description: ISO3 country code of the item political view (default for international).
+            This response element is populated when the politicalView parameter is
+            set in the query
+          type: string
+        resultType:
+          description: 'WARNING: The resultType values ''intersection'' and ''postalCodePoint''
+            are in BETA state'
+          enum:
+          - administrativeArea
+          - locality
+          - street
+          - intersection
+          - addressBlock
+          - houseNumber
+          - postalCodePoint
+          - place
+          type: string
+        houseNumberType:
+          description: |-
+            * PA - a Point Address represents an individual address as a point object. Point Addresses are coming from trusted sources.
+              We can say with high certainty that the address exists and at what position. A Point Address result contains two types of coordinates.
+              One is the access point (or navigation coordinates), which is the point to start or end a drive. The other point is the position or display point.
+              This point varies per source and country. The point can be the rooftop point, a point close to the building entry, or a point close to the building,
+              driveway or parking lot that belongs to the building.
+            * interpolated - an interpolated address. These are approximate positions as a result of a linear interpolation based on address ranges.
+              Address ranges, especially in the USA, are typical per block. For interpolated addresses, we cannot say with confidence that the address exists in reality.
+              But the interpolation provides a good location approximation that brings people in most use cases close to the target location.
+              The access point of an interpolated address result is calculated based on the address range and the road geometry.
+              The position (display) point is pre-configured offset from the street geometry.
+              Compared to Point Addresses, interpolated addresses are less accurate.
+          enum:
+          - PA
+          - interpolated
+          type: string
+        addressBlockType:
+          enum:
+          - block
+          - subblock
+          type: string
+        localityType:
+          enum:
+          - postalCode
+          - subdistrict
+          - district
+          - city
+          type: string
+        administrativeAreaType:
+          enum:
+          - county
+          - state
+          - country
+          type: string
+        houseNumberFallback:
+          description: If true, indicates that the requested house number was corrected
+            to match the nearest known house number. This field is visible only when
+            the value is true.
+          type: boolean
+        address:
+          allOf:
+          - $ref: '#/components/schemas/Address'
+          description: Postal address of the result item.
+        position:
+          allOf:
+          - $ref: '#/components/schemas/DisplayResponseCoordinate'
+          description: The coordinates (latitude, longitude) of a pin on a map corresponding
+            to the searched place.
+        access:
+          description: Coordinates of the place you are navigating to (for example,
+            driving or walking). This is a point on a road or in a parking lot.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/AccessResponseCoordinate'
+          type: array
+        mapView:
+          allOf:
+          - $ref: '#/components/schemas/MapView'
+          description: The bounding box enclosing the geometric shape (area or line)
+            that an individual result covers. `place` typed results have no `mapView`.
+        categories:
+          description: The list of categories assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        chains:
+          description: The list of chains assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Chain'
+          type: array
+        references:
+          description: The list of supplier references available for this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/SupplierReference'
+          type: array
+        foodTypes:
+          description: The list of food types assigned to this place.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Category'
+          type: array
+        contacts:
+          description: Contact information like phone, email, WWW.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/ContactInformation'
+          type: array
+        openingHours:
+          description: |-
+            A list of hours during which the place is open for business.
+            This field is optional: When it is not present, it means that we are lacking data about the place opening hours.
+            Days without opening hours have to be considered as closed.
+          items:
+            allOf:
+            - $ref: '#/components/schemas/OpeningHours'
+          type: array
+        timeZone:
+          allOf:
+          - $ref: '#/components/schemas/TimeZoneInfo'
+          description: BETA - Provides time zone information for this place. (rendered
+            only if 'show=tz' is provided.)
+        extended:
+          allOf:
+          - $ref: '#/components/schemas/ExtendedAttribute'
+          description: Extended attributes section to contain detailed information
+            for specific result types.
+        phonemes:
+          allOf:
+          - $ref: '#/components/schemas/PhonemesSection'
+          description: Phonemes for address and place names. (rendered only if 'show=phonemes'
+            is provided.)
+        streetInfo:
+          description: Street Details (only rendered if 'show=streetInfo' is provided.)
+          items:
+            allOf:
+            - $ref: '#/components/schemas/StreetInfo'
+          type: array
+        countryInfo:
+          allOf:
+          - $ref: '#/components/schemas/CountryInfo'
+          description: Country Details (only rendered if 'show=countryInfo' is provided.)
+      required:
+      - address
+      - title
+      type: object
+  securitySchemes:
+    Bearer:
+      bearerFormat: JWT
+      description: |
+        A token obtained from a separate endpoint using client credentials and an OAuth 1.0a HMAC-SHA256 signed request.
+        For more information on how to get a bearer token, see the
+        [Identity & Access Management Guide](https://developer.here.com/documentation/identity-access-management/dev_guide/index.html).
+      scheme: bearer
+      type: http
+    ApiKey:
+      description: |
+        A key generated specifically to authenticate API requests.
+        For more information on how to get an API key, see the
+        [Identity & Access Management Guide](https://developer.here.com/documentation/identity-access-management/dev_guide/index.html).
+      in: query
+      name: apiKey
+      type: apiKey
