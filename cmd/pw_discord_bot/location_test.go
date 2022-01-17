@@ -1,4 +1,4 @@
-package discord_bot
+package main
 
 import (
 	"fmt"

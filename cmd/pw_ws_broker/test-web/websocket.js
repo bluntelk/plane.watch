@@ -1,10 +1,12 @@
 ;(() => {
     console.log("Websockets!")
 
+    let host = window.location.host
+
     let ws = {
         conn: null,
         dial: function () {
-            this.conn = new WebSocket(`ws://localhost:3000/planes`, ["planes"])
+            this.conn = new WebSocket(`ws://${host}/planes`, ["planes"])
             this.conn.addEventListener("close", ev => {
                 console.error(`WebSocket Disconnected code: ${ev.code}, reason: ${ev.reason}`)
                 if (ev.code !== 1001) {

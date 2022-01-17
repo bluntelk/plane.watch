@@ -121,20 +121,11 @@ func main() {
 			EnvVars: []string{"DEBUG"},
 		},
 		&cli.BoolFlag{
-			Name:    "debug",
-			Usage:   "Show Extra Debug Information",
-			EnvVars: []string{"DEBUG"},
-		},
-		&cli.BoolFlag{
-			Name:    "quiet",
-			Usage:   "Only show important messages",
-			EnvVars: []string{"QUIET"},
-		},
-		&cli.BoolFlag{
 			Name:  "register-test-queues",
 			Usage: "Subscribes a bunch of queues to our routing keys",
 		},
 	}
+	logging.IncludeDebugQuiet(app)
 	stats.IncludePrometheusFlags(app, 9601)
 
 	app.Before = func(c *cli.Context) error {

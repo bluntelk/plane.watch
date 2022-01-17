@@ -1,4 +1,4 @@
-package discord_bot
+package main
 
 // handles the list of alerting locations
 
@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"plane.watch/lib/mapping"
+	"plane.watch/lib/tile_grid"
 	"strings"
 	"sync"
 )
@@ -26,7 +27,10 @@ type (
 		Lat             float64
 		Lon             float64
 		AlertRadius     int // The radius of the circle to alert in
+		TileGrid        string
 	}
+
+	locationMatchFunc func(l *location)
 )
 
 var (
@@ -85,7 +89,8 @@ func addAlertLocation(discordUserId, discordUserName, locationName string, lat, 
 		LocationName:    locationName,
 		Lat:             lat,
 		Lon:             lon,
-		AlertRadius:     500,
+		AlertRadius:     50000,
+		TileGrid:        tile_grid.LookupTile(lat, lon),
 	}
 	alertLocations = append(alertLocations, loc)
 	alertLocationsRWLock.Unlock()
@@ -147,12 +152,14 @@ func loadLocationsList() {
 			log.Printf("No save file. %s does not exist. proceeding with empty list", saveLoc)
 			return
 		}
-		log.Fatalf("Failed to read %s. %s", saveLoc, err)
+		log.Error().Err(err).Msgf("Failed to read %s. %s", saveLoc, err)
+		panic(err)
 		return
 	}
 	err = json.Unmarshal(b, &alertLocations)
 	if nil != err {
-		log.Fatalf("Failed to parse %s JSON perfectly. %s", saveLoc, err)
+		log.Error().Err(err).Msgf("Failed to parse %s JSON perfectly. %s", saveLoc, err)
+		panic(err)
 	}
 	isLoaded = true
 }
@@ -179,6 +186,16 @@ func saveLocationsList() error {
 }
 
 func geoCodeAddress(addr string) (float64, float64, error) {
-	log.Printf("Geocoding user address: %s", addr)
+	log.Info().Msgf("Geocoding user address: %s", addr)
 	return mapping.FindCoordinates(addr)
+}
+
+func forLocation(tileName string, matchFunc locationMatchFunc) {
+	alertLocationsRWLock.RLock()
+	defer alertLocationsRWLock.RUnlock()
+	for i := range alertLocations {
+		//if alertLocations[i].TileGrid == tileName {
+		matchFunc(&alertLocations[i])
+		//}
+	}
 }

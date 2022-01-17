@@ -3,6 +3,7 @@ package stats
 import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"net/http"
 )
@@ -20,7 +21,9 @@ func IncludePrometheusFlags(app *cli.App, defaultPort int) {
 
 func RunPrometheusWebServer(c *cli.Context) {
 	go func() {
+		metricsPort := c.Int("prom-metrics-port")
+		log.Info().Int("Port", metricsPort).Msgf("Prometheus Listener")
 		http.Handle("/metrics", promhttp.Handler())
-		_ = http.ListenAndServe(fmt.Sprintf(":%d", c.Int("prom-metrics-port")), nil)
+		_ = http.ListenAndServe(fmt.Sprintf(":%d", metricsPort), nil)
 	}()
 }

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"plane.watch/lib/logging"
+	"plane.watch/lib/stats"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/mode_s"
 	"runtime/debug"
@@ -28,10 +29,13 @@ func main() {
 			Value: "8080",
 			Usage: "Port to run the website on",
 		},
-		&cli.BoolFlag{
-			Name:  "verbose",
-			Usage: "output debug info on the CLI",
-		},
+	}
+	logging.IncludeDebugQuiet(app)
+	stats.IncludePrometheusFlags(app, 9605)
+
+	app.Before = func(c *cli.Context) error {
+		logging.SetVerboseOrQuiet(c.Bool("debug"), c.Bool("quiet"))
+		return nil
 	}
 
 	app.Action = runHttpServer
@@ -43,6 +47,7 @@ func main() {
 }
 
 func runHttpServer(c *cli.Context) error {
+	stats.RunPrometheusWebServer(c)
 	var htdocsPath string
 	var err error
 	var files fs.FS

@@ -1,13 +1,14 @@
 package main
 
 import (
+	"errors"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"os"
-	"plane.watch/lib/discord_bot"
-	"plane.watch/lib/discord_bot/config"
+	"plane.watch/cmd/pw_discord_bot/config"
 	"plane.watch/lib/logging"
 	"plane.watch/lib/mapping"
+	"plane.watch/lib/stats"
 )
 
 func main() {
@@ -29,9 +30,14 @@ func main() {
 	}
 
 	app.Flags = []cli.Flag{
+		&cli.StringFlag{
+			Name:  "config-file",
+			Usage: "Provides the location of the config file",
+			Value: "",
+		},
 		&cli.BoolFlag{
 			Name:  "nuke-commands",
-			Usage: "Use the command to re-register all bot commands",
+			Usage: "Use the command to re-register all Discord bot commands",
 			Value: false,
 		},
 		&cli.StringFlag{
@@ -44,17 +50,10 @@ func main() {
 			Usage: "Use this if your connection is not TLS protected",
 			Value: false,
 		},
-		&cli.BoolFlag{
-			Name:    "debug",
-			Usage:   "Show Extra Debug Information",
-			EnvVars: []string{"DEBUG"},
-		},
-		&cli.BoolFlag{
-			Name:    "quiet",
-			Usage:   "Only show important messages",
-			EnvVars: []string{"QUIET"},
-		},
 	}
+
+	logging.IncludeDebugQuiet(app)
+	stats.IncludePrometheusFlags(app, 9604)
 
 	app.Before = func(c *cli.Context) error {
 		logging.SetVerboseOrQuiet(c.Bool("debug"), c.Bool("quiet"))
@@ -76,10 +75,14 @@ func runCli(c *cli.Context) error {
 }
 
 func run(c *cli.Context) error {
+	stats.RunPrometheusWebServer(c)
 
-	conf := config.Load()
+	conf := config.Load(c.String("config-file"))
+	if nil == conf {
+		return errors.New("failed to load config")
+	}
 
-	pwBot, err := discord_bot.NewBot(conf.Token)
+	pwBot, err := NewPlaneWatchBot(conf.Token)
 	if nil != err {
 		return err
 	}

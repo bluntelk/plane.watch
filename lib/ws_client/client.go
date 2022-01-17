@@ -62,7 +62,10 @@ func (c *Client) Connect() (err error) {
 
 func (c *Client) Disconnect() error {
 	close(c.locationChan)
-	return c.conn.Close(websocket.StatusNormalClosure, "Closing...")
+	if nil != c.conn {
+		return c.conn.Close(websocket.StatusNormalClosure, "Closing...")
+	}
+	return nil
 }
 
 func (c *Client) listen() {

@@ -113,17 +113,8 @@ func main() {
 			Name:  "ref-lon",
 			Usage: "The reference longitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
 		},
-		&cli.BoolFlag{
-			Name:    "debug",
-			Usage:   "Show Extra Debug Information",
-			EnvVars: []string{"DEBUG"},
-		},
-		&cli.BoolFlag{
-			Name:    "quiet",
-			Usage:   "Only show important messages",
-			EnvVars: []string{"QUIET"},
-		},
 	}
+	logging.IncludeDebugQuiet(app)
 	stats.IncludePrometheusFlags(app, 9602)
 
 	app.Commands = []*cli.Command{

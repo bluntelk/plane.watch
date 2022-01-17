@@ -49,3 +49,11 @@ type (
 		TypeCode        *string `json:"type_code"`
 	}
 )
+
+func (epl *EnrichedPlaneLocation) Plane() string {
+	if "" != epl.PlaneLocation.FlightNumber {
+		return epl.PlaneLocation.FlightNumber
+	}
+
+	return "ICAO: " + epl.PlaneLocation.Icao
+}

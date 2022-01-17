@@ -72,18 +72,9 @@ func main() {
 			Usage:   "Serve up a test website for websocket testing",
 			EnvVars: []string{"TEST_WEB"},
 		},
-		&cli.BoolFlag{
-			Name:    "debug",
-			Usage:   "Show Extra Debug Information",
-			EnvVars: []string{"DEBUG"},
-		},
-		&cli.BoolFlag{
-			Name:    "quiet",
-			Usage:   "Only show important messages",
-			EnvVars: []string{"QUIET"},
-		},
 	}
 
+	logging.IncludeDebugQuiet(app)
 	stats.IncludePrometheusFlags(app, 9603)
 
 	app.Before = func(c *cli.Context) error {
