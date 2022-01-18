@@ -21,7 +21,7 @@ COPY --from=build /app/pw_ingest /app
 # limit ourselves to just location updates
 ENV PUBLISH_TYPES=location-updates
 
-HEALTHCHECK --interval=1m --timeout=3s CMD wget http://localhost:9602/health-check
+HEALTHCHECK --interval=15s --timeout=3s CMD wget --spider http://localhost:9602/status
 
 # Command to run
 CMD /app/pw_ingest daemon
