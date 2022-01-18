@@ -17,9 +17,9 @@ RUN go build plane.watch/cmd/pw_ws_broker
 FROM alpine:latest
 WORKDIR /app
 COPY --from=build /app/pw_ws_broker /app
-COPY docker/pw_ws_broker/entrypoint.sh /app
 EXPOSE 80
-EXPOSE 9603
+
+HEALTHCHECK --interval=15s --timeout=3s CMD wget --spider http://localhost:9603/status
 
 # Command to run
-CMD ["/app/entrypoint.sh"]
+CMD /app/pw_ws_broker daemon

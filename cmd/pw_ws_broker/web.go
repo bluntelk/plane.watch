@@ -27,7 +27,8 @@ type (
 		serveMux   http.ServeMux
 		httpServer http.Server
 
-		clients ClientList
+		clients   ClientList
+		listening bool
 	}
 	WsClient struct {
 		conn *websocket.Conn
@@ -121,6 +122,15 @@ func (bw *PwWsBrokerWeb) servePlanes(w http.ResponseWriter, r *http.Request) {
 		log.Debug().Str("proto", conn.Subprotocol()).Msg("Bad connection, could not speak protocol")
 		return
 	}
+}
+
+func (bw *PwWsBrokerWeb) HealthCheck() bool {
+	log.Info().Bool("Web Listening", bw.listening).Msg("Health check")
+	return bw.listening
+}
+
+func (bw *PwWsBrokerWeb) HealthCheckName() string {
+	return "WS Broker Web"
 }
 
 func NewWsClient(conn *websocket.Conn) *WsClient {

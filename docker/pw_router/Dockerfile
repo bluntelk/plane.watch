@@ -17,8 +17,8 @@ RUN go build plane.watch/cmd/pw_router
 FROM alpine:latest
 WORKDIR /app
 COPY --from=build /app/pw_router /app
-COPY docker/pw_router/entrypoint.sh /app
-EXPOSE 9601
+
+HEALTHCHECK --interval=15s --timeout=3s CMD wget --spider http://localhost:9601/status
 
 # Command to run
-CMD ["/app/entrypoint.sh"]
+CMD /app/pw_router daemon

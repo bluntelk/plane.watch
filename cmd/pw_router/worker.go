@@ -242,5 +242,4 @@ func (w *worker) publishLocationUpdate(routingKey string, msg []byte) {
 	} else {
 		log.Debug().Msgf("Sent msg to routing key %s", routingKey)
 	}
-
 }

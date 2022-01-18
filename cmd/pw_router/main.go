@@ -216,6 +216,7 @@ func run(c *cli.Context) error {
 	if err = r.connect(rabbitConfig, time.Second*5); nil != err {
 		return err
 	}
+	monitoring.AddHealthCheck(r.rmq)
 
 	if err = r.makeQueue("reducer-in", c.String("source-route-key")); nil != err {
 		return err

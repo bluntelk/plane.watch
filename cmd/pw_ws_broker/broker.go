@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"plane.watch/lib/export"
+	"plane.watch/lib/monitoring"
 	"plane.watch/lib/rabbitmq"
 	"plane.watch/lib/randstr"
 	"syscall"
@@ -51,6 +52,9 @@ func (b *PwWsBroker) Setup() error {
 		tile := loc.PlaneLocation.TileLocation + highLow
 		b.clients.SendLocationUpdate(highLow, tile, loc)
 	}
+
+	monitoring.AddHealthCheck(b.rabbit)
+	monitoring.AddHealthCheck(&b.PwWsBrokerWeb)
 	return nil
 }
 
@@ -58,7 +62,9 @@ func (b *PwWsBroker) Run() {
 	go b.consumeAll()
 
 	log.Info().Str("HttpAddr", b.httpServer.Addr).Msg("HTTP Listening on")
+	b.listening = true
 	if err := b.httpServer.ListenAndServe(); nil != err {
+		b.listening = false
 		log.Error().Err(err).Send()
 	}
 }

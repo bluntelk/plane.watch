@@ -286,7 +286,8 @@ func (r *RabbitMQ) connect(uri string, done chan bool) {
 
 func (r *RabbitMQ) HealthCheck() bool {
 	log.Debug().Msg("RabbitMQ Health Check")
-	if nil == r.conn {
+	if nil == r || nil == r.conn {
+		log.Error().Msg("Rabbit Healthcheck Bad")
 		return false
 	}
 	return !r.conn.IsClosed()
