@@ -17,8 +17,11 @@ RUN go build plane.watch/cmd/pw_ingest
 FROM alpine:latest
 WORKDIR /app
 COPY --from=build /app/pw_ingest /app
-COPY docker/pw_ingest/entrypoint.sh /app
-EXPOSE 9602
+
+# limit ourselves to just location updates
+ENV PUBLISH_TYPES=location-updates
+
+HEALTHCHECK --interval=1m --timeout=3s CMD wget http://localhost:9602/health-check
 
 # Command to run
-CMD ["/app/entrypoint.sh"]
+CMD /app/pw_ingest daemon

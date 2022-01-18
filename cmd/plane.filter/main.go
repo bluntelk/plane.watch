@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
@@ -65,14 +64,7 @@ func (r *rabbit) connect(timeout time.Duration) error {
 
 	log.Info().Str("host", rabbitConfig.String()).Msg("Connecting to RabbitMQ")
 	r.rmq = rabbitmq.New(&rabbitConfig)
-	connected := make(chan bool)
-	go r.rmq.Connect(connected)
-	select {
-	case <-connected:
-		return nil
-	case <-time.After(timeout):
-		return fmt.Errorf("failed to connect to rabbit in a timely manner")
-	}
+	return r.rmq.ConnectAndWait(timeout)
 }
 
 func (r *rabbit) makeQueue(name string) error {

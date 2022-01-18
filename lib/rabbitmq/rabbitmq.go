@@ -283,3 +283,15 @@ func (r *RabbitMQ) connect(uri string, done chan bool) {
 
 	done <- true
 }
+
+func (r *RabbitMQ) HealthCheck() bool {
+	log.Debug().Msg("RabbitMQ Health Check")
+	if nil == r.conn {
+		return false
+	}
+	return !r.conn.IsClosed()
+}
+
+func (r *RabbitMQ) HealthCheckName() string {
+	return "RabbitMQ"
+}

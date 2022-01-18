@@ -10,7 +10,7 @@ import (
 	"os"
 	"path"
 	"plane.watch/lib/logging"
-	"plane.watch/lib/stats"
+	"plane.watch/lib/monitoring"
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/mode_s"
 	"runtime/debug"
@@ -31,7 +31,7 @@ func main() {
 		},
 	}
 	logging.IncludeVerbosityFlags(app)
-	stats.IncludePrometheusFlags(app, 9605)
+	monitoring.IncludeMonitoringFlags(app, 9605)
 
 	app.Before = func(c *cli.Context) error {
 		logging.SetLoggingLevel(c)
@@ -47,7 +47,7 @@ func main() {
 }
 
 func runHttpServer(c *cli.Context) error {
-	stats.RunPrometheusWebServer(c)
+	monitoring.RunWebServer(c)
 	var htdocsPath string
 	var err error
 	var files fs.FS

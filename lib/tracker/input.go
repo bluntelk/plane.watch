@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"plane.watch/lib/monitoring"
 	"plane.watch/lib/tracker/beast"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
@@ -41,12 +42,14 @@ type (
 	Producer interface {
 		EventMaker
 		fmt.Stringer
+		monitoring.HealthCheck
 	}
 
 	// Sink is something that takes the output from our producers and trackers
 	Sink interface {
 		EventListener
 		Stopper
+		monitoring.HealthCheck
 	}
 
 	// Middleware has a chance to modify a frame before we send it to the plane Tracker
@@ -117,7 +120,8 @@ func (t *Tracker) AddProducer(p Producer) {
 	if nil == p {
 		return
 	}
-
+	monitoring.AddHealthCheck(p)
+	
 	t.debugMessage("Adding producer: %s", p)
 	t.producers = append(t.producers, p)
 	t.producerWaiter.Add(1)
@@ -145,6 +149,7 @@ func (t *Tracker) AddSink(s Sink) {
 		return
 	}
 	t.sinks = append(t.sinks, s)
+	monitoring.AddHealthCheck(s)
 }
 
 // Stop attempts to stop all the things, mid flight. Use this if you have something else waiting for things to finish

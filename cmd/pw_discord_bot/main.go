@@ -8,7 +8,7 @@ import (
 	"plane.watch/cmd/pw_discord_bot/config"
 	"plane.watch/lib/logging"
 	"plane.watch/lib/mapping"
-	"plane.watch/lib/stats"
+	"plane.watch/lib/monitoring"
 )
 
 func main() {
@@ -53,7 +53,7 @@ func main() {
 	}
 
 	logging.IncludeVerbosityFlags(app)
-	stats.IncludePrometheusFlags(app, 9604)
+	monitoring.IncludeMonitoringFlags(app, 9604)
 
 	app.Before = func(c *cli.Context) error {
 		logging.SetLoggingLevel(c)
@@ -75,7 +75,7 @@ func runCli(c *cli.Context) error {
 }
 
 func run(c *cli.Context) error {
-	stats.RunPrometheusWebServer(c)
+	monitoring.RunWebServer(c)
 
 	conf := config.Load(c.String("config-file"))
 	if nil == conf {

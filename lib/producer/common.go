@@ -45,6 +45,8 @@ type (
 		stats struct {
 			avr, beast, sbs1 prometheus.Counter
 		}
+
+		hasFetcher, fetcherConnected bool
 	}
 
 	Option func(*producer)
@@ -72,7 +74,30 @@ func New(opts ...Option) *producer {
 		opt(p)
 	}
 
+	if "" == p.Name {
+		p.Name = p.OriginIdentifier
+	}
+	if "" == p.Name {
+		p.Name = p.Tag
+	}
+	if "" == p.Name {
+		p.Name = producerType(p.producerType)
+	}
+
 	return p
+}
+
+func producerType(in int) string {
+	switch in {
+	case Avr:
+		return "AVR"
+	case Beast:
+		return "Beast"
+	case Sbs1:
+		return "SBS1"
+	default:
+		return "Unknown"
+	}
 }
 
 // producer.New(WithFetcher(host, port), WithType(producer.Avr), WithRefLatLon(lat, lon))
@@ -115,6 +140,7 @@ func WithSourceTag(tag string) Option {
 func WithFetcher(host, port string) Option {
 	hp := net.JoinHostPort(host, port)
 	return func(p *producer) {
+		p.hasFetcher = true
 		p.FrameSource.OriginIdentifier = hp
 		p.run = func() {
 			p.addInfo("Fetching From Host: %s:%s", host, port)
@@ -222,6 +248,17 @@ func (p *producer) addError(err error) {
 	log.Error().Str("section", p.Name).Err(err).Send()
 }
 
+func (p *producer) HealthCheck() bool {
+	if p.hasFetcher {
+		return p.fetcherConnected
+	}
+	return true
+}
+
+func (p *producer) HealthCheckName() string {
+	return p.Name
+}
+
 func (p *producer) Stop() {
 	p.cmdChan <- cmdExit
 }
@@ -309,11 +346,12 @@ func (p *producer) fetcher(host, port string, read func(net.Conn) error) {
 		var backOff = time.Second
 		var err error
 		for isWorking() {
-			p.addDebug("We are working!")
+			p.addDebug("Connecting...")
 			wLock.Lock()
 			conn, err = net.Dial("tcp", net.JoinHostPort(host, port))
 			wLock.Unlock()
 			if nil != err {
+				p.fetcherConnected = false
 				p.addError(err)
 				time.Sleep(backOff)
 				backOff = backOff*2 + ((time.Duration(rand.Intn(20)) * time.Millisecond * 100) - time.Second)
@@ -324,6 +362,7 @@ func (p *producer) fetcher(host, port string, read func(net.Conn) error) {
 			}
 			p.addDebug("Connected!")
 			backOff = time.Second
+			p.fetcherConnected = true
 
 			if err = read(conn); nil != err {
 				p.addError(err)
@@ -348,5 +387,4 @@ func (p *producer) fetcher(host, port string, read func(net.Conn) error) {
 			}
 		}
 	}()
-
 }

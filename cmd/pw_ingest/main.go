@@ -11,9 +11,9 @@ import (
 	"os"
 	"plane.watch/lib/dedupe"
 	"plane.watch/lib/logging"
+	"plane.watch/lib/monitoring"
 	"plane.watch/lib/producer"
 	"plane.watch/lib/sink"
-	"plane.watch/lib/stats"
 	"plane.watch/lib/tracker"
 	"strconv"
 	"strings"
@@ -90,9 +90,8 @@ func main() {
 			EnvVars: []string{"PUBLISH"},
 		},
 		&cli.BoolFlag{
-			Name:    "rabbitmq-test-queues",
-			Usage:   fmt.Sprintf("Create a queue (named after the publishing routing key) and bind it. This allows you to see the messages being published."),
-			EnvVars: []string{"PUBLISH"},
+			Name:  "rabbitmq-test-queues",
+			Usage: fmt.Sprintf("Create a queue (named after the publishing routing key) and bind it. This allows you to see the messages being published."),
 		},
 
 		&cli.StringFlag{
@@ -115,7 +114,7 @@ func main() {
 		},
 	}
 	logging.IncludeVerbosityFlags(app)
-	stats.IncludePrometheusFlags(app, 9602)
+	monitoring.IncludeMonitoringFlags(app, 9602)
 
 	app.Commands = []*cli.Command{
 		{
@@ -280,7 +279,7 @@ func handleFileSource(urlFile, defaultTag string, defaultRefLat, defaultRefLon f
 }
 
 func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
-	stats.RunPrometheusWebServer(c)
+	monitoring.RunWebServer(c)
 	refLat := c.Float64("refLat")
 	refLon := c.Float64("refLon")
 
@@ -296,7 +295,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 	trk.AddMiddleware(dedupe.NewFilter())
 
 	for _, sinkUrl := range c.StringSlice("sink") {
-		log.Debug().Str("sink-url", sinkUrl).Send()
+		log.Debug().Str("sink-url", sinkUrl).Msg("With Sink")
 		p, err := handleSink(sinkUrl, defaultTag, defaultTTl, defaultQueues, c.Bool("rabbitmq-test-queues"))
 		if nil != err {
 			log.Error().Err(err).Str("url", sinkUrl).Msgf("Failed to understand URL: %s", err)
@@ -305,6 +304,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		}
 	}
 	for _, fetchUrl := range c.StringSlice("fetch") {
+		log.Debug().Str("fetch-url", fetchUrl).Msg("With Fetch")
 		p, err := handleSource(fetchUrl, defaultTag, refLat, refLon, false)
 		if nil != err {
 			log.Error().Err(err).Str("url", fetchUrl).Msgf("Failed to understand URL: %s", err)
@@ -313,6 +313,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		}
 	}
 	for _, listenUrl := range c.StringSlice("listen") {
+		log.Debug().Str("listen-url", listenUrl).Msg("With Listen")
 		p, err := handleSource(listenUrl, defaultTag, refLat, refLon, true)
 		if nil != err {
 			log.Error().Err(err).Str("url", listenUrl).Msgf("Failed to understand URL: %s", err)
@@ -321,6 +322,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		}
 	}
 	for _, fileUrl := range c.StringSlice("file") {
+		log.Debug().Str("file-url", fileUrl).Msg("With File")
 		p, err := handleFileSource(fileUrl, defaultTag, refLat, refLon)
 		if nil != err {
 			log.Error().Err(err).Str("url", fileUrl).Msgf("Failed to understand URL: %s", err)

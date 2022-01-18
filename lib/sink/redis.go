@@ -28,5 +28,13 @@ func (r *RedisSink) Listen() chan tracker.Event {
 }
 
 func (r *RedisSink) Stop() {
-	close (r.events)
+	close(r.events)
+}
+
+func (r *RedisSink) HealthCheck() bool {
+	return false
+}
+
+func (r *RedisSink) HealthCheckName() string {
+	return "Redis"
 }

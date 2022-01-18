@@ -22,6 +22,14 @@ func NewLoggerSink(opts ...Option) *LoggerSink {
 	return l
 }
 
+func (l *LoggerSink) HealthCheck() bool {
+	return true
+}
+
+func (l *LoggerSink) HealthCheckName() string {
+	return "Logger Sink"
+}
+
 func (l *LoggerSink) Stop() {
 	l.Config.Finish()
 }

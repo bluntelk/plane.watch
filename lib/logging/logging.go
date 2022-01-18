@@ -49,7 +49,7 @@ func SetVerboseOrQuiet(trace, verbose, quiet bool) {
 	if quiet {
 		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 	}
-	log.Info().Str("log-level", zerolog.GlobalLevel().String()).Msg("Logging Set")
+	//log.Info().Str("log-level", zerolog.GlobalLevel().String()).Msg("Logging Set")
 }
 
 func cliWriter() zerolog.ConsoleWriter {

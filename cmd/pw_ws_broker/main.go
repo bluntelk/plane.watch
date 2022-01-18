@@ -8,7 +8,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"os"
 	"plane.watch/lib/logging"
-	"plane.watch/lib/stats"
+	"plane.watch/lib/monitoring"
 )
 
 var (
@@ -75,7 +75,7 @@ func main() {
 	}
 
 	logging.IncludeVerbosityFlags(app)
-	stats.IncludePrometheusFlags(app, 9603)
+	monitoring.IncludeMonitoringFlags(app, 9603)
 
 	app.Before = func(c *cli.Context) error {
 		logging.SetLoggingLevel(c)
@@ -97,7 +97,7 @@ func runCli(c *cli.Context) error {
 }
 
 func run(c *cli.Context) error {
-	stats.RunPrometheusWebServer(c)
+	monitoring.RunWebServer(c)
 	source := c.String("source")
 	lowRoute := c.String("route-key-low")
 	highRoute := c.String("route-key-high")

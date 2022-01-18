@@ -233,3 +233,11 @@ func (d *display) OnEvent(e tracker.Event) {
 func (d *display) Stop() {
 	d.app.Stop()
 }
+
+func (d *display) HealthCheck() bool {
+	return true
+}
+
+func (d *display) HealthCheckName() string {
+	return "TUI Display"
+}

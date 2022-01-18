@@ -84,6 +84,7 @@ func NewRabbitMqSink(opts ...Option) (*RabbitMqSink, error) {
 
 	var err error
 	if r.mq, err = r.connect(time.Second * 5); nil != err {
+		r.mq = nil
 		return nil, err
 	}
 
@@ -312,14 +313,7 @@ func (r *RabbitMqSink) connect(timeout time.Duration) (*rabbitmq.RabbitMQ, error
 
 	log.Info().Str("host", rabbitConfig.String()).Msg("Connecting to RabbitMQ")
 	rabbit := rabbitmq.New(&rabbitConfig)
-	connected := make(chan bool)
-	go rabbit.Connect(connected)
-	select {
-	case <-connected:
-		return rabbit, nil
-	case <-time.After(timeout):
-		return nil, fmt.Errorf("failed to connect to rabbit in a timely manner")
-	}
+	return rabbit, rabbit.ConnectAndWait(timeout)
 }
 
 func (r *RabbitMqSink) setup() error {
@@ -343,4 +337,16 @@ func (r *RabbitMqSink) setup() error {
 	}
 
 	return nil
+}
+
+func (r *RabbitMqSink) HealthCheck() bool {
+	log.Debug().Msg("RabbitmqSink Health Check")
+	if nil == r.mq {
+		return false
+	}
+	return r.mq.HealthCheck()
+}
+
+func (r *RabbitMqSink) HealthCheckName() string {
+	return "Rabbit MQ Sink"
 }

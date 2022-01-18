@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/url"
 	"os"
-	"plane.watch/lib/stats"
+	"plane.watch/lib/monitoring"
 	"plane.watch/lib/tile_grid"
 	"sync"
 	"time"
@@ -126,7 +126,7 @@ func main() {
 		},
 	}
 	logging.IncludeVerbosityFlags(app)
-	stats.IncludePrometheusFlags(app, 9601)
+	monitoring.IncludeMonitoringFlags(app, 9601)
 
 	app.Before = func(c *cli.Context) error {
 		logging.SetLoggingLevel(c)
@@ -184,7 +184,7 @@ func (r *pwRouter) setupTestQueues() error {
 
 func run(c *cli.Context) error {
 	// setup and start the prom exporter
-	stats.RunPrometheusWebServer(c)
+	monitoring.RunWebServer(c)
 
 	var err error
 	// connect to rabbitmq, create ourselves 2 queues
