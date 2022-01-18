@@ -299,6 +299,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		p, err := handleSink(sinkUrl, defaultTag, defaultTTl, defaultQueues, c.Bool("rabbitmq-test-queues"))
 		if nil != err {
 			log.Error().Err(err).Str("url", sinkUrl).Msgf("Failed to understand URL: %s", err)
+			return nil, err
 		} else {
 			trk.AddSink(p)
 		}
@@ -308,6 +309,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		p, err := handleSource(fetchUrl, defaultTag, refLat, refLon, false)
 		if nil != err {
 			log.Error().Err(err).Str("url", fetchUrl).Msgf("Failed to understand URL: %s", err)
+			return nil, err
 		} else {
 			trk.AddProducer(p)
 		}
@@ -317,6 +319,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		p, err := handleSource(listenUrl, defaultTag, refLat, refLon, true)
 		if nil != err {
 			log.Error().Err(err).Str("url", listenUrl).Msgf("Failed to understand URL: %s", err)
+			return nil, err
 		} else {
 			trk.AddProducer(p)
 		}
@@ -326,6 +329,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		p, err := handleFileSource(fileUrl, defaultTag, refLat, refLon)
 		if nil != err {
 			log.Error().Err(err).Str("url", fileUrl).Msgf("Failed to understand URL: %s", err)
+			return nil, err
 		} else {
 			trk.AddProducer(p)
 		}

@@ -86,9 +86,9 @@ func New(cfg *Config) *RabbitMQ {
 
 func (r *RabbitMQ) Connect(connected chan bool) {
 	reset := make(chan bool)
-	done := make(chan bool)
+	connectedChan := make(chan bool)
 	timer := time.AfterFunc(0, func() {
-		r.connect(r.uri, done)
+		r.connect(r.uri, connectedChan)
 		reset <- true
 	})
 	defer timer.Stop()
@@ -97,7 +97,7 @@ func (r *RabbitMQ) Connect(connected chan bool) {
 
 	for {
 		select {
-		case <-done:
+		case <-connectedChan:
 			r.log.Debug().Msg("RabbitMQ connected and channel established")
 			r.connected = true
 			connected <- true
@@ -125,6 +125,7 @@ func (r *RabbitMQ) Connect(connected chan bool) {
 		}
 	}
 }
+
 func (r *RabbitMQ) ConnectAndWait(timeout time.Duration) error {
 	r.log.Info().Str("Url", r.uri).Dur("Timeout MS", timeout).Msg("Connecting")
 	connected := make(chan bool)
