@@ -19,6 +19,13 @@ import (
 const alertLocationsFile = "alert-locations.json"
 
 type (
+	alertConfig struct {
+		HeightLowFt, HeightHighFt int
+		AlertRadiusMtr            int
+		Enabled                   bool
+	}
+	alertConfigs map[string]*alertConfig
+
 	location struct {
 		DiscordUserId   string
 		DiscordUserName string
@@ -26,7 +33,7 @@ type (
 		Address         string
 		Lat             float64
 		Lon             float64
-		AlertRadius     int // The radius of the circle to alert in
+		AlertConfig     alertConfigs // The radius of the circle to alert in
 		TileGrid        string
 	}
 
@@ -37,6 +44,38 @@ var (
 	alertLocationsRWLock sync.RWMutex
 	alertLocations       []location
 	isLoaded             bool
+	standardAlerts       = map[string]*alertConfig{
+		"very-low": { // LOW flying aircraft, probably looking for something
+			HeightLowFt:    -2_000,
+			HeightHighFt:   2_000,
+			AlertRadiusMtr: 500,
+			Enabled:        true,
+		},
+		"low": { // low flying, probably in transit
+			HeightLowFt:    2_000,
+			HeightHighFt:   5_000,
+			AlertRadiusMtr: 1000,
+			Enabled:        true,
+		},
+		"medium": { // small commercial? ~ 5000ft
+			HeightLowFt:    5_000,
+			HeightHighFt:   10_000,
+			AlertRadiusMtr: 1500,
+			Enabled:        true,
+		},
+		"high": { // aircraft up to 15,000ft - probably coming into land
+			HeightLowFt:    10_000,
+			HeightHighFt:   25_000,
+			AlertRadiusMtr: 3000,
+			Enabled:        true,
+		},
+		"very-high": { // aircraft above 15,000ft - probably commercial in transit, not wanting an alert by default
+			HeightLowFt:    25_000,
+			HeightHighFt:   328084, // 100k
+			AlertRadiusMtr: 20000,
+			Enabled:        false,
+		},
+	}
 )
 
 func getPath() string {
@@ -89,7 +128,7 @@ func addAlertLocation(discordUserId, discordUserName, locationName string, lat, 
 		LocationName:    locationName,
 		Lat:             lat,
 		Lon:             lon,
-		AlertRadius:     50000,
+		AlertConfig:     standardAlerts,
 		TileGrid:        tile_grid.LookupTile(lat, lon),
 	}
 	alertLocations = append(alertLocations, loc)
@@ -128,13 +167,13 @@ func setLocationAddress(discordUserId, locationName, address string) error {
 }
 
 // allows updating the radius in which we alert for this location
-func setLocationAlertRadius(discordUserId, locationName string, alertRadius int) error {
+func setLocationAlertConfigEnabled(discordUserId, locationName, which string, enabled bool) error {
 	idx := getExisting(discordUserId, locationName)
 	if -1 == idx {
 		return errors.New("that location name does not exist")
 	}
 	alertLocationsRWLock.Lock()
-	alertLocations[idx].AlertRadius = alertRadius
+	alertLocations[idx].AlertConfig[which].Enabled = enabled
 	alertLocationsRWLock.Unlock()
 	return saveLocationsList()
 }
@@ -194,8 +233,17 @@ func forLocation(tileName string, matchFunc locationMatchFunc) {
 	alertLocationsRWLock.RLock()
 	defer alertLocationsRWLock.RUnlock()
 	for i := range alertLocations {
-		//if alertLocations[i].TileGrid == tileName {
-		matchFunc(&alertLocations[i])
-		//}
+		if alertLocations[i].TileGrid == tileName {
+			matchFunc(&alertLocations[i])
+		}
 	}
+}
+
+func (ac *alertConfigs) configForHeight(altitude int) *alertConfig {
+	for _, config := range *ac {
+		if altitude >= config.HeightLowFt && altitude < config.HeightHighFt {
+			return config
+		}
+	}
+	return nil
 }

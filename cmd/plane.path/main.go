@@ -7,6 +7,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"io"
 	"os"
+	"plane.watch/lib/logging"
 	"plane.watch/lib/tracker"
 	"runtime/pprof"
 )
@@ -41,10 +42,6 @@ func main() {
 	}
 	app.Flags = []cli.Flag{
 		&cli.BoolFlag{
-			Name:  "verbose, v",
-			Usage: "verbose debugging output",
-		},
-		&cli.BoolFlag{
 			Name:  "stdout",
 			Usage: "Output to stdout instead of to a file (disables any other output)",
 		},
@@ -53,6 +50,7 @@ func main() {
 			Usage: "creates a CPU Profile of the code",
 		},
 	}
+	logging.IncludeVerbosityFlags(app)
 
 	tracker.MaxLocationHistory = -1
 	app.Before = func(context *cli.Context) error {

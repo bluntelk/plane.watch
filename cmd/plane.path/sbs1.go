@@ -10,7 +10,7 @@ import (
 
 func parseSbs1(c *cli.Context) error {
 	opts := make([]tracker.Option, 0)
-	logging.SetVerboseOrQuiet(c.Bool("verbose"), c.Bool("quiet"))
+	logging.SetLoggingLevel(c)
 
 	out, err := getOutput(c)
 	if nil != err {

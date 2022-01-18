@@ -125,11 +125,11 @@ func main() {
 			Usage: "Subscribes a bunch of queues to our routing keys",
 		},
 	}
-	logging.IncludeDebugQuiet(app)
+	logging.IncludeVerbosityFlags(app)
 	stats.IncludePrometheusFlags(app, 9601)
 
 	app.Before = func(c *cli.Context) error {
-		logging.SetVerboseOrQuiet(c.Bool("debug"), c.Bool("quiet"))
+		logging.SetLoggingLevel(c)
 		return nil
 	}
 

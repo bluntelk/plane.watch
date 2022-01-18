@@ -52,11 +52,11 @@ func main() {
 		},
 	}
 
-	logging.IncludeDebugQuiet(app)
+	logging.IncludeVerbosityFlags(app)
 	stats.IncludePrometheusFlags(app, 9604)
 
 	app.Before = func(c *cli.Context) error {
-		logging.SetVerboseOrQuiet(c.Bool("debug"), c.Bool("quiet"))
+		logging.SetLoggingLevel(c)
 		return nil
 	}
 

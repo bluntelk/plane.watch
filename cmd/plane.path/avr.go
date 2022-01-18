@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-type timeFiddler struct{
+type timeFiddler struct {
 	events chan tracker.Event
 }
 
@@ -35,8 +35,7 @@ func (fm *timeFiddler) Stop() {
 
 func parseAvr(c *cli.Context) error {
 	opts := make([]tracker.Option, 0)
-	var verbose bool
-	logging.SetVerboseOrQuiet(c.Bool("verbose"), c.Bool("quiet"))
+	logging.SetLoggingLevel(c)
 
 	out, err := getOutput(c)
 	if nil != err {
@@ -45,9 +44,6 @@ func parseAvr(c *cli.Context) error {
 
 	trk := tracker.NewTracker(opts...)
 	trk.AddMiddleware(NewTimeFiddler())
-	if verbose {
-		logging.SetVerboseOrQuiet(verbose, false)
-	}
 	trk.AddProducer(producer.New(producer.WithType(producer.Avr), producer.WithFiles(getFilePaths(c))))
 	trk.Wait()
 	return writeResult(trk, out)

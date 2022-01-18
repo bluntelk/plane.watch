@@ -64,18 +64,31 @@ func (a *pwAlertBot) handleUpdate(update *export.EnrichedPlaneLocation) {
 	if nil == update {
 		return
 	}
+	// ignore updates of we do not have enough data on them
+	if 0 == update.PlaneLocation.Altitude && !update.PlaneLocation.OnGround {
+		// probably an update that is incomplete, we can catch the next one
+		return
+	}
 
 	forLocation(update.PlaneLocation.TileLocation, func(alert *location) {
 		distance := getDistanceBetween(update.PlaneLocation.Lat, update.PlaneLocation.Lon, alert.Lat, alert.Lon)
-		log.Debug().
+		ac := alert.AlertConfig.configForHeight(update.PlaneLocation.Altitude)
+		if nil == ac {
+			log.Error().Int("altitude", update.PlaneLocation.Altitude).Msg("Failed to get alert config")
+			return
+		}
+		if !ac.Enabled {
+			return
+		}
+		log.Trace().
 			Floats64("alert-location", []float64{alert.Lat, alert.Lon}).
 			Floats64("plane-location", []float64{update.PlaneLocation.Lat, update.PlaneLocation.Lon}).
 			Int("Distance (m)", distance).
-			Int("Alert Radius", alert.AlertRadius).
-			Bool("In Air Space", distance <= alert.AlertRadius).
+			Int("Alert Radius", ac.AlertRadiusMtr).
+			Bool("In Air Space", distance <= ac.AlertRadiusMtr).
 			Msg("Distance Calc")
 
-		if distance <= alert.AlertRadius {
+		if distance <= ac.AlertRadiusMtr {
 			// do alert
 			a.alertUser(&proximityAlert{
 				time:        time.Now(),

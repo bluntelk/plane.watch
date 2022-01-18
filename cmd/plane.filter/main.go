@@ -44,7 +44,7 @@ func main() {
 
 	app.Before = func(c *cli.Context) error {
 		logging.ConfigureForCli()
-		logging.SetVerboseOrQuiet(c.Bool("debug"), c.Bool("quiet"))
+		logging.SetLoggingLevel(c)
 		return nil
 	}
 

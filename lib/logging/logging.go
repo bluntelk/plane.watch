@@ -11,8 +11,12 @@ import (
 
 var isCli bool
 
-func IncludeDebugQuiet(app *cli.App) {
+func IncludeVerbosityFlags(app *cli.App) {
 	app.Flags = append(app.Flags,
+		&cli.BoolFlag{
+			Name:  "very-verbose",
+			Usage: "Enable trace level debugging",
+		},
 		&cli.BoolFlag{
 			Name:    "debug",
 			Usage:   "Show Extra Debug Information",
@@ -26,14 +30,26 @@ func IncludeDebugQuiet(app *cli.App) {
 	)
 }
 
-func SetVerboseOrQuiet(verbose, quiet bool) {
+func SetLoggingLevel(c *cli.Context) {
+	SetVerboseOrQuiet(
+		c.Bool("very-verbose"),
+		c.Bool("debug"),
+		c.Bool("quiet"),
+	)
+}
+
+func SetVerboseOrQuiet(trace, verbose, quiet bool) {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	if trace {
+		zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	}
 	if verbose {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 	if quiet {
 		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 	}
+	log.Info().Str("log-level", zerolog.GlobalLevel().String()).Msg("Logging Set")
 }
 
 func cliWriter() zerolog.ConsoleWriter {

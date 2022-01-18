@@ -114,7 +114,7 @@ func main() {
 			Usage: "The reference longitude for decoding messages. Needs to be within 45nm of where the messages are generated.",
 		},
 	}
-	logging.IncludeDebugQuiet(app)
+	logging.IncludeVerbosityFlags(app)
 	stats.IncludePrometheusFlags(app, 9602)
 
 	app.Commands = []*cli.Command{
@@ -137,7 +137,7 @@ func main() {
 	}
 
 	app.Before = func(c *cli.Context) error {
-		logging.SetVerboseOrQuiet(c.Bool("debug"), c.Bool("quiet"))
+		logging.SetLoggingLevel(c)
 		return nil
 	}
 
@@ -370,7 +370,6 @@ func run(c *cli.Context) error {
 
 // runDaemon does not have pretty cli output (just JSON from logging)
 func runDaemon(c *cli.Context) error {
-	logging.SetVerboseOrQuiet(false, true)
 	trk, err := commonSetup(c)
 	if nil != err {
 		return err

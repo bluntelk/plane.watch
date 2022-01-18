@@ -30,11 +30,11 @@ func main() {
 			Usage: "Port to run the website on",
 		},
 	}
-	logging.IncludeDebugQuiet(app)
+	logging.IncludeVerbosityFlags(app)
 	stats.IncludePrometheusFlags(app, 9605)
 
 	app.Before = func(c *cli.Context) error {
-		logging.SetVerboseOrQuiet(c.Bool("debug"), c.Bool("quiet"))
+		logging.SetLoggingLevel(c)
 		return nil
 	}
 
@@ -62,7 +62,7 @@ func runHttpServer(c *cli.Context) error {
 		htdocsPath = path.Clean(c.Args().First())
 		files = os.DirFS(htdocsPath)
 	}
-	logging.SetVerboseOrQuiet(c.Bool("verbose"), false)
+	logging.SetLoggingLevel(c)
 
 	http.Handle("/", http.FileServer(http.FS(files)))
 
