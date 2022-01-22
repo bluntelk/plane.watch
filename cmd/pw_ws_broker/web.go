@@ -31,24 +31,22 @@ type (
 		listening bool
 	}
 	WsClient struct {
-		conn *websocket.Conn
-
-		subLock sync.RWMutex
-		subs    map[string]bool
-
+		conn    *websocket.Conn
 		outChan chan ws_protocol.WsResponse
+		cmdChan chan WsCmd
 	}
-
+	WsCmd struct {
+		action string
+		what   string
+	}
 	ClientList struct {
-		clients     map[*WsClient]chan ws_protocol.WsResponse
-		clientsLock sync.RWMutex
+		//clients     map[*WsClient]chan ws_protocol.WsResponse
+		clients sync.Map
 	}
 )
 
 func (bw *PwWsBrokerWeb) configureWeb() error {
-	bw.clients = ClientList{
-		clients: make(map[*WsClient]chan ws_protocol.WsResponse),
-	}
+	bw.clients = ClientList{}
 	bw.serveMux.HandleFunc("/", bw.indexPage)
 	bw.serveMux.HandleFunc("/grid", bw.jsonGrid)
 	bw.serveMux.HandleFunc("/planes", bw.servePlanes)
@@ -115,10 +113,11 @@ func (bw *PwWsBrokerWeb) servePlanes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Debug().Str("protocol", conn.Subprotocol()).Msg("Speaking...")
 	switch conn.Subprotocol() {
 	case ws_protocol.WsProtocolPlanes:
 		client := NewWsClient(conn)
-		bw.clients.addClient(client, client.outChan)
+		bw.clients.addClient(client)
 		client.Handle(r.Context())
 		bw.clients.removeClient(client)
 	default:
@@ -140,7 +139,7 @@ func (bw *PwWsBrokerWeb) HealthCheckName() string {
 func NewWsClient(conn *websocket.Conn) *WsClient {
 	client := WsClient{
 		conn:    conn,
-		subs:    map[string]bool{},
+		cmdChan: make(chan WsCmd),
 		outChan: make(chan ws_protocol.WsResponse),
 	}
 	return &client
@@ -159,31 +158,28 @@ func (c *WsClient) Handle(ctx context.Context) {
 	}
 }
 func (c *WsClient) AddSub(tileName string) {
-	c.subLock.Lock()
-	defer c.subLock.Unlock()
-	c.subs[tileName] = true
+	log.Debug().Msg("Add Sub")
+	c.cmdChan <- WsCmd{
+		action: ws_protocol.RequestTypeSubscribe,
+		what:   tileName,
+	}
+	log.Debug().Msg("Add Sub Done")
 }
 func (c *WsClient) UnSub(tileName string) {
-	c.subLock.Lock()
-	defer c.subLock.Unlock()
-	c.subs[tileName] = false
-}
-func (c *WsClient) SubTiles() []string {
-	c.subLock.RLock()
-	defer c.subLock.RUnlock()
-	tiles := make([]string, 0, len(c.subs))
-	for k, v := range c.subs {
-		if v {
-			tiles = append(tiles, k)
-		}
+	log.Debug().Msg("Unsub")
+	c.cmdChan <- WsCmd{
+		action: ws_protocol.RequestTypeUnsubscribe,
+		what:   tileName,
 	}
-	return tiles
+	log.Debug().Msg("Unsub done")
 }
-func (c *WsClient) HasSub(tileName string) bool {
-	c.subLock.RLock()
-	defer c.subLock.RUnlock()
-	val, ok := c.subs[tileName]
-	return val && ok
+func (c *WsClient) SendTiles() {
+	log.Debug().Msg("Unsub")
+	c.cmdChan <- WsCmd{
+		action: ws_protocol.RequestTypeSubscribeList,
+		what:   "",
+	}
+	log.Debug().Msg("Unsub done")
 }
 
 func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Conn) error {
@@ -208,18 +204,13 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 				switch rq.Type {
 				case ws_protocol.RequestTypeSubscribe:
 					c.AddSub(rq.GridTile)
-					_ = c.sendAck(ctx, ws_protocol.ResponseTypeAckSub, rq.GridTile)
 				case ws_protocol.RequestTypeSubscribeList:
-					err = c.sendPlaneMessage(ctx, &ws_protocol.WsResponse{
-						Type:  ws_protocol.ResponseTypeSubTiles,
-						Tiles: c.SubTiles(),
-					})
+					c.SendTiles()
 					if nil != err {
 						return
 					}
 				case ws_protocol.RequestTypeUnsubscribe:
 					c.UnSub(rq.GridTile)
-					_ = c.sendAck(ctx, ws_protocol.ResponseTypeAckUnsub, rq.GridTile)
 				default:
 					_ = c.sendError(ctx, "Unknown request type")
 				}
@@ -231,14 +222,42 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 	}()
 
 	// write a stream of location information
+	subs := make(map[string]bool)
 
-	for planeMsg := range c.outChan {
-		if err := c.sendPlaneMessage(ctx, &planeMsg); nil != err {
+	for {
+		var err error
+		select {
+		case cmdMsg := <-c.cmdChan:
+			switch cmdMsg.action {
+			case "exit":
+				return nil
+			case ws_protocol.RequestTypeSubscribe:
+				subs[cmdMsg.what] = true
+				err = c.sendAck(ctx, ws_protocol.ResponseTypeAckSub, cmdMsg.what)
+			case ws_protocol.RequestTypeUnsubscribe:
+				delete(subs, cmdMsg.what)
+				err = c.sendAck(ctx, ws_protocol.ResponseTypeAckUnsub, cmdMsg.what)
+			case ws_protocol.RequestTypeSubscribeList:
+				tiles := make([]string, 0, len(subs))
+				for k, v := range subs {
+					if v {
+						tiles = append(tiles, k)
+					}
+				}
+				err = c.sendPlaneMessage(ctx, &ws_protocol.WsResponse{
+					Type:  ws_protocol.ResponseTypeSubTiles,
+					Tiles: tiles,
+				})
+
+			}
+		case planeMsg := <-c.outChan:
+			err = c.sendPlaneMessage(ctx, &planeMsg)
+		}
+
+		if nil != err {
 			return err
 		}
 	}
-
-	return nil
 }
 
 func (c *WsClient) sendAck(ctx context.Context, ackType, tile string) error {
@@ -280,30 +299,35 @@ func (c *WsClient) writeTimeout(ctx context.Context, timeout time.Duration, msg 
 	return c.conn.Write(ctxW, websocket.MessageText, msg)
 }
 
-func (cl *ClientList) addClient(c *WsClient, out chan ws_protocol.WsResponse) {
-	cl.clientsLock.Lock()
-	defer cl.clientsLock.Unlock()
-	cl.clients[c] = out
+func (cl *ClientList) addClient(c *WsClient) {
+	log.Debug().Msg("Add Client")
+	cl.clients.Store(c, true)
 	prometheusNumClients.Inc()
+	log.Debug().Msg("Add Client Done")
 }
 
 func (cl *ClientList) removeClient(c *WsClient) {
-	cl.clientsLock.Lock()
-	defer cl.clientsLock.Unlock()
-	delete(cl.clients, c)
+	log.Debug().Msg("Remove Client")
+	close(c.outChan)
+	cl.clients.Delete(c)
 	prometheusNumClients.Dec()
+	log.Debug().Msg("Remove Client Done")
 }
 
+// SendLocationUpdate sends an update to each listening client
+// todo: make this threaded?
 func (cl *ClientList) SendLocationUpdate(highLow, tile string, loc *export.EnrichedPlaneLocation) {
-	cl.clientsLock.RLock()
-	defer cl.clientsLock.RUnlock()
-
-	for client, outChan := range cl.clients {
-		if client.HasSub(tile) || client.HasSub("all"+highLow) {
-			outChan <- ws_protocol.WsResponse{
-				Type:     ws_protocol.ResponseTypePlaneLocation,
-				Location: loc,
+	cl.clients.Range(func(key, value interface{}) bool {
+		defer func() {
+			if r := recover(); nil != r {
+				log.Error().Msgf("Panic: %v", r)
 			}
+		}()
+		client := key.(*WsClient)
+		client.outChan <- ws_protocol.WsResponse{
+			Type:     ws_protocol.ResponseTypePlaneLocation,
+			Location: loc,
 		}
-	}
+		return true
+	})
 }
