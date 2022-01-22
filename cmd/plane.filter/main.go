@@ -35,10 +35,7 @@ func main() {
 	app := cli.NewApp()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
-	app.Flags = []cli.Flag{
-		&cli.BoolFlag{Name: "debug"},
-		&cli.BoolFlag{Name: "quiet"},
-	}
+	logging.IncludeVerbosityFlags(app)
 	app.Action = run
 
 	app.Before = func(c *cli.Context) error {

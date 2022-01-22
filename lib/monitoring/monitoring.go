@@ -56,15 +56,18 @@ func AddHealthCheck(f HealthCheck) {
 func healthCheck(w http.ResponseWriter, r *http.Request) {
 	healthChecksLock.RLock()
 	defer healthChecksLock.RUnlock()
-	healthy := true
+	healthy := len(healthChecks) > 0
 	lgr := log.With().Str("Section", "Health Check").Logger()
 	lgr.Debug().Int("Num Checks", len(healthChecks)).Msg("Performing Health Check")
 	for _, check := range healthChecks {
-		ok := check.HealthCheck()
 		lgr.Debug().
 			Str("Name", check.HealthCheckName()).
+			Msg("Performing check...")
+		ok := check.HealthCheck()
+		lgr.Info().
+			Str("Name", check.HealthCheckName()).
 			Bool("Ok", ok).
-			Msg("Performing Check...")
+			Msg("Performing returned...")
 		if !ok {
 			healthy = false
 		}

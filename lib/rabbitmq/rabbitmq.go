@@ -88,7 +88,8 @@ func (r *RabbitMQ) Connect(connected chan bool) {
 	reset := make(chan bool)
 	connectedChan := make(chan bool)
 	timer := time.AfterFunc(0, func() {
-		r.connect(r.uri, connectedChan)
+		_ = r.connect(r.uri)
+		connectedChan <- true
 		reset <- true
 	})
 	defer timer.Stop()
@@ -118,6 +119,7 @@ func (r *RabbitMQ) Connect(connected chan bool) {
 			}
 
 			r.log.Error().
+				Int64("backoff (s)", backoffInterval).
 				Int64("attempt", backoffIntervalCounter).
 				Msgf("Failed to connect, attempt %d, Retrying in %d seconds", backoffIntervalCounter, backoffInterval)
 
@@ -261,28 +263,27 @@ func (r *RabbitMQ) Publish(exchange, key string, msg amqp.Publishing) error {
 	return ErrNilChannel
 }
 
-func (r *RabbitMQ) connect(uri string, done chan bool) {
+func (r *RabbitMQ) connect(uri string) error {
 	var err error
 
 	r.log.Debug().Str("Url", uri).Msg("Dialing")
 	r.conn, err = amqp.Dial(uri)
 	if err != nil {
 		r.log.Error().Err(err).Msg("Cannot Connect")
-		return
+		return err
 	}
 
 	r.log.Debug().Msg("Config established, getting Channel")
 	r.channel, err = r.conn.Channel()
 	if err != nil {
 		log.Error().Err(err).Msg("Channel Error")
-		return
+		return err
 	}
 
 	// Notify disconnect channel when disconnected
 	r.disconnected = make(chan *amqp.Error)
 	r.channel.NotifyClose(r.disconnected)
-
-	done <- true
+	return nil
 }
 
 func (r *RabbitMQ) HealthCheck() bool {

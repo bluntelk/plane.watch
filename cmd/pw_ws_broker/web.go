@@ -101,7 +101,11 @@ func (bw *PwWsBrokerWeb) servePlanes(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		Subprotocols:       []string{ws_protocol.WsProtocolPlanes},
 		InsecureSkipVerify: false,
-		//		OriginPatterns:       nil, // maybe set this for plane.watch?
+		OriginPatterns: []string{
+			"*localhost*",
+			"*plane.watch*",
+		},
+		//		OriginPatterns:       nil, // TODO maybe set this for plane.watch?
 		CompressionMode: websocket.CompressionContextTakeover,
 	})
 	if nil != err {
