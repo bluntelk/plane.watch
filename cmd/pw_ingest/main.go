@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"plane.watch/lib/dedupe"
+	"plane.watch/lib/example_finder"
 	"plane.watch/lib/logging"
 	"plane.watch/lib/monitoring"
 	"plane.watch/lib/producer"
@@ -132,6 +133,21 @@ func main() {
 			Name:   "daemon",
 			Usage:  "Docker Daemon Mode",
 			Action: runDaemon,
+		},
+		{
+			Name:   "filter",
+			Usage:  "Find examples from input",
+			Action: runDfFilter,
+			Flags: []cli.Flag{
+				&cli.StringSliceFlag{
+					Name:  "icao",
+					Usage: "Plane ICAO to filter on. e,g, --icao=E48DF6 --icao=123ABC",
+				},
+				&cli.BoolFlag{
+					Name:  "locations-only",
+					Usage: "Filter location updates only",
+				},
+			},
 		},
 	}
 
@@ -350,6 +366,36 @@ func runSimple(c *cli.Context) error {
 		opts = append(opts, sink.WithoutLoggingLocation())
 	}
 	trk.AddSink(sink.NewLoggerSink(opts...))
+
+	trk.Wait()
+	return nil
+}
+
+// runDfFilter is a special mode for hunting down DF examples from live inputs
+func runDfFilter(c *cli.Context) error {
+	logging.ConfigureForCli()
+
+	trk, err := commonSetup(c)
+	if nil != err {
+		return err
+	}
+	var opts []sink.Option
+	if c.Bool("quiet") {
+		opts = append(opts, sink.WithoutLoggingLocation())
+	}
+	opts = append(opts, sink.WithoutLoggingLocation())
+	trk.AddSink(sink.NewLoggerSink(opts...))
+
+	var filterOpts []example_finder.Option
+	if c.Bool("locations-only") {
+		filterOpts = append(filterOpts, example_finder.WithDF17MessageTypeLocation())
+	} else {
+		filterOpts = append(filterOpts, example_finder.WithDownlinkFormatType(17))
+	}
+	for _, icao := range c.StringSlice("icao") {
+		filterOpts = append(filterOpts, example_finder.WithPlaneIcaoStr(icao))
+	}
+	trk.AddMiddleware(example_finder.NewFilter(filterOpts...))
 
 	trk.Wait()
 	return nil
