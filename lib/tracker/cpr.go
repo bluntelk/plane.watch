@@ -177,6 +177,7 @@ func (cpr *CprLocation) decode(onGround bool) (*PlaneLocation, error) {
 // computeLatitudeIndex computes `j` in the decode algorithm
 func (cpr *CprLocation) computeLatitudeIndex() {
 	cpr.latitudeIndex = int32(math.Floor((((59 * cpr.evenLat) - (60 * cpr.oddLat)) / 131072) + 0.5))
+	//log.Printf("J = %d", cpr.latitudeIndex)
 }
 
 func (cpr *CprLocation) computeAirDLatRLat() {
@@ -194,7 +195,7 @@ func (cpr *CprLocation) computeLongitudeZone() error {
 	if cpr.nl0 != cpr.nl1 {
 		return fmt.Errorf("Incorrect NL Calculation %d!=%d (for lat/lon %0.13f / %0.13f)", cpr.nl0, cpr.nl1, cpr.rlat0, cpr.rlat1)
 	}
-
+	//log.Printf("nl0: %d, nl1: %d", cpr.nl0, cpr.nl1)
 	return nil
 }
 
@@ -220,7 +221,6 @@ func (cpr *CprLocation) computeLatLon() (*PlaneLocation, error) {
 
 		loc.longitude = cpr.dlonFunction(cpr.rlat1, 1) * (cprModFunction(int32(m), ni) + (cpr.oddLon / 131072))
 		loc.latitude = cpr.rlat1
-		//log.Printf("	rlat = %0.6f, rlon = %0.6f\n", loc.latitude, loc.longitude);
 	} else {
 		// do even decode
 		cpr.oddDecode = false
@@ -232,8 +232,8 @@ func (cpr *CprLocation) computeLatLon() (*PlaneLocation, error) {
 		//log.Printf("	m = %0.2f", m)
 		loc.longitude = cpr.dlonFunction(cpr.rlat0, 0) * (cprModFunction(int32(m), ni) + cpr.evenLon/131072)
 		loc.latitude = cpr.rlat0
-		//log.Printf("	rlat = %0.6f, rlon = %0.6f\n", loc.latitude, loc.longitude);
 	}
+	//log.Printf("\tlat = %0.6f, lon = %0.6f\n", loc.latitude, loc.longitude)
 	return &loc, nil
 }
 
@@ -252,7 +252,7 @@ func (cpr *CprLocation) surfaceLongitudeTwiddle(refLon float64, loc *PlaneLocati
 
 func (cpr *CprLocation) normaliseLatLon(loc *PlaneLocation) error {
 	if loc.longitude > 180.0 {
-		loc.longitude -= 180.0
+		loc.longitude -= 360.0
 	}
 	//log.Printf("post normalise rlat = %0.6f, rlon = %0.6f\n", loc.latitude, loc.longitude);
 
@@ -385,10 +385,10 @@ func (cpr *CprLocation) decodeGlobalAir() (*PlaneLocation, error) {
 	cpr.computeAirDLatRLat()
 
 	// Note: Southern hemisphere values are 270° to 360°. Subtract 360°.
-	if cpr.rlat0 > 270 {
+	if cpr.rlat0 >= 270 {
 		cpr.rlat0 = cpr.rlat0 - 360
 	}
-	if cpr.rlat1 > 270 {
+	if cpr.rlat1 >= 270 {
 		cpr.rlat1 = cpr.rlat1 - 360
 	}
 
@@ -408,7 +408,7 @@ func (cpr *CprLocation) decodeGlobalAir() (*PlaneLocation, error) {
 	if err = cpr.normaliseLatLon(locRet); nil != err {
 		return nil, err
 	}
-	locRet.onGround = true
+	locRet.onGround = false
 	return locRet, nil
 }
 
@@ -436,6 +436,7 @@ func cprNFunction(lat float64, isOdd int32) int32 {
 }
 
 func (cpr *CprLocation) dlonFunction(lat float64, isOdd int32) float64 {
+	//log.Printf("DLON = %0.1f / (n) %d, %0.2f", cpr.globalSurfaceRange, cprNFunction(lat, isOdd), cpr.globalSurfaceRange/float64(cprNFunction(lat, isOdd)))
 	return cpr.globalSurfaceRange / float64(cprNFunction(lat, isOdd))
 }
 
@@ -446,6 +447,7 @@ func cprModFunction(a, b int32) float64 {
 		res += float64(b)
 	}
 	//return math.Floor(res)
+	//log.Printf("Mod(%d, %d)=%0.2f", a, b, res)
 	return res
 }
 

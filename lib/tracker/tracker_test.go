@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/rs/zerolog"
 	"plane.watch/lib/tracker/mode_s"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -298,5 +299,67 @@ func TestPlane_HasVelocity(t *testing.T) {
 
 	if !p.HasVelocity() {
 		t.Error("Did not correctly set velocity")
+	}
+}
+
+func TestCorrectCprDecodeSouthAmerica(t *testing.T) {
+	type pair struct {
+		odd, even string
+		lat, lon  string
+		icao      uint32
+	}
+
+	icao, _ := strconv.ParseUint("E065D3", 16, 32)
+
+	samples := []pair{
+		{
+			odd:  "8DE065D358C38797B4F57E1A56F2",
+			even: "8DE065D358C3833F06A8657B6B41",
+			lat:  "-31.12995",
+			lon:  "-54.14777",
+			icao: uint32(icao),
+		},
+	}
+	trk := NewTracker()
+	for _, sample := range samples {
+		t.Run(fmt.Sprintf("decode_%s_%s", sample.odd, sample.even), func(tt *testing.T) {
+			oddFrame, err := mode_s.DecodeString(sample.odd, time.Now())
+			if nil != err {
+				tt.Error(err)
+			}
+			if oddFrame.IsEven() {
+				tt.Error("Odd Frame was Even")
+			}
+			evenFrame, err := mode_s.DecodeString(sample.even, time.Now())
+			if nil != err {
+				tt.Error(err)
+			}
+			if !evenFrame.IsEven() {
+				tt.Error("Even frame was Odd")
+			}
+			p := trk.GetPlane(sample.icao)
+			if err = p.setCprEvenLocation(float64(evenFrame.Latitude()), float64(evenFrame.Longitude()), evenFrame.TimeStamp()); nil != err {
+				tt.Error(err)
+			}
+			if err = p.setCprOddLocation(float64(oddFrame.Latitude()), float64(oddFrame.Longitude()), oddFrame.TimeStamp()); nil != err {
+				tt.Error(err)
+			}
+
+			loc, err := p.cprLocation.decodeGlobalAir()
+			if nil != err {
+				tt.Error(err)
+			}
+
+			if loc.onGround {
+				t.Error("Decoding air position resulted in aircraft being on ground")
+			}
+
+			if fmt.Sprintf("%0.5f", loc.latitude) != sample.lat {
+				t.Errorf("Got incorrect Latitude: expecting: %s != got: %0.5f", sample.lat, loc.latitude)
+			}
+			if fmt.Sprintf("%0.5f", loc.longitude) != sample.lon {
+				t.Errorf("Got incorrect Longitude: expecting: %s != got: %0.5f", sample.lon, loc.longitude)
+			}
+		})
 	}
 }
