@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"math"
-	"plane.watch/lib/rabbitmq"
 	"time"
+
+	"plane.watch/lib/rabbitmq"
 
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
@@ -166,6 +167,7 @@ func (w *worker) handleMsg(msg []byte) error {
 
 	update := export.PlaneLocation{}
 	if err = json.Unmarshal(msg, &update); nil != err {
+		log.Error().Msg("Unable to unmarshal JSON: " + err.Error())
 		updatesError.Inc()
 		return err
 	}
@@ -185,6 +187,8 @@ func (w *worker) handleMsg(msg []byte) error {
 			lastSignificantUpdate: update,
 		})
 
+		cacheAdditions.Inc()
+
 		log.Debug().
 			Str("aircraft", update.Icao).
 			Msg("First time seeing aircraft.")
@@ -194,6 +198,13 @@ func (w *worker) handleMsg(msg []byte) error {
 		// we have existing data, check to make sure we
 		record, _ := w.rabbit.syncSamples.Load(update.Icao)
 		tRecord := record.(planeLocationLast)
+
+		//check if this is a removed record and purge it from the cache
+		if update.Removed {
+			w.rabbit.syncSamples.Delete(update.Icao)
+			return nil // don't need to do anything else with this.
+		}
+
 		tRecord.candidateUpdate = update
 		w.rabbit.syncSamples.Store(update.Icao, tRecord)
 	}

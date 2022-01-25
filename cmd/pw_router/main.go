@@ -5,10 +5,12 @@ import (
 	"errors"
 	"net/url"
 	"os"
-	"plane.watch/lib/monitoring"
-	"plane.watch/lib/tile_grid"
 	"sync"
 	"time"
+
+	"plane.watch/lib/dedupe"
+	"plane.watch/lib/monitoring"
+	"plane.watch/lib/tile_grid"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -32,7 +34,7 @@ type (
 		rmq  *rabbitmq.RabbitMQ
 		conf *rabbitmq.Config
 
-		syncSamples sync.Map
+		syncSamples *dedupe.ForgetfulSyncMap
 	}
 
 	planeLocationLast struct {
@@ -61,6 +63,18 @@ var (
 	updatesError = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "pw_router_updates_error_total",
 		Help: "The total number of messages that could not be processed due to an error.",
+	})
+	cacheEntries = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "pw_router_cache_planes_count",
+		Help: "The number of planes in the reducer cache.",
+	})
+	cacheAdditions = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pw_router_cache_addition_total",
+		Help: "The number of additions made to the plane cache.",
+	})
+	cacheEvictions = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pw_router_cache_eviction_total",
+		Help: "The number of cache evictions made from the cache.",
 	})
 )
 
@@ -119,6 +133,16 @@ func main() {
 			Name:    "spread-updates",
 			Usage:   "publish location updates to their respective tileXX_high and tileXX_low routing keys as well",
 			EnvVars: []string{"DEBUG"},
+		},
+		&cli.IntFlag{
+			Name:  "update-age",
+			Usage: "seconds to keep an update before aging it out of the cache.",
+			Value: 60,
+		},
+		&cli.IntFlag{
+			Name:  "update-age-sweep-interval",
+			Usage: "Seconds between cache age sweeps..",
+			Value: 5,
 		},
 		&cli.BoolFlag{
 			Name:  "register-test-queues",
@@ -189,8 +213,27 @@ func run(c *cli.Context) error {
 	var err error
 	// connect to rabbitmq, create ourselves 2 queues
 	r := pwRouter{
-		syncSamples: sync.Map{},
+		syncSamples: dedupe.NewForgetfulSyncMap(time.Duration(c.Int("update-age-sweep-interval"))*time.Second, time.Duration(c.Int("update-age"))*time.Second),
 	}
+
+	r.syncSamples.SetEvictionAction(func(key interface{}, value interface{}) {
+		cacheEvictions.Inc()
+		log.Debug().Msgf("Evicting cache entry Icao: %s", key)
+	})
+
+	// periodic background events
+	var bgEventsExitChan chan bool
+	go func(exitChan chan bool) {
+		gaugeTimer := time.Tick(1 * time.Second)
+		for {
+			select {
+			case <-gaugeTimer:
+				cacheEntries.Set(float64(r.syncSamples.Len()))
+			case <-exitChan:
+				return
+			}
+		}
+	}(bgEventsExitChan)
 
 	if "" == c.String("rabbitmq") {
 		return errors.New("please specify the --rabbitmq parameter")
@@ -254,6 +297,9 @@ func run(c *cli.Context) error {
 	}
 
 	wg.Wait()
+
+	// cleanup
+	bgEventsExitChan <- true
 
 	return nil
 }

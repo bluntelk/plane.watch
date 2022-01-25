@@ -2,6 +2,8 @@ package dedupe
 
 import (
 	"fmt"
+	"time"
+
 	"plane.watch/lib/tracker"
 	"plane.watch/lib/tracker/beast"
 	"plane.watch/lib/tracker/mode_s"
@@ -19,12 +21,11 @@ type (
 		events chan tracker.Event
 		list   *ForgetfulSyncMap
 	}
-
 )
 
 func NewFilter() *Filter {
 	return &Filter{
-		list: NewForgetfulSyncMap(),
+		list:   NewForgetfulSyncMap(10*time.Second, 60*time.Second),
 		events: make(chan tracker.Event),
 	}
 }
