@@ -30,9 +30,16 @@ type (
 		clients   ClientList
 		listening bool
 	}
+
+	loadedResponse struct {
+		out ws_protocol.WsResponse
+
+		highLow, tile string
+	}
+
 	WsClient struct {
 		conn    *websocket.Conn
-		outChan chan ws_protocol.WsResponse
+		outChan chan loadedResponse
 		cmdChan chan WsCmd
 	}
 	WsCmd struct {
@@ -140,7 +147,7 @@ func NewWsClient(conn *websocket.Conn) *WsClient {
 	client := WsClient{
 		conn:    conn,
 		cmdChan: make(chan WsCmd),
-		outChan: make(chan ws_protocol.WsResponse),
+		outChan: make(chan loadedResponse),
 	}
 	return &client
 }
@@ -251,7 +258,13 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 
 			}
 		case planeMsg := <-c.outChan:
-			err = c.sendPlaneMessage(ctx, &planeMsg)
+			// if we have a subscription to this planes tile or all tiles
+			log.Debug().Str("tile", planeMsg.tile).Str("highlow", planeMsg.highLow).Msg("info")
+			tileSub, tileOk := subs[planeMsg.tile]
+			allSub, allOk := subs["all"+planeMsg.highLow]
+			if (tileSub && tileOk) || (allSub && allOk) {
+				err = c.sendPlaneMessage(ctx, &planeMsg.out)
+			}
 		}
 
 		if nil != err {
@@ -324,9 +337,13 @@ func (cl *ClientList) SendLocationUpdate(highLow, tile string, loc *export.Plane
 			}
 		}()
 		client := key.(*WsClient)
-		client.outChan <- ws_protocol.WsResponse{
-			Type:     ws_protocol.ResponseTypePlaneLocation,
-			Location: loc,
+		client.outChan <- loadedResponse{
+			out: ws_protocol.WsResponse{
+				Type:     ws_protocol.ResponseTypePlaneLocation,
+				Location: loc,
+			},
+			highLow: highLow,
+			tile:    tile,
 		}
 		return true
 	})
