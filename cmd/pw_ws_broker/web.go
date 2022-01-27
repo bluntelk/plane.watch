@@ -316,7 +316,7 @@ func (cl *ClientList) removeClient(c *WsClient) {
 
 // SendLocationUpdate sends an update to each listening client
 // todo: make this threaded?
-func (cl *ClientList) SendLocationUpdate(highLow, tile string, loc *export.EnrichedPlaneLocation) {
+func (cl *ClientList) SendLocationUpdate(highLow, tile string, loc *export.PlaneLocation) {
 	cl.clients.Range(func(key, value interface{}) bool {
 		defer func() {
 			if r := recover(); nil != r {

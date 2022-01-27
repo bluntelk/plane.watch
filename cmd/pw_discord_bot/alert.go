@@ -16,7 +16,7 @@ const (
 
 type (
 	pwAlertBot struct {
-		locationUpdates  chan *export.EnrichedPlaneLocation
+		locationUpdates  chan *export.PlaneLocation
 		numUpdateWorkers int
 
 		// keeps track of when we alerted a user
@@ -31,7 +31,7 @@ type (
 	proximityAlert struct {
 		time        time.Time
 		alert       *location
-		update      *export.EnrichedPlaneLocation
+		update      *export.PlaneLocation
 		distanceMtr int
 	}
 )
@@ -60,21 +60,21 @@ func (a *pwAlertBot) stop() error {
 	return nil
 }
 
-func (a *pwAlertBot) handleUpdate(update *export.EnrichedPlaneLocation) {
+func (a *pwAlertBot) handleUpdate(update *export.PlaneLocation) {
 	if nil == update {
 		return
 	}
 	// ignore updates of we do not have enough data on them
-	if 0 == update.PlaneLocation.Altitude && !update.PlaneLocation.OnGround {
+	if 0 == update.Altitude && !update.OnGround {
 		// probably an update that is incomplete, we can catch the next one
 		return
 	}
 
-	forLocation(update.PlaneLocation.TileLocation, func(alert *location) {
-		distance := getDistanceBetween(update.PlaneLocation.Lat, update.PlaneLocation.Lon, alert.Lat, alert.Lon)
-		ac := alert.AlertConfig.configForHeight(update.PlaneLocation.Altitude)
+	forLocation(update.TileLocation, func(alert *location) {
+		distance := getDistanceBetween(update.Lat, update.Lon, alert.Lat, alert.Lon)
+		ac := alert.AlertConfig.configForHeight(update.Altitude)
 		if nil == ac {
-			log.Error().Int("altitude", update.PlaneLocation.Altitude).Msg("Failed to get alert config")
+			log.Error().Int("altitude", update.Altitude).Msg("Failed to get alert config")
 			return
 		}
 		if !ac.Enabled {
@@ -82,7 +82,7 @@ func (a *pwAlertBot) handleUpdate(update *export.EnrichedPlaneLocation) {
 		}
 		log.Trace().
 			Floats64("alert-location", []float64{alert.Lat, alert.Lon}).
-			Floats64("plane-location", []float64{update.PlaneLocation.Lat, update.PlaneLocation.Lon}).
+			Floats64("plane-location", []float64{update.Lat, update.Lon}).
 			Int("Distance (m)", distance).
 			Int("Alert Radius", ac.AlertRadiusMtr).
 			Bool("In Air Space", distance <= ac.AlertRadiusMtr).
@@ -124,7 +124,7 @@ func (a *pwAlertBot) alertUser(pa *proximityAlert) {
 }
 
 func (pa *proximityAlert) Key() string {
-	key := pa.alert.DiscordUserId + pa.alert.LocationName + pa.update.PlaneLocation.Icao
+	key := pa.alert.DiscordUserId + pa.alert.LocationName + pa.update.Icao
 
 	return key
 }

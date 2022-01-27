@@ -21,9 +21,9 @@ type (
 		GridTile string `json:"gridTile"`
 	}
 	WsResponse struct {
-		Type     string                        `json:"type"`
-		Message  string                        `json:"message,omitempty"`
-		Tiles    []string                      `json:"tiles,omitempty"`
-		Location *export.EnrichedPlaneLocation `json:"location,omitempty"`
+		Type     string                `json:"type"`
+		Message  string                `json:"message,omitempty"`
+		Tiles    []string              `json:"tiles,omitempty"`
+		Location *export.PlaneLocation `json:"location,omitempty"`
 	}
 )

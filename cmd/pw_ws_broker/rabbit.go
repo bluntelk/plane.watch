@@ -19,7 +19,7 @@ type (
 		routeLow    string
 		routeHigh   string
 
-		processMessage func(highLow string, loc *export.EnrichedPlaneLocation)
+		processMessage func(highLow string, loc *export.PlaneLocation)
 	}
 )
 
@@ -62,7 +62,7 @@ func (br *PwWsBrokerRabbit) consume(queue, what string) {
 	}
 
 	for msg := range ch {
-		planeData := export.EnrichedPlaneLocation{}
+		planeData := export.PlaneLocation{}
 		errJson := json.Unmarshal(msg.Body, &planeData)
 		if nil != errJson {
 			log.Debug().Err(err).Msg("did not understand msg")

@@ -26,8 +26,8 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 	// check the currentUpdate vs lastUpdate, if any of the following have changed,
 	// then emit an event onto the locate-updates-reduced queue.
 	// - Heading, VerticalRate, Velocity, Altitude, FlightNumber, FlightStatus, OnGround, Special, Squawk
-	candidate := history.candidateUpdate.PlaneLocation
-	last := history.lastSignificantUpdate.PlaneLocation
+	candidate := history.candidateUpdate
+	last := history.lastSignificantUpdate
 
 	// if any of these fields differ, indicate this update is significant
 	if candidate.HasHeading && last.HasHeading && math.Abs(candidate.Heading-last.Heading) > SigHeadingChange {
@@ -164,13 +164,13 @@ func (w *worker) run(ctx context.Context, ch <-chan amqp.Delivery) {
 func (w *worker) handleMsg(msg []byte) error {
 	var err error
 
-	update := export.EnrichedPlaneLocation{}
+	update := export.PlaneLocation{}
 	if err = json.Unmarshal(msg, &update); nil != err {
 		updatesError.Inc()
 		return err
 	}
 
-	if "" == update.PlaneLocation.Icao {
+	if "" == update.Icao {
 		log.Debug().Str("payload", string(msg)).Msg("empty ICAO")
 		updatesError.Inc()
 		return nil
@@ -179,41 +179,41 @@ func (w *worker) handleMsg(msg []byte) error {
 	updatesProcessed.Inc()
 
 	// if this is the first time in a while we've seen this Icao
-	if _, ok := w.rabbit.syncSamples.Load(update.PlaneLocation.Icao); !ok {
+	if _, ok := w.rabbit.syncSamples.Load(update.Icao); !ok {
 
-		w.rabbit.syncSamples.Store(update.PlaneLocation.Icao, planeLocationLast{
+		w.rabbit.syncSamples.Store(update.Icao, planeLocationLast{
 			lastSignificantUpdate: update,
 		})
 
 		log.Debug().
-			Str("aircraft", update.PlaneLocation.Icao).
+			Str("aircraft", update.Icao).
 			Msg("First time seeing aircraft.")
 
 		return nil // can't check this for significance
 	} else {
 		// we have existing data, check to make sure we
-		record, _ := w.rabbit.syncSamples.Load(update.PlaneLocation.Icao)
+		record, _ := w.rabbit.syncSamples.Load(update.Icao)
 		tRecord := record.(planeLocationLast)
 		tRecord.candidateUpdate = update
-		w.rabbit.syncSamples.Store(update.PlaneLocation.Icao, tRecord)
+		w.rabbit.syncSamples.Store(update.Icao, tRecord)
 	}
 
-	planeRecord, _ := w.rabbit.syncSamples.Load(update.PlaneLocation.Icao)
+	planeRecord, _ := w.rabbit.syncSamples.Load(update.Icao)
 
 	if w.isSignificant(planeRecord.(planeLocationLast)) {
 		updatesSignificant.Inc()
 
 		// if it's significant, roll the values through and emit an event.
-		sigRecord, _ := w.rabbit.syncSamples.Load(update.PlaneLocation.Icao)
+		sigRecord, _ := w.rabbit.syncSamples.Load(update.Icao)
 		tSigRecord := sigRecord.(planeLocationLast)
 		tSigRecord.lastSignificantUpdate = tSigRecord.candidateUpdate
-		w.rabbit.syncSamples.Store(update.PlaneLocation.Icao, tSigRecord)
+		w.rabbit.syncSamples.Store(update.Icao, tSigRecord)
 
 		if err == nil {
 			// emit the new lastSignificant
 			w.publishLocationUpdate(w.destRoutingKey, msg) // all low speed messages
 			if w.spreadUpdates {
-				w.publishLocationUpdate(update.PlaneLocation.TileLocation+qSuffixLow, msg) // tile based low speed messages
+				w.publishLocationUpdate(update.TileLocation+qSuffixLow, msg) // tile based low speed messages
 			}
 			updatesPublished.Inc()
 		} else {
@@ -223,7 +223,7 @@ func (w *worker) handleMsg(msg []byte) error {
 
 	// publish this to the tile HIGH queue
 	if w.spreadUpdates {
-		w.publishLocationUpdate(update.PlaneLocation.TileLocation+qSuffixHigh, msg) // tile based low speed messages
+		w.publishLocationUpdate(update.TileLocation+qSuffixHigh, msg) // tile based low speed messages
 	}
 
 	return nil

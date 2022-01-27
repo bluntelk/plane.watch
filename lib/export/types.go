@@ -3,14 +3,10 @@ package export
 import "time"
 
 type (
-	// EnrichedPlaneLocation is our representation of what the enrichment centre outputs
-	EnrichedPlaneLocation struct {
-		PlaneLocation  PlaneLocation  `json:"LocationInformation"`
-		EnrichmentData EnrichmentData `json:"EnrichmentData"`
-	}
 
-	// PlaneLocation is what pw_ingest outputs for its location-updates
+	// PlaneLocation is our exported data format. it encodes to JSON
 	PlaneLocation struct {
+		// This info is populated by the tracker
 		New, Removed      bool
 		Icao              string
 		Lat, Lon, Heading float64
@@ -33,27 +29,33 @@ type (
 		TileLocation      string
 		TrackedSince      time.Time
 		LastMsg           time.Time
+
+		// Enrichment Plane data
+		IcaoCode        *string `json:",omitempty"`
+		Registration    *string `json:",omitempty"`
+		TypeCode        *string `json:",omitempty"`
+		Serial          *string `json:",omitempty"`
+		RegisteredOwner *string `json:",omitempty"`
+		COFAOwner       *string `json:",omitempty"`
+		FlagCode        *string `json:",omitempty"`
+
+		// Enrichment Route Data
+		CallSign  *string   `json:",omitempty"`
+		Operator  *string   `json:",omitempty"`
+		RouteCode *string   `json:",omitempty"`
+		Segments  []Segment `json:",omitempty"`
 	}
 
-	EnrichmentData struct {
-		Aircraft *Aircraft `json:"aircraft,omitempty"`
-	}
-
-	Aircraft struct {
-		CofaOwner       *string `json:"cofa_owner"`
-		FlagCode        *string `json:"flag_code"`
-		IcaoCode        *string `json:"icao_code"`
-		RegisteredOwner *string `json:"registered_owner"`
-		Registration    *string `json:"registration"`
-		Serial          *string `json:"serial"`
-		TypeCode        *string `json:"type_code"`
+	Segment struct {
+		Name     string
+		ICAOCode string
 	}
 )
 
-func (epl *EnrichedPlaneLocation) Plane() string {
-	if "" != epl.PlaneLocation.FlightNumber {
-		return epl.PlaneLocation.FlightNumber
+func (pl *PlaneLocation) Plane() string {
+	if "" != pl.FlightNumber {
+		return pl.FlightNumber
 	}
 
-	return "ICAO: " + epl.PlaneLocation.Icao
+	return "ICAO: " + pl.Icao
 }

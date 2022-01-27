@@ -444,7 +444,7 @@ func (b *pwDiscordBot) sendPlaneAlert(pa *proximityAlert) {
 	b.log.
 		Debug().
 		Str("User", pa.alert.DiscordUserName).
-		Str("Plane", pa.update.PlaneLocation.Icao).
+		Str("Plane", pa.update.Icao).
 		Int("Distance (m)", pa.distanceMtr).
 		Msg("Alerting user of plane")
 
@@ -463,7 +463,7 @@ func (b *pwDiscordBot) sendPlaneAlert(pa *proximityAlert) {
 		Fields: []*discordgo.MessageEmbedField{
 			{
 				Name:   "Aircraft Type",
-				Value:  pa.update.PlaneLocation.Airframe,
+				Value:  pa.update.Airframe,
 				Inline: false,
 			},
 		},

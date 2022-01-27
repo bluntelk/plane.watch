@@ -36,8 +36,8 @@ type (
 	}
 
 	planeLocationLast struct {
-		lastSignificantUpdate export.EnrichedPlaneLocation
-		candidateUpdate       export.EnrichedPlaneLocation
+		lastSignificantUpdate export.PlaneLocation
+		candidateUpdate       export.PlaneLocation
 	}
 )
 
