@@ -187,6 +187,7 @@ func (w *worker) handleMsg(msg []byte) error {
 			lastSignificantUpdate: update,
 		})
 
+		cacheEntries.Inc()
 		cacheAdditions.Inc()
 
 		log.Debug().

@@ -135,14 +135,16 @@ func main() {
 			EnvVars: []string{"DEBUG"},
 		},
 		&cli.IntFlag{
-			Name:  "update-age",
-			Usage: "seconds to keep an update before aging it out of the cache.",
-			Value: 60,
+			Name:    "update-age",
+			Usage:   "seconds to keep an update before aging it out of the cache.",
+			Value:   30,
+			EnvVars: []string{"UPDATE_AGE"},
 		},
 		&cli.IntFlag{
-			Name:  "update-age-sweep-interval",
-			Usage: "Seconds between cache age sweeps..",
-			Value: 5,
+			Name:    "update-age-sweep-interval",
+			Usage:   "Seconds between cache age sweeps..",
+			Value:   5,
+			EnvVars: []string{"UPDATE_SWEEP"},
 		},
 		&cli.BoolFlag{
 			Name:  "register-test-queues",
@@ -218,22 +220,9 @@ func run(c *cli.Context) error {
 
 	r.syncSamples.SetEvictionAction(func(key interface{}, value interface{}) {
 		cacheEvictions.Inc()
+		cacheEntries.Dec()
 		log.Debug().Msgf("Evicting cache entry Icao: %s", key)
 	})
-
-	// periodic background events
-	var bgEventsExitChan chan bool
-	go func(exitChan chan bool) {
-		gaugeTimer := time.Tick(1 * time.Second)
-		for {
-			select {
-			case <-gaugeTimer:
-				cacheEntries.Set(float64(r.syncSamples.Len()))
-			case <-exitChan:
-				return
-			}
-		}
-	}(bgEventsExitChan)
 
 	if "" == c.String("rabbitmq") {
 		return errors.New("please specify the --rabbitmq parameter")
@@ -297,9 +286,6 @@ func run(c *cli.Context) error {
 	}
 
 	wg.Wait()
-
-	// cleanup
-	bgEventsExitChan <- true
 
 	return nil
 }
