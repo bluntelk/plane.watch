@@ -88,9 +88,13 @@ func (r *RabbitMQ) Connect(connected chan bool) {
 	reset := make(chan bool)
 	connectedChan := make(chan bool)
 	timer := time.AfterFunc(0, func() {
-		_ = r.connect(r.uri)
-		connectedChan <- true
-		reset <- true
+		err := r.connect(r.uri)
+		if nil == err {
+			connectedChan <- true
+			reset <- true
+		} else {
+			r.log.Error().Err(err).Msg("Could not establish connection")
+		}
 	})
 	defer timer.Stop()
 
@@ -149,8 +153,19 @@ func (r *RabbitMQ) Disconnect() {
 	r.connected = false
 }
 
-func (r *RabbitMQ) Disconnected() chan *amqp.Error {
-	return r.disconnected
+func (r *RabbitMQ) handleDisconnect() {
+	for msg := range r.disconnected {
+		r.log.Info().
+			Str("connection", "disconnected").
+			Str("error", msg.Error()).
+			Bool("server", msg.Server).
+			Str("reason", msg.Reason).
+			Int("code", msg.Code).
+			Bool("recover", msg.Recover).
+			Send()
+		r.connected = false
+		r.channel = nil
+	}
 }
 
 func (r *RabbitMQ) ExchangeDeclare(name, kind string) error {
@@ -167,7 +182,7 @@ func (r *RabbitMQ) ExchangeDeclare(name, kind string) error {
 		)
 	}
 
-	r.log.Warn().Err(ErrNilChannel).Str("what", "ExchangeDeclare").Send()
+	r.log.Warn().Err(ErrNilChannel).Str("what", "ExchangeDeclare").Msg("We do not have a channel, cannot proceed")
 	return ErrNilChannel
 }
 
@@ -187,7 +202,7 @@ func (r *RabbitMQ) QueueDeclare(name string, ttlMs int) (amqp.Queue, error) {
 			},
 		)
 	}
-	r.log.Warn().Err(ErrNilChannel).Str("what", "QueueDeclare").Send()
+	r.log.Warn().Err(ErrNilChannel).Str("what", "QueueDeclare").Msg("We do not have a channel, cannot proceed")
 	return amqp.Queue{}, ErrNilChannel
 }
 
@@ -206,7 +221,7 @@ func (r *RabbitMQ) QueueBind(name, routingKey, sourceExchange string) error {
 			nil,
 		)
 	}
-	r.log.Warn().Err(ErrNilChannel).Str("what", "QueueBind").Send()
+	r.log.Warn().Err(ErrNilChannel).Str("what", "QueueBind").Msg("We do not have a channel, cannot proceed")
 	return ErrNilChannel
 }
 
@@ -224,8 +239,7 @@ func (r *RabbitMQ) QueueRemove(name string) error {
 		r.log.Debug().Int("Num Messages Lost", n).Msg("Queue Removed")
 		return err
 	}
-	r.log.Warn().Err(ErrNilChannel).Str("what", "QueueRemove").Send()
-
+	r.log.Warn().Err(ErrNilChannel).Str("what", "QueueRemove").Msg("We do not have a channel, cannot proceed")
 	return ErrNilChannel
 }
 
@@ -245,7 +259,7 @@ func (r *RabbitMQ) Consume(name, consumer string) (<-chan amqp.Delivery, error) 
 			nil,
 		)
 	}
-	r.log.Warn().Err(ErrNilChannel).Str("what", "Consume").Send()
+	r.log.Warn().Err(ErrNilChannel).Str("what", "Consume").Msg("We do not have a channel, cannot proceed")
 	return nil, ErrNilChannel
 }
 
@@ -259,7 +273,7 @@ func (r *RabbitMQ) Publish(exchange, key string, msg amqp.Publishing) error {
 			msg,
 		)
 	}
-	r.log.Warn().Err(ErrNilChannel).Str("what", "Publish").Send()
+	r.log.Warn().Err(ErrNilChannel).Str("what", "Publish").Msg("We do not have a channel, cannot proceed")
 	return ErrNilChannel
 }
 
@@ -283,16 +297,20 @@ func (r *RabbitMQ) connect(uri string) error {
 	// Notify disconnect channel when disconnected
 	r.disconnected = make(chan *amqp.Error)
 	r.channel.NotifyClose(r.disconnected)
+	go r.handleDisconnect()
 	return nil
 }
 
 func (r *RabbitMQ) HealthCheck() bool {
 	log.Debug().Msg("RabbitMQ Health Check")
-	if nil == r || nil == r.conn {
+	if nil == r || nil == r.conn || nil == r.channel {
 		log.Error().Msg("Rabbit Healthcheck Bad")
 		return false
 	}
-	return !r.conn.IsClosed()
+	if nil != r.conn {
+		return !r.conn.IsClosed()
+	}
+	return false
 }
 
 func (r *RabbitMQ) HealthCheckName() string {

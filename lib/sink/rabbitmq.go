@@ -2,7 +2,6 @@ package sink
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
@@ -299,7 +298,10 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 	}
 
 	if nil != err {
-		fmt.Println(err)
+		log.Error().Err(err).Str("event-type", e.Type()).Str("event", e.String()).Msg("Unable to handle event")
+	}
+	if err == rabbitmq.ErrNilChannel {
+		panic(err)
 	}
 }
 

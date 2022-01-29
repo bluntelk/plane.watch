@@ -587,13 +587,22 @@ func (f *Frame) Raw() []byte {
 }
 
 func (f *Frame) IcaoStr() string {
+	if nil == f {
+		return ""
+	}
 	return fmt.Sprintf("%06X", f.icao)
 }
 
 func (f *Frame) Latitude() int {
+	if nil == f {
+		return -1
+	}
 	return f.rawLatitude
 }
 func (f *Frame) Longitude() int {
+	if nil == f {
+		return -1
+	}
 	return f.rawLongitude
 }
 
@@ -611,6 +620,9 @@ func (f *Frame) MustAltitude() int32 {
 }
 
 func (f *Frame) AltitudeUnits() string {
+	if nil == f {
+		return "metres"
+	}
 	if f.unit == modesUnitMetres {
 		return "metres"
 	} else {
@@ -619,14 +631,23 @@ func (f *Frame) AltitudeUnits() string {
 }
 
 func (f *Frame) AltitudeValid() bool {
+	if nil == f {
+		return false
+	}
 	return f.validAltitude
 }
 
 func (f *Frame) FlightStatusString() string {
+	if nil == f {
+		return ""
+	}
 	return flightStatusTable[f.fs]
 }
 
 func (f *Frame) FlightStatus() byte {
+	if nil == f {
+		return 255
+	}
 	return f.fs
 }
 
@@ -645,6 +666,9 @@ func (f *Frame) MustVelocity() float64 {
 }
 
 func (f *Frame) VelocityValid() bool {
+	if nil == f {
+		return false
+	}
 	return f.validVelocity
 }
 
@@ -662,23 +686,29 @@ func (f *Frame) MustHeading() float64 {
 }
 
 func (f *Frame) HeadingValid() bool {
+	if nil == f {
+		return false
+	}
 	return f.validHeading
 }
 
 func (f *Frame) VerticalRate() (int, error) {
-	if f.validVerticalRate {
+	if f.VerticalRateValid() {
 		return f.verticalRate, nil
 	}
 	return 0, fmt.Errorf("vertical rate (VR) is not valid")
 }
 func (f *Frame) MustVerticalRate() int {
-	if f.validVerticalRate {
+	if f.VerticalRateValid() {
 		return f.verticalRate
 	}
 	panic("vertical rate (VR) is not valid")
 }
 
 func (f *Frame) VerticalRateValid() bool {
+	if nil == f {
+		return false
+	}
 	return f.validVerticalRate
 }
 
@@ -691,33 +721,48 @@ func (f *Frame) VerticalRateValid() bool {
 //}
 
 func (f *Frame) SquawkIdentity() uint32 {
+	if nil == f {
+		return 0
+	}
 	return f.identity
 }
 
 func (f *Frame) OnGround() (bool, error) {
-	if f.validVerticalStatus {
+	if f.VerticalStatusValid() {
 		return f.onGround, nil
 	}
 	return false, fmt.Errorf("vertical status (VS) is not valid")
 }
 func (f *Frame) MustOnGround() bool {
-	if f.validVerticalStatus {
+	if f.VerticalStatusValid() {
 		return f.onGround
 	}
 	panic("vertical status (VS) is not valid")
 }
 func (f *Frame) VerticalStatusValid() bool {
+	if nil == f {
+		return false
+	}
 	return f.validVerticalStatus
 }
 func (f *Frame) Alert() bool {
+	if nil == f {
+		return false
+	}
 	return f.alert
 }
 
 func (f *Frame) ValidCategory() bool {
+	if nil == f {
+		return false
+	}
 	return f.catValid
 }
 
 func (f *Frame) Category() string {
+	if !f.ValidCategory() {
+		return ""
+	}
 	return aircraftCategory[f.catType][f.catSubType]
 }
 func (f *Frame) CategoryType() string {
