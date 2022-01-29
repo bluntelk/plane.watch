@@ -18,7 +18,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 
-	"plane.watch/lib/export"
 	"plane.watch/lib/logging"
 	"plane.watch/lib/rabbitmq"
 )
@@ -36,11 +35,6 @@ type (
 
 		syncSamples *dedupe.ForgetfulSyncMap
 	}
-
-	planeLocationLast struct {
-		lastSignificantUpdate export.PlaneLocation
-		candidateUpdate       export.PlaneLocation
-	}
 )
 
 var (
@@ -51,6 +45,10 @@ var (
 	updatesSignificant = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "pw_router_updates_significant_total",
 		Help: "The total number of messages determined to be significant.",
+	})
+	updatesInsignificant = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pw_router_updates_insignificant_total",
+		Help: "The total number of messages determined to be insignificant.",
 	})
 	updatesIgnored = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "pw_router_updates_ignored_total",
@@ -67,10 +65,6 @@ var (
 	cacheEntries = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "pw_router_cache_planes_count",
 		Help: "The number of planes in the reducer cache.",
-	})
-	cacheAdditions = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "pw_router_cache_addition_total",
-		Help: "The number of additions made to the plane cache.",
 	})
 	cacheEvictions = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "pw_router_cache_eviction_total",
@@ -131,8 +125,8 @@ func main() {
 		},
 		&cli.BoolFlag{
 			Name:    "spread-updates",
-			Usage:   "publish location updates to their respective tileXX_high and tileXX_low routing keys as well",
-			EnvVars: []string{"DEBUG"},
+			Usage:   "publish location updates to their respective tileXX_high and tileXX_low routing keys as well.",
+			EnvVars: []string{"SPREAD"},
 		},
 		&cli.IntFlag{
 			Name:    "update-age",
@@ -142,13 +136,13 @@ func main() {
 		},
 		&cli.IntFlag{
 			Name:    "update-age-sweep-interval",
-			Usage:   "Seconds between cache age sweeps..",
+			Usage:   "Seconds between cache age sweeps.",
 			Value:   5,
 			EnvVars: []string{"UPDATE_SWEEP"},
 		},
 		&cli.BoolFlag{
 			Name:  "register-test-queues",
-			Usage: "Subscribes a bunch of queues to our routing keys",
+			Usage: "Subscribes a bunch of queues to our routing keys.",
 		},
 	}
 	logging.IncludeVerbosityFlags(app)

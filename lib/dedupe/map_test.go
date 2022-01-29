@@ -165,7 +165,7 @@ func TestForgetfulSyncMap_HasKeyNotFound(t *testing.T) {
 	result := testMap.HasKey("NOTKEY")
 
 	if result {
-		t.Error("Key wasn't present when it should have been.")
+		t.Error("Key was present when it should not have been.")
 	}
 }
 
@@ -176,6 +176,12 @@ func TestForgetfulSyncMap_Delete(t *testing.T) {
 	testMap.AddKey(testKey)
 
 	if !testMap.HasKey(testKey) {
+		t.Error("Key doesn't exist.")
+	}
+
+	testMap.Delete(testKey)
+
+	if testMap.HasKey(testKey) {
 		t.Error("Key still exists after being deleted.")
 	}
 }

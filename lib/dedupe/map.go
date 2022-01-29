@@ -40,12 +40,11 @@ func (f *ForgetfulSyncMap) SetEvictionAction(evictFunc func(key interface{}, val
 
 func (f *ForgetfulSyncMap) sweep() {
 	var remove bool
-	removeCount := 0
-	testCount := 0
+
 	oldest := time.Now().Add(-f.oldAfter)
 	f.lookup.Range(func(key, value interface{}) bool {
 		remove = true
-		testCount++
+
 		if t, ok := value.(ForgetableItem).age, true; ok {
 			if t.After(oldest) {
 				remove = false
@@ -57,7 +56,6 @@ func (f *ForgetfulSyncMap) sweep() {
 				f.evictionFunc(key, value)
 			}
 			f.lookup.Delete(key)
-			removeCount++
 		}
 
 		return true
