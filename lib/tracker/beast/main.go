@@ -1,6 +1,7 @@
 package beast
 
 import (
+	"errors"
 	"fmt"
 	"plane.watch/lib/tracker/mode_s"
 	"time"
@@ -21,6 +22,9 @@ type (
 )
 
 func (f *Frame) Icao() uint32 {
+	if nil == f {
+		return 0
+	}
 	if !f.hasDecoded {
 		_, _ = f.Decode()
 	}
@@ -28,6 +32,9 @@ func (f *Frame) Icao() uint32 {
 }
 
 func (f *Frame) IcaoStr() string {
+	if nil == f {
+		return ""
+	}
 	if !f.hasDecoded {
 		_, _ = f.Decode()
 	}
@@ -35,6 +42,9 @@ func (f *Frame) IcaoStr() string {
 }
 
 func (f *Frame) Decode() (bool, error) {
+	if nil == f {
+		return false, errors.New("nil frame")
+	}
 	f.hasDecoded = true
 	return f.decodedModeS.Decode()
 }
@@ -45,6 +55,9 @@ func (f *Frame) TimeStamp() time.Time {
 }
 
 func (f *Frame) Raw() []byte {
+	if nil == f {
+		return []byte{}
+	}
 	return f.raw
 }
 
@@ -103,10 +116,17 @@ func (f *Frame) decodeModeAc() {
 }
 
 func (f *Frame) decodeModeSShort() *mode_s.Frame {
+	if nil == f {
+		return nil
+	}
+
 	return mode_s.NewFrame(f.avr(), time.Now())
 }
 
 func (f *Frame) decodeModeSLong() *mode_s.Frame {
+	if nil == f {
+		return nil
+	}
 	return mode_s.NewFrame(f.avr(), time.Now())
 }
 
@@ -115,6 +135,9 @@ func (f *Frame) decodeConfig() {
 }
 
 func (f *Frame) avr() string {
+	if nil == f {
+		return ""
+	}
 	return fmt.Sprintf("@%X%X;", f.mlatTimestamp, f.body)
 }
 
@@ -130,6 +153,9 @@ func (f *Frame) BeastTicksNs() time.Duration {
 }
 
 func (f *Frame) String() string {
+	if nil == f {
+		return ""
+	}
 	msgTypeString := map[byte]string{
 		0x31: "MODE_AC",
 		0x32: "MODE_S_SHORT",
@@ -146,6 +172,9 @@ func (f *Frame) String() string {
 }
 
 func (f *Frame) isMlat() bool {
+	if nil == f {
+		return false
+	}
 	for i, b := range magicTimestampMLAT {
 		if b != f.raw[i+2] {
 			return false
@@ -155,6 +184,9 @@ func (f *Frame) isMlat() bool {
 }
 
 func (f *Frame) AvrFrame() *mode_s.Frame {
+	if nil == f {
+		return nil
+	}
 	if !f.hasDecoded {
 		_, _ = f.Decode()
 	}
@@ -162,5 +194,8 @@ func (f *Frame) AvrFrame() *mode_s.Frame {
 }
 
 func (f *Frame) AvrRaw() []byte {
+	if nil == f {
+		return nil
+	}
 	return f.body
 }
