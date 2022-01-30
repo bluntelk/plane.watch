@@ -608,6 +608,10 @@ func (f *Frame) showFlightStatus(output io.Writer) {
 
 func (f *Frame) showICAO(output io.Writer) {
 	fprintf(output, "AA: ICAO            : %6X", f.icao)
+	s, err := f.DecodeAuIcaoCallSign()
+	if nil == err {
+		fprintf(output, "CallSign            : %s", s)
+	}
 	fprintln(output, "")
 }
 

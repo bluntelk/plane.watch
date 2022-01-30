@@ -1,7 +1,6 @@
 $(document).ready(function () {
-    var packet = $('#packet');
-    var inputForm =$('#input-form');
-    packet.val("*A028009F96887B05FFA000413602;");
+    let packet = $('#packet');
+    let inputForm =$('#input-form');
     inputForm.submit(function (event) {
         var packet = $('#packet').val();
         $.get("/decode", {'packet': packet})
@@ -13,6 +12,15 @@ $(document).ready(function () {
             });
         event.preventDefault();
     });
+
+    let search = new URLSearchParams(window.location.search)
+    const requestedDecode = search.get("q")
+    if ("" !== requestedDecode) {
+        packet.val(requestedDecode)
+        inputForm.submit()
+    } else {
+        packet.val("*A028009F96887B05FFA000413602;");
+    }
 
 
     // hook the menu items

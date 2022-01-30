@@ -5,6 +5,7 @@ package mode_s
 */
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -297,7 +298,7 @@ type (
 		downLinkFormat byte // Down link Format (DF)
 		icao           uint32
 		crc, checkSum  uint32
-		identity       uint32
+		identity       uint32 // squawk identity
 		special        string
 		emergency      string
 		alert          bool
@@ -974,4 +975,31 @@ func (f *Frame) getAirplaneLengthWidth() (float32, float32, error) {
 	}
 
 	return length, width, err
+}
+
+// DecodeAuIcao takes the ICAO of an australian aircraft and can decode it into a callsign
+func (f *Frame) DecodeAuIcaoCallSign() (string, error) {
+	start := uint32(0x7C0000)
+	end := uint32(0x7C822D)
+
+	if f.icao < start || f.icao > end {
+		return "", errors.New("not an AU aircraft ICAO")
+	}
+
+	charset := "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	// process this the same as turning seconds into a h:m:s string
+	auNum := int(f.icao) - int(start)
+	var char1, char2, char3 int
+	char3 = auNum % 36
+
+	auNum -= char3
+	char2 = (auNum / 36) % 36
+
+	auNum -= char2 * 36
+	char1 = (auNum / (36 * 36)) % 36
+
+	decodeStr := fmt.Sprintf("%s%s%s", string(charset[char1]), string(charset[char2]), string(charset[char3]))
+
+	return "VH-" + decodeStr, nil
 }
