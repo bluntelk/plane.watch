@@ -39,8 +39,7 @@ func DecodeString(rawFrame string, t time.Time) (*Frame, error) {
 	if frame.isNoOp() {
 		return nil, nil
 	}
-	err := frame.Parse()
-	return frame, err
+	return frame, nil
 }
 
 func NewFrame(rawFrame string, t time.Time) *Frame {
@@ -62,7 +61,7 @@ func (f *Frame) Decode() (bool, error) {
 	if err := f.parseIntoRaw(); nil != err {
 		return false, err
 	}
-	return !f.isNoOp(), f.Parse()
+	return !f.isNoOp(), f.parse()
 }
 
 func (f *Frame) parseIntoRaw() error {
@@ -104,7 +103,7 @@ func (f *Frame) parseIntoRaw() error {
 	return nil
 }
 
-func (f *Frame) Parse() error {
+func (f *Frame) parse() error {
 	var err error
 
 	if f.isNoOp() {
@@ -120,7 +119,7 @@ func (f *Frame) Parse() error {
 
 	// now see if the message we got matches up with the DF format we decoded
 	if int(f.getMessageLengthBytes()) != len(f.message) {
-		return fmt.Errorf("cannot Parse AVR Frame (DF%d) (%X). Incorrect length %d != %d", f.downLinkFormat, f.message, f.getMessageLengthBytes(), len(f.message))
+		return fmt.Errorf("cannot parse AVR Frame (DF%d) (%X). Incorrect length %d != %d", f.downLinkFormat, f.message, f.getMessageLengthBytes(), len(f.message))
 	}
 
 	err = f.checkCrc()
@@ -131,17 +130,20 @@ func (f *Frame) Parse() error {
 	// decode the specific DF type
 	switch f.downLinkFormat {
 	case 0: // Airborne position, baro altitude only
+		f.decodeICAO()
 		f.decodeVerticalStatus()
 		f.decodeCrossLinkCapability()
 		f.decodeSensitivityLevel()
 		f.decodeReplyInformation()
 		err = f.decode13bitAltitudeCode()
 	case 4:
+		f.decodeICAO()
 		f.decodeFlightStatus()
 		f.decodeDownLinkRequest()
 		f.decodeUtilityMessage()
 		err = f.decode13bitAltitudeCode()
 	case 5: //DF_5
+		f.decodeICAO()
 		f.decodeFlightStatus()
 		f.decodeDownLinkRequest()
 		f.decodeUtilityMessage()
@@ -150,6 +152,7 @@ func (f *Frame) Parse() error {
 		f.decodeICAO()
 		f.decodeCapability()
 	case 16: //DF_16
+		f.decodeICAO()
 		f.decodeVerticalStatus()
 		err = f.decode13bitAltitudeCode()
 		f.decodeReplyInformation()
@@ -165,10 +168,12 @@ func (f *Frame) Parse() error {
 			f.decodeAdsb()
 		}
 	case 20: //DF_20
+		f.decodeICAO()
 		f.decodeFlightStatus()
 		_ = f.decode13bitAltitudeCode()
 		err = f.decodeCommB()
 	case 21: //DF_21
+		f.decodeICAO()
 		f.decodeFlightStatus()
 		f.decodeSquawkIdentity(2, 3) // gillham encoded squawk
 		err = f.decodeCommB()
@@ -228,6 +233,9 @@ func (f *Frame) SetTimeStamp(t time.Time) {
 // call after frame.raw is set. does the preparing
 func (f *Frame) parseRawToMessage() error {
 	frameLen := len(f.raw)
+	if nil != f.message {
+		return nil
+	}
 
 	// cheap bitwise even number check!
 	if 0 != (frameLen & 1) {
@@ -329,7 +337,12 @@ func (f *Frame) decodeUtilityMessage() {
 // Determines the ICAO address from bytes 2,3 and 4
 func (f *Frame) decodeICAO() {
 	switch f.downLinkFormat {
-	case 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31:
+	case 0, 4, 5, 16, 20, 21:
+		// attempt to get the ICAO from the AP Field
+		// AP is CRC overlaid with the ICAO
+		f.icao = f.decodeModeSChecksumAddr()
+
+	case 1, 2, 3, 6, 7, 8, 9, 10, 12, 13, 14, 15, 19, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31:
 		f.icao = 0
 	case 11, 17, 18:
 		a := uint32(f.message[1])

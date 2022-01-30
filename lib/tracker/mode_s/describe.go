@@ -469,16 +469,19 @@ func (f *Frame) Describe(output io.Writer) {
 		f.showSensitivityLevel(output)
 		f.showReplyInformation(output)
 		f.showAltitude(output)
+		f.showICAO(output)
 	case 4:
 		f.showFlightStatus(output)
 		f.showDownLinkRequest(output)
 		f.showUtilityMessage(output)
 		f.showAltitude(output)
+		f.showICAO(output)
 	case 5:
 		f.showFlightStatus(output)
 		f.showDownLinkRequest(output)
 		f.showUtilityMessage(output)
 		f.showIdentity(output)
+		f.showICAO(output)
 	case 11:
 		f.showCapability(output)
 		f.showICAO(output)
@@ -487,6 +490,7 @@ func (f *Frame) Describe(output io.Writer) {
 		f.showSensitivityLevel(output)
 		f.showReplyInformation(output)
 		f.showAltitude(output)
+		f.showICAO(output)
 	case 17:
 		f.showCapability(output)
 		f.showICAO(output)
@@ -505,11 +509,13 @@ func (f *Frame) Describe(output io.Writer) {
 		f.showAltitude(output)
 		f.showFlightNumber(output)
 		f.showBdsData(output)
+		f.showICAO(output)
 	case 21: //DF_21
 		f.showFlightStatus(output)
 		f.showIdentity(output) // gillham encoded squawk
 		f.showFlightNumber(output)
 		f.showBdsData(output)
+		f.showICAO(output)
 	}
 
 	f.showBitString(output)
