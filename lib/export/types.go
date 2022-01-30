@@ -30,6 +30,9 @@ type (
 		TrackedSince      time.Time
 		LastMsg           time.Time
 
+		AircraftWidth  *float32 `json:",omitempty"`
+		AircraftLength *float32 `json:",omitempty"`
+
 		// Enrichment Plane data
 		IcaoCode        *string `json:",omitempty"`
 		Registration    *string `json:",omitempty"`

@@ -127,7 +127,7 @@ func TestFrame_VerticalRate(t *testing.T) {
 	}
 }
 
-func TestFrame_DecodeAuIcaoCallSign(t *testing.T) {
+func TestFrame_DecodeAuIcaoRegistration(t *testing.T) {
 	icao := uint32(0x7C0000)
 	//end := uint32(0x7C822D)
 	charset := "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -138,7 +138,7 @@ func TestFrame_DecodeAuIcaoCallSign(t *testing.T) {
 				expected := "VH-" + string(charset[char1]) + string(charset[char2]) + string(charset[char3])
 				f := Frame{icao: icao}
 
-				s, err := f.DecodeAuIcaoCallSign()
+				s, err := f.DecodeAuIcaoRegistration()
 				if icao > 0x7C822D {
 					// expect an error
 					if nil == err {
@@ -148,8 +148,8 @@ func TestFrame_DecodeAuIcaoCallSign(t *testing.T) {
 					if nil != err {
 						t.Error(err)
 					}
-					if s != expected {
-						t.Errorf("Did not decode correctly. Expected %s, got: %s", expected, s)
+					if *s != expected {
+						t.Errorf("Did not decode correctly. Expected %s, got: %s", expected, *s)
 					}
 				}
 				icao++

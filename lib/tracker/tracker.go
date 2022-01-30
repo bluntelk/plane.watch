@@ -151,6 +151,8 @@ func (p *Plane) HandleModeSFrame(frame *mode_s.Frame, refLat, refLon *float64) {
 		Str("DF17 Msg Type", frame.MessageTypeString()).
 		Send()
 
+	hasChanged = hasChanged || p.setRegistration(frame.DecodeAuIcaoRegistration())
+
 	// determine what to do with our given frame
 	switch frame.DownLinkType() {
 	case 0:
@@ -353,6 +355,7 @@ func (p *Plane) HandleModeSFrame(frame *mode_s.Frame, refLat, refLon *float64) {
 				if frame.VerticalStatusValid() {
 					hasChanged = hasChanged || p.setGroundStatus(frame.MustOnGround())
 				}
+				hasChanged = hasChanged || p.setAirFrameWidthLength(frame.GetAirplaneLengthWidth())
 
 				break
 			}

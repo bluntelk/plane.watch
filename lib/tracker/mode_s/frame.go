@@ -914,12 +914,10 @@ func (f *Frame) NavigationIntegrityCategory(nicSupplA bool) (byte, error) {
 	return nic, err
 }
 
-/**
- * Gets the air frames size in metres
- */
-func (f *Frame) getAirplaneLengthWidth() (float32, float32, error) {
+// GetAirplaneLengthWidth Gets the air frames size in metres, if we have it
+func (f *Frame) GetAirplaneLengthWidth() (*float32, *float32, error) {
 	if !(f.messageType == 31 && f.messageSubType == 1) {
-		return 0, 0, fmt.Errorf("can only get aircraft size from ADSB message 31 sub type 1")
+		return nil, nil, fmt.Errorf("can only get aircraft size from ADSB message 31 sub type 1")
 	}
 	var length, width float32
 	var err error
@@ -974,16 +972,16 @@ func (f *Frame) getAirplaneLengthWidth() (float32, float32, error) {
 		err = fmt.Errorf("unable to determine airframes size")
 	}
 
-	return length, width, err
+	return &length, &width, err
 }
 
-// DecodeAuIcao takes the ICAO of an australian aircraft and can decode it into a callsign
-func (f *Frame) DecodeAuIcaoCallSign() (string, error) {
+// DecodeAuIcaoRegistration takes the ICAO of an australian aircraft and can decode it into a callsign
+func (f *Frame) DecodeAuIcaoRegistration() (*string, error) {
 	start := uint32(0x7C0000)
 	end := uint32(0x7C822D)
 
 	if f.icao < start || f.icao > end {
-		return "", errors.New("not an AU aircraft ICAO")
+		return nil, errors.New("not an AU aircraft ICAO")
 	}
 
 	charset := "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -999,7 +997,7 @@ func (f *Frame) DecodeAuIcaoCallSign() (string, error) {
 	auNum -= char2 * 36
 	char1 = (auNum / (36 * 36)) % 36
 
-	decodeStr := fmt.Sprintf("%s%s%s", string(charset[char1]), string(charset[char2]), string(charset[char3]))
+	decodeStr := fmt.Sprintf("VH-%s%s%s", string(charset[char1]), string(charset[char2]), string(charset[char3]))
 
-	return "VH-" + decodeStr, nil
+	return &decodeStr, nil
 }

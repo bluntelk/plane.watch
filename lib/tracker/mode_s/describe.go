@@ -608,9 +608,9 @@ func (f *Frame) showFlightStatus(output io.Writer) {
 
 func (f *Frame) showICAO(output io.Writer) {
 	fprintf(output, "AA: ICAO            : %6X", f.icao)
-	s, err := f.DecodeAuIcaoCallSign()
+	s, err := f.DecodeAuIcaoRegistration()
 	if nil == err {
-		fprintf(output, "CallSign            : %s", s)
+		fprintf(output, "Registration        : %s", *s)
 	}
 	fprintln(output, "")
 }
@@ -784,9 +784,9 @@ func (f *Frame) showOperationalModeInfo(output io.Writer) {
 
 }
 func (f *Frame) showAircraftLengthWidth(output io.Writer) {
-	length, width, err := f.getAirplaneLengthWidth()
+	length, width, err := f.GetAirplaneLengthWidth()
 	if nil == err {
-		fprintf(output, "    Airframe Size   : width:%0.1f length:%0.1f metres\n", width, length)
+		fprintf(output, "    Airframe Size   : width:%0.1f length:%0.1f metres\n", *width, *length)
 	}
 }
 func (f *Frame) showCrossCheck(output io.Writer) {

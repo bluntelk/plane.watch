@@ -176,24 +176,26 @@ func (r *RabbitMqSink) sendLocationEventToExchange(routingKey string, le *tracke
 	plane := le.Plane()
 	if nil != plane {
 		eventStruct := export.PlaneLocation{
-			New:           le.New(),
-			Removed:       le.Removed(),
-			Icao:          plane.IcaoIdentifierStr(),
-			Lat:           plane.Lat(),
-			Lon:           plane.Lon(),
-			Heading:       plane.Heading(),
-			Altitude:      int(plane.Altitude()),
-			VerticalRate:  plane.VerticalRate(),
-			AltitudeUnits: plane.AltitudeUnits(),
-			Velocity:      plane.Velocity(),
-			FlightNumber:  strings.TrimSpace(plane.FlightNumber()),
-			FlightStatus:  plane.FlightStatus(),
-			OnGround:      plane.OnGround(),
-			Airframe:      plane.AirFrame(),
-			AirframeType:  plane.AirFrameType(),
-			Squawk:        plane.SquawkIdentityStr(),
-			Special:       plane.Special(),
-
+			New:             le.New(),
+			Removed:         le.Removed(),
+			Icao:            plane.IcaoIdentifierStr(),
+			Lat:             plane.Lat(),
+			Lon:             plane.Lon(),
+			Heading:         plane.Heading(),
+			Altitude:        int(plane.Altitude()),
+			VerticalRate:    plane.VerticalRate(),
+			AltitudeUnits:   plane.AltitudeUnits(),
+			Velocity:        plane.Velocity(),
+			FlightNumber:    strings.TrimSpace(plane.FlightNumber()),
+			FlightStatus:    plane.FlightStatus(),
+			OnGround:        plane.OnGround(),
+			Airframe:        plane.AirFrame(),
+			AirframeType:    plane.AirFrameType(),
+			Squawk:          plane.SquawkIdentityStr(),
+			Special:         plane.Special(),
+			AircraftWidth:   plane.AirFrameWidth(),
+			AircraftLength:  plane.AirFrameLength(),
+			Registration:    plane.Registration(),
 			HasLocation:     plane.HasLocation(),
 			HasHeading:      plane.HasHeading(),
 			HasVerticalRate: plane.HasVerticalRate(),
@@ -202,6 +204,9 @@ func (r *RabbitMqSink) sendLocationEventToExchange(routingKey string, le *tracke
 			TileLocation:    plane.GridTileLocation(),
 			LastMsg:         plane.LastSeen().UTC(),
 			TrackedSince:    plane.TrackedSince().UTC(),
+		}
+		if "" != eventStruct.FlightNumber {
+			eventStruct.CallSign = &eventStruct.FlightNumber
 		}
 
 		var jsonBuf []byte
