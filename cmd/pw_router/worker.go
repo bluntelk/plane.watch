@@ -74,11 +74,11 @@ func (w *worker) isSignificant(history planeLocationLast) bool {
 		return true
 	}
 
-	if candidate.FlightNumber != last.FlightNumber {
+	if candidate.CallSign != last.CallSign && nil != candidate.CallSign {
 		log.Debug().
 			Str("aircraft", candidate.Icao).
-			Str("last", last.FlightNumber).
-			Str("current", candidate.FlightNumber).
+			Str("last", unptr(last.CallSign)).
+			Str("current", unptr(candidate.CallSign)).
 			Int64("diff_time", int64(candidate.LastMsg.Sub(last.LastMsg))).
 			Msg("Significant FlightNumber change.")
 		return true
@@ -242,4 +242,11 @@ func (w *worker) publishLocationUpdate(routingKey string, msg []byte) {
 	} else {
 		log.Debug().Msgf("Sent msg to routing key %s", routingKey)
 	}
+}
+
+func unptr(s *string) string {
+	if nil == s {
+		return ""
+	}
+	return *s
 }
