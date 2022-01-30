@@ -75,7 +75,8 @@ func (f *Frame) checkCrc() error {
 		// decoding/checking CRC here is tricky. Field Type AP
 		return nil
 	case 11, 17, 18: // Field Type PI
-		if 0 != f.decodeModeSChecksum() {
+		f.checkSum = f.decodeModeSChecksum()
+		if 0 == f.checkSum {
 			return nil
 		}
 		return fmt.Errorf("invalid checksum for DF %d (%s)", f.downLinkFormat, f.raw)
