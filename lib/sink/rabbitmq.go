@@ -175,6 +175,7 @@ func (r *RabbitMqSink) sendLocationEventToExchange(routingKey string, le *tracke
 	var err error
 	plane := le.Plane()
 	if nil != plane {
+		callSign := strings.TrimSpace(plane.FlightNumber())
 		eventStruct := export.PlaneLocation{
 			New:             le.New(),
 			Removed:         le.Removed(),
@@ -186,7 +187,7 @@ func (r *RabbitMqSink) sendLocationEventToExchange(routingKey string, le *tracke
 			VerticalRate:    plane.VerticalRate(),
 			AltitudeUnits:   plane.AltitudeUnits(),
 			Velocity:        plane.Velocity(),
-			FlightNumber:    strings.TrimSpace(plane.FlightNumber()),
+			CallSign:        &callSign,
 			FlightStatus:    plane.FlightStatus(),
 			OnGround:        plane.OnGround(),
 			Airframe:        plane.AirFrame(),
@@ -204,9 +205,6 @@ func (r *RabbitMqSink) sendLocationEventToExchange(routingKey string, le *tracke
 			TileLocation:    plane.GridTileLocation(),
 			LastMsg:         plane.LastSeen().UTC(),
 			TrackedSince:    plane.TrackedSince().UTC(),
-		}
-		if "" != eventStruct.FlightNumber {
-			eventStruct.CallSign = &eventStruct.FlightNumber
 		}
 
 		var jsonBuf []byte
