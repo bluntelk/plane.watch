@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"io/fs"
 	"net/http"
 	"os"
+	"os/signal"
 	"path"
 	"plane.watch/lib/logging"
 	"plane.watch/lib/monitoring"
@@ -15,6 +17,7 @@ import (
 	"plane.watch/lib/tracker/mode_s"
 	"runtime/debug"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -25,9 +28,28 @@ func main() {
 	app := cli.NewApp()
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
-			Name:  "port",
-			Value: "8080",
-			Usage: "Port to run the website on",
+			Name:    "listen-http",
+			Aliases: []string{"port"},
+			Value:   ":8080",
+			Usage:   "Port to run the website on (http)",
+		},
+		&cli.StringFlag{
+			Name:  "listen-https",
+			Value: ":8443",
+			Usage: "Port to run the website on (https)",
+		},
+
+		&cli.StringFlag{
+			Name:    "tls-cert",
+			Usage:   "The path to a PEM encoded TLS Full Chain Certificate (cert+intermediate+ca)",
+			Value:   "",
+			EnvVars: []string{"TLS_CERT"},
+		},
+		&cli.StringFlag{
+			Name:    "tls-cert-key",
+			Usage:   "The path to a PEM encoded TLS Certificate Key",
+			Value:   "",
+			EnvVars: []string{"TLS_CERT_KEY"},
 		},
 	}
 	logging.IncludeVerbosityFlags(app)
@@ -47,6 +69,11 @@ func main() {
 }
 
 func runHttpServer(c *cli.Context) error {
+	cert := c.String("tls-cert")
+	certKey := c.String("tls-cert-key")
+	if ("" != cert || "" != certKey) && ("" == cert || "" == certKey) {
+		return errors.New("please provide both certificate and key")
+	}
 	monitoring.RunWebServer(c)
 	var htdocsPath string
 	var err error
@@ -121,10 +148,39 @@ func runHttpServer(c *cli.Context) error {
 
 	})
 
-	port := ":" + c.String("port")
+	exitChan := make(chan bool)
+	go listenHttp(exitChan, c.String("listen-http"))
+	if "" != cert {
+		go listenHttps(exitChan, cert, certKey, c.String("listen-https"))
+	}
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	select {
+	case <-exitChan:
+		log.Error().Msg("There as an error and we are exiting")
+	case <-sc:
+		log.Debug().Msg("Kill Signal Received")
+	}
+
+	return nil
+}
+
+func listenHttp(exitChan chan bool, port string) {
 	log.Info().Msgf("Decode Listening on %s...", port)
 	if err := http.ListenAndServe(port, nil); nil != err {
-		log.Error().Err(err).Send()
+		if http.ErrServerClosed != err {
+			log.Error().Err(err).Send()
+		}
 	}
-	return nil
+	exitChan <- true
+}
+
+func listenHttps(exitChan chan bool, cert, certKey, port string) {
+	log.Info().Msgf("Decode Listening on %s...", port)
+	if err := http.ListenAndServeTLS(port, cert, certKey, nil); nil != err {
+		if http.ErrServerClosed != err {
+			log.Error().Err(err).Send()
+		}
+	}
+	exitChan <- true
 }
