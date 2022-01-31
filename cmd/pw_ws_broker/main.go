@@ -67,6 +67,19 @@ func main() {
 			Value:   ":80",
 			EnvVars: []string{"HTTP_ADDR"},
 		},
+		&cli.StringFlag{
+			Name:    "tls-cert",
+			Usage:   "The path to a PEM encoded TLS Full Chain Certificate (cert+intermediate+ca)",
+			Value:   "",
+			EnvVars: []string{"TLS_CERT"},
+		},
+		&cli.StringFlag{
+			Name:    "tls-cert-key",
+			Usage:   "The path to a PEM encoded TLS Certificate Key",
+			Value:   "",
+			EnvVars: []string{"TLS_CERT_KEY"},
+		},
+
 		&cli.BoolFlag{
 			Name:    "serve-test-web",
 			Usage:   "Serve up a test website for websocket testing",
@@ -79,6 +92,7 @@ func main() {
 
 	app.Before = func(c *cli.Context) error {
 		logging.SetLoggingLevel(c)
+
 		return nil
 	}
 
@@ -97,6 +111,15 @@ func runCli(c *cli.Context) error {
 }
 
 func run(c *cli.Context) error {
+	cert := c.String("tls-cert")
+	certKey := c.String("tls-cert-key")
+	if ("" != cert || "" != certKey) && ("" == cert || "" == certKey) {
+		return errors.New("please provide both certificate and key")
+	}
+	if ":80" == c.String("http-addr") && "" != cert {
+		return c.Set("http-addr", ":443")
+	}
+
 	monitoring.RunWebServer(c)
 	source := c.String("source")
 	lowRoute := c.String("route-key-low")
@@ -124,6 +147,8 @@ func run(c *cli.Context) error {
 		lowRoute,
 		highRoute,
 		c.String("http-addr"),
+		c.String("tls-cert"),
+		c.String("tls-cert-key"),
 		c.Bool("serve-test-web"),
 	)
 	if nil != err {

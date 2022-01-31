@@ -54,10 +54,14 @@ func (br *PwWsBrokerRabbit) configureRabbitMq() error {
 	return nil
 }
 
-func (br *PwWsBrokerRabbit) consume(queue, what string) {
+func (br *PwWsBrokerRabbit) consume(exitChan chan bool, queue, what string) {
 	ch, err := br.rabbit.Consume(queue, "pw_ws_broker"+what)
 	if nil != err {
-		log.Error().Err(err).Msg("Failed to consume")
+		log.Error().
+			Err(err).
+			Str("queue", queue).
+			Str("what", what).
+			Msg("Failed to consume")
 		return
 	}
 
@@ -71,8 +75,13 @@ func (br *PwWsBrokerRabbit) consume(queue, what string) {
 		br.processMessage(what, &planeData)
 
 	}
+	log.Info().
+		Str("queue", queue).
+		Str("what", what).
+		Msg("Finished Consuming")
+	exitChan <- true
 }
-func (br *PwWsBrokerRabbit) consumeAll() {
-	go br.consume(br.queueLow, "_low")
-	go br.consume(br.queueHigh, "_high")
+func (br *PwWsBrokerRabbit) consumeAll(exitChan chan bool) {
+	go br.consume(exitChan, br.queueLow, "_low")
+	go br.consume(exitChan, br.queueHigh, "_high")
 }
