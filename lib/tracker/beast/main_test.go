@@ -2,6 +2,7 @@ package beast
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -108,6 +109,25 @@ func Test_newBeastMsg(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := newBeastMsg(tt.args.rawBytes); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("newBeastMsg() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFrame_SignalRssi(t *testing.T) {
+	tests := []struct {
+		name string
+		args []byte
+		want string
+	}{
+		{name: "AC", args: beastModeAc, want: "-Inf"},
+		{name: "Long", args: beastModeSShort, want: "15.8"},
+		{name: "Short", args: beastModeSLong, want: "16.0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := fmt.Sprintf("%0.1f", newBeastMsg(tt.args).SignalRssi()); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("newBeastMsg() = %v, want %v", got, tt.want)
 			}
 		})

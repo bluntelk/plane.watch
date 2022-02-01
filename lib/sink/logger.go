@@ -40,7 +40,9 @@ func (l *LoggerSink) OnEvent(e tracker.Event) {
 		log.Info().Str("event", "method").Msg(e.String())
 	case *tracker.PlaneLocationEvent:
 		if l.logLocation {
-			log.Info().Msg(e.String())
+			log.Info().
+				Str("RSSI", e.(*tracker.PlaneLocationEvent).Plane().SignalLevelStr()).
+				Msg(e.String())
 		}
 	case *tracker.InfoEvent:
 		i := e.(*tracker.InfoEvent)

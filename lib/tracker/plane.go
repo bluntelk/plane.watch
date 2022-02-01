@@ -73,6 +73,8 @@ type (
 		msgCount         uint64
 		airframe         airframe
 
+		signalLevel *float64 // RSSI dBFS
+
 		rwLock sync.RWMutex
 	}
 
@@ -204,6 +206,35 @@ func (p *Plane) Special() string {
 	return strings.TrimSpace(ret)
 }
 
+// setSignalLevel sets the receivers signal level for this frame
+func (p *Plane) setSignalLevel(rssi float64) bool {
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	hasChanged := true
+	if nil != p.signalLevel {
+		hasChanged = *p.signalLevel != rssi
+	}
+	p.signalLevel = &rssi
+	return hasChanged
+}
+
+// SignalLevel gives the RSSI value from the last frame processed for this plane
+func (p *Plane) SignalLevel() *float64 {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.signalLevel
+}
+
+// SignalLevelStr gives the RSSI value from the last frame processed for this plane
+func (p *Plane) SignalLevelStr() string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	if nil == p.signalLevel {
+		return ""
+	}
+	return fmt.Sprintf("%0.1f", *p.signalLevel)
+}
+
 func haveTty() bool {
 	fi, err := os.Stdout.Stat()
 	if nil != err {
@@ -228,7 +259,13 @@ func (p *Plane) String() string {
 	red := "\033[38;5;160m"
 
 	if colourOutput {
-		id = fmt.Sprintf("%sPlane (%s%s %-8s%s)", white, lime, p.IcaoIdentifierStr(), p.FlightNumber(), white)
+		c := lime
+		v := p.IcaoIdentifierStr()
+		if nil != p.Registration() {
+			c = orange
+			v = *p.Registration()
+		}
+		id = fmt.Sprintf("%sPlane (%s%s %-8s%s)", white, c, v, p.FlightNumber(), white)
 	} else {
 		id = fmt.Sprintf("Plane (%s %-8s)", p.IcaoIdentifierStr(), p.FlightNumber())
 	}

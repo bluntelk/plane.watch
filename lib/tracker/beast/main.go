@@ -3,6 +3,7 @@ package beast
 import (
 	"errors"
 	"fmt"
+	"math"
 	"plane.watch/lib/tracker/mode_s"
 	"time"
 )
@@ -163,10 +164,10 @@ func (f *Frame) String() string {
 		0x34: "RADARCAPE_STATUS",
 	}
 	return fmt.Sprintf(
-		"Type: %-16s Time: %06X Signal %03d Data: %X",
+		"Type: %-16s, Time: %06X, Signal RSSI %0.1f dBFS, Data: %X",
 		msgTypeString[f.msgType],
 		f.mlatTimestamp,
-		f.signalLevel,
+		f.SignalRssi(),
 		f.body,
 	)
 }
@@ -198,4 +199,8 @@ func (f *Frame) AvrRaw() []byte {
 		return nil
 	}
 	return f.body
+}
+
+func (f *Frame) SignalRssi() float64 {
+	return 10 * math.Log10(float64(f.signalLevel))
 }
