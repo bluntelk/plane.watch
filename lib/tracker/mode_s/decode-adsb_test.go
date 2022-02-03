@@ -10,7 +10,7 @@ func TestDecodeDF17BaroAlt1(t *testing.T) {
 	frame, err := DecodeString("*8d7c4a08581fa28e6038b87a2e88;", time.Now())
 	if nil != err {
 		t.Error(err)
-		return
+		t.FailNow()
 	}
 
 	if a, _ := frame.Altitude(); a != 5250 {
@@ -67,6 +67,7 @@ func TestDecodeDF17MT19ST1(t *testing.T) {
 	}
 	if nil == frame {
 		t.Error("Failed to decode frame")
+		t.FailNow()
 	}
 
 	if 17 != frame.DownLinkType() {
@@ -254,6 +255,9 @@ func TestAltitudeDecode(t *testing.T) {
 	frame, err := DecodeString("*8D7C7DAA582886FB218A9AFB0420;", time.Now())
 	if nil != err {
 		t.Error(err)
+	}
+	if nil == frame {
+		t.FailNow()
 	}
 	a, err := frame.Altitude()
 	if nil != err {

@@ -469,16 +469,19 @@ func (f *Frame) Describe(output io.Writer) {
 		f.showSensitivityLevel(output)
 		f.showReplyInformation(output)
 		f.showAltitude(output)
+		f.showICAO(output)
 	case 4:
 		f.showFlightStatus(output)
 		f.showDownLinkRequest(output)
 		f.showUtilityMessage(output)
 		f.showAltitude(output)
+		f.showICAO(output)
 	case 5:
 		f.showFlightStatus(output)
 		f.showDownLinkRequest(output)
 		f.showUtilityMessage(output)
 		f.showIdentity(output)
+		f.showICAO(output)
 	case 11:
 		f.showCapability(output)
 		f.showICAO(output)
@@ -487,6 +490,7 @@ func (f *Frame) Describe(output io.Writer) {
 		f.showSensitivityLevel(output)
 		f.showReplyInformation(output)
 		f.showAltitude(output)
+		f.showICAO(output)
 	case 17:
 		f.showCapability(output)
 		f.showICAO(output)
@@ -505,11 +509,13 @@ func (f *Frame) Describe(output io.Writer) {
 		f.showAltitude(output)
 		f.showFlightNumber(output)
 		f.showBdsData(output)
+		f.showICAO(output)
 	case 21: //DF_21
 		f.showFlightStatus(output)
 		f.showIdentity(output) // gillham encoded squawk
 		f.showFlightNumber(output)
 		f.showBdsData(output)
+		f.showICAO(output)
 	}
 
 	f.showBitString(output)
@@ -608,6 +614,10 @@ func (f *Frame) showFlightStatus(output io.Writer) {
 
 func (f *Frame) showICAO(output io.Writer) {
 	fprintf(output, "AA: ICAO            : %6X", f.icao)
+	s, err := f.DecodeAuIcaoRegistration()
+	if nil == err {
+		fprintf(output, "Registration        : %s", *s)
+	}
 	fprintln(output, "")
 }
 
@@ -780,9 +790,9 @@ func (f *Frame) showOperationalModeInfo(output io.Writer) {
 
 }
 func (f *Frame) showAircraftLengthWidth(output io.Writer) {
-	length, width, err := f.getAirplaneLengthWidth()
+	length, width, err := f.GetAirplaneLengthWidth()
 	if nil == err {
-		fprintf(output, "    Airframe Size   : width:%0.1f length:%0.1f metres\n", width, length)
+		fprintf(output, "    Airframe Size   : width:%0.1f length:%0.1f metres\n", *width, *length)
 	}
 }
 func (f *Frame) showCrossCheck(output io.Writer) {

@@ -5,6 +5,7 @@ package mode_s
 */
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -297,7 +298,7 @@ type (
 		downLinkFormat byte // Down link Format (DF)
 		icao           uint32
 		crc, checkSum  uint32
-		identity       uint32
+		identity       uint32 // squawk identity
 		special        string
 		emergency      string
 		alert          bool
@@ -587,13 +588,22 @@ func (f *Frame) Raw() []byte {
 }
 
 func (f *Frame) IcaoStr() string {
+	if nil == f {
+		return ""
+	}
 	return fmt.Sprintf("%06X", f.icao)
 }
 
 func (f *Frame) Latitude() int {
+	if nil == f {
+		return -1
+	}
 	return f.rawLatitude
 }
 func (f *Frame) Longitude() int {
+	if nil == f {
+		return -1
+	}
 	return f.rawLongitude
 }
 
@@ -611,6 +621,9 @@ func (f *Frame) MustAltitude() int32 {
 }
 
 func (f *Frame) AltitudeUnits() string {
+	if nil == f {
+		return "metres"
+	}
 	if f.unit == modesUnitMetres {
 		return "metres"
 	} else {
@@ -619,14 +632,23 @@ func (f *Frame) AltitudeUnits() string {
 }
 
 func (f *Frame) AltitudeValid() bool {
+	if nil == f {
+		return false
+	}
 	return f.validAltitude
 }
 
 func (f *Frame) FlightStatusString() string {
+	if nil == f {
+		return ""
+	}
 	return flightStatusTable[f.fs]
 }
 
 func (f *Frame) FlightStatus() byte {
+	if nil == f {
+		return 255
+	}
 	return f.fs
 }
 
@@ -645,6 +667,9 @@ func (f *Frame) MustVelocity() float64 {
 }
 
 func (f *Frame) VelocityValid() bool {
+	if nil == f {
+		return false
+	}
 	return f.validVelocity
 }
 
@@ -662,23 +687,29 @@ func (f *Frame) MustHeading() float64 {
 }
 
 func (f *Frame) HeadingValid() bool {
+	if nil == f {
+		return false
+	}
 	return f.validHeading
 }
 
 func (f *Frame) VerticalRate() (int, error) {
-	if f.validVerticalRate {
+	if f.VerticalRateValid() {
 		return f.verticalRate, nil
 	}
 	return 0, fmt.Errorf("vertical rate (VR) is not valid")
 }
 func (f *Frame) MustVerticalRate() int {
-	if f.validVerticalRate {
+	if f.VerticalRateValid() {
 		return f.verticalRate
 	}
 	panic("vertical rate (VR) is not valid")
 }
 
 func (f *Frame) VerticalRateValid() bool {
+	if nil == f {
+		return false
+	}
 	return f.validVerticalRate
 }
 
@@ -691,33 +722,48 @@ func (f *Frame) VerticalRateValid() bool {
 //}
 
 func (f *Frame) SquawkIdentity() uint32 {
+	if nil == f {
+		return 0
+	}
 	return f.identity
 }
 
 func (f *Frame) OnGround() (bool, error) {
-	if f.validVerticalStatus {
+	if f.VerticalStatusValid() {
 		return f.onGround, nil
 	}
 	return false, fmt.Errorf("vertical status (VS) is not valid")
 }
 func (f *Frame) MustOnGround() bool {
-	if f.validVerticalStatus {
+	if f.VerticalStatusValid() {
 		return f.onGround
 	}
 	panic("vertical status (VS) is not valid")
 }
 func (f *Frame) VerticalStatusValid() bool {
+	if nil == f {
+		return false
+	}
 	return f.validVerticalStatus
 }
 func (f *Frame) Alert() bool {
+	if nil == f {
+		return false
+	}
 	return f.alert
 }
 
 func (f *Frame) ValidCategory() bool {
+	if nil == f {
+		return false
+	}
 	return f.catValid
 }
 
 func (f *Frame) Category() string {
+	if !f.ValidCategory() {
+		return ""
+	}
 	return aircraftCategory[f.catType][f.catSubType]
 }
 func (f *Frame) CategoryType() string {
@@ -868,12 +914,10 @@ func (f *Frame) NavigationIntegrityCategory(nicSupplA bool) (byte, error) {
 	return nic, err
 }
 
-/**
- * Gets the air frames size in metres
- */
-func (f *Frame) getAirplaneLengthWidth() (float32, float32, error) {
+// GetAirplaneLengthWidth Gets the air frames size in metres, if we have it
+func (f *Frame) GetAirplaneLengthWidth() (*float32, *float32, error) {
 	if !(f.messageType == 31 && f.messageSubType == 1) {
-		return 0, 0, fmt.Errorf("can only get aircraft size from ADSB message 31 sub type 1")
+		return nil, nil, fmt.Errorf("can only get aircraft size from ADSB message 31 sub type 1")
 	}
 	var length, width float32
 	var err error
@@ -928,5 +972,32 @@ func (f *Frame) getAirplaneLengthWidth() (float32, float32, error) {
 		err = fmt.Errorf("unable to determine airframes size")
 	}
 
-	return length, width, err
+	return &length, &width, err
+}
+
+// DecodeAuIcaoRegistration takes the ICAO of an australian aircraft and can decode it into a callsign
+func (f *Frame) DecodeAuIcaoRegistration() (*string, error) {
+	start := uint32(0x7C0000)
+	end := uint32(0x7C822D)
+
+	if f.icao < start || f.icao > end {
+		return nil, errors.New("not an AU aircraft ICAO")
+	}
+
+	charset := "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	// process this the same as turning seconds into a h:m:s string
+	auNum := int(f.icao) - int(start)
+	var char1, char2, char3 int
+	char3 = auNum % 36
+
+	auNum -= char3
+	char2 = (auNum / 36) % 36
+
+	auNum -= char2 * 36
+	char1 = (auNum / (36 * 36)) % 36
+
+	decodeStr := fmt.Sprintf("VH-%s%s%s", string(charset[char1]), string(charset[char2]), string(charset[char3]))
+
+	return &decodeStr, nil
 }

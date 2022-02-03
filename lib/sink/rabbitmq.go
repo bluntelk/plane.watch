@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
@@ -177,25 +176,28 @@ func (r *RabbitMqSink) sendLocationEventToExchange(routingKey string, le *tracke
 	var err error
 	plane := le.Plane()
 	if nil != plane {
+		callSign := strings.TrimSpace(plane.FlightNumber())
 		eventStruct := export.PlaneLocation{
-			New:           le.New(),
-			Removed:       le.Removed(),
-			Icao:          plane.IcaoIdentifierStr(),
-			Lat:           plane.Lat(),
-			Lon:           plane.Lon(),
-			Heading:       plane.Heading(),
-			Altitude:      int(plane.Altitude()),
-			VerticalRate:  plane.VerticalRate(),
-			AltitudeUnits: plane.AltitudeUnits(),
-			Velocity:      plane.Velocity(),
-			FlightNumber:  strings.TrimSpace(plane.FlightNumber()),
-			FlightStatus:  plane.FlightStatus(),
-			OnGround:      plane.OnGround(),
-			Airframe:      plane.AirFrame(),
-			AirframeType:  plane.AirFrameType(),
-			Squawk:        plane.SquawkIdentityStr(),
-			Special:       plane.Special(),
-
+			New:             le.New(),
+			Removed:         le.Removed(),
+			Icao:            plane.IcaoIdentifierStr(),
+			Lat:             plane.Lat(),
+			Lon:             plane.Lon(),
+			Heading:         plane.Heading(),
+			Altitude:        int(plane.Altitude()),
+			VerticalRate:    plane.VerticalRate(),
+			AltitudeUnits:   plane.AltitudeUnits(),
+			Velocity:        plane.Velocity(),
+			CallSign:        &callSign,
+			FlightStatus:    plane.FlightStatus(),
+			OnGround:        plane.OnGround(),
+			Airframe:        plane.AirFrame(),
+			AirframeType:    plane.AirFrameType(),
+			Squawk:          plane.SquawkIdentityStr(),
+			Special:         plane.Special(),
+			AircraftWidth:   plane.AirFrameWidth(),
+			AircraftLength:  plane.AirFrameLength(),
+			Registration:    plane.Registration(),
 			HasLocation:     plane.HasLocation(),
 			HasHeading:      plane.HasHeading(),
 			HasVerticalRate: plane.HasVerticalRate(),
@@ -300,7 +302,10 @@ func (r *RabbitMqSink) OnEvent(e tracker.Event) {
 	}
 
 	if nil != err {
-		fmt.Println(err)
+		log.Error().Err(err).Str("event-type", e.Type()).Str("event", e.String()).Msg("Unable to handle event")
+	}
+	if err == rabbitmq.ErrNilChannel {
+		panic(err)
 	}
 }
 

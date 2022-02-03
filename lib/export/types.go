@@ -14,7 +14,6 @@ type (
 		Altitude          int
 		VerticalRate      int
 		AltitudeUnits     string
-		FlightNumber      string
 		FlightStatus      string
 		OnGround          bool
 		Airframe          string
@@ -29,6 +28,9 @@ type (
 		TileLocation      string
 		TrackedSince      time.Time
 		LastMsg           time.Time
+
+		AircraftWidth  *float32 `json:",omitempty"`
+		AircraftLength *float32 `json:",omitempty"`
 
 		// Enrichment Plane data
 		IcaoCode        *string `json:",omitempty"`
@@ -52,9 +54,14 @@ type (
 	}
 )
 
+// Plane here gives us something to look at
 func (pl *PlaneLocation) Plane() string {
-	if "" != pl.FlightNumber {
-		return pl.FlightNumber
+	if nil != pl.CallSign && "" != *pl.CallSign {
+		return *pl.CallSign
+	}
+
+	if nil != pl.Registration && "" != *pl.Registration {
+		return *pl.Registration
 	}
 
 	return "ICAO: " + pl.Icao

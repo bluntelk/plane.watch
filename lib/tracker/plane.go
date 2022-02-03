@@ -48,6 +48,14 @@ type (
 		statusId   byte
 	}
 
+	airframe struct {
+		category     string
+		categoryType string
+		width        *float32
+		length       *float32
+		registration *string
+	}
+
 	Plane struct {
 		tracker          *Tracker
 		trackedSince     time.Time
@@ -63,8 +71,7 @@ type (
 		frameTimes       []time.Time
 		recentFrameCount int
 		msgCount         uint64
-		airframeCategory string
-		airframeType     string
+		airframe         airframe
 
 		rwLock sync.RWMutex
 	}
@@ -352,12 +359,31 @@ func (p *Plane) FlightNumber() string {
 	return p.flight.identifier
 }
 
+// Registration belongs to the plane. e.g. VH-OWO
+func (p *Plane) Registration() *string {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.airframe.registration
+}
+
 // setFlightNumber is the flights identifier/number
 func (p *Plane) setFlightNumber(flightIdentifier string) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	hasChanged := p.flight.identifier != flightIdentifier
 	p.flight.identifier = flightIdentifier
+	return hasChanged
+}
+
+// setCallSign sets our flights call sign
+func (p *Plane) setRegistration(reg *string, err error) bool {
+	if nil != err {
+		return false
+	}
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	hasChanged := p.airframe.registration != reg
+	p.airframe.registration = reg
 	return hasChanged
 }
 
@@ -388,26 +414,55 @@ func (p *Plane) SquawkIdentityStr() string {
 func (p *Plane) setAirFrameCategory(category string) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
-	hasChanged := p.airframeCategory != category
-	p.airframeCategory = category
+	hasChanged := p.airframe.category != category
+	p.airframe.category = category
 	return hasChanged
 }
 
 func (p *Plane) AirFrame() string {
-	return p.airframeCategory
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.airframe.category
 }
 
 // setAirFrameCategory is the type of airframe for this aircraft
 func (p *Plane) setAirFrameCategoryType(categoryType string) bool {
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
-	hasChanged := p.airframeType != categoryType
-	p.airframeType = categoryType
+	hasChanged := p.airframe.categoryType != categoryType
+	p.airframe.categoryType = categoryType
 	return hasChanged
 }
 
 func (p *Plane) AirFrameType() string {
-	return p.airframeType
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.airframe.categoryType
+}
+
+// setAirFrameCategory is the type of airframe for this aircraft
+func (p *Plane) setAirFrameWidthLength(w, l *float32, err error) bool {
+	if nil != err {
+		return false
+	}
+	p.rwLock.Lock()
+	defer p.rwLock.Unlock()
+	hasChanged := p.airframe.width != w || p.airframe.length != l
+	p.airframe.width = w
+	p.airframe.length = l
+	return hasChanged
+}
+
+func (p *Plane) AirFrameWidth() *float32 {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.airframe.width
+}
+
+func (p *Plane) AirFrameLength() *float32 {
+	p.rwLock.RLock()
+	defer p.rwLock.RUnlock()
+	return p.airframe.length
 }
 
 // setHeading gives our plane some direction in life

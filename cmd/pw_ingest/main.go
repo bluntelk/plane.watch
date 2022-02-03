@@ -314,7 +314,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		log.Debug().Str("sink-url", sinkUrl).Msg("With Sink")
 		p, err := handleSink(sinkUrl, defaultTag, defaultTTl, defaultQueues, c.Bool("rabbitmq-test-queues"))
 		if nil != err {
-			log.Error().Err(err).Str("url", sinkUrl).Msgf("Failed to understand URL: %s", err)
+			log.Error().Err(err).Str("url", sinkUrl).Str("what", "sink").Msg("Failed setup sink")
 			return nil, err
 		} else {
 			trk.AddSink(p)
@@ -324,7 +324,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		log.Debug().Str("fetch-url", fetchUrl).Msg("With Fetch")
 		p, err := handleSource(fetchUrl, defaultTag, refLat, refLon, false)
 		if nil != err {
-			log.Error().Err(err).Str("url", fetchUrl).Msgf("Failed to understand URL: %s", err)
+			log.Error().Err(err).Str("url", fetchUrl).Str("what", "fetch").Msg("Failed setup source")
 			return nil, err
 		} else {
 			trk.AddProducer(p)
@@ -334,7 +334,7 @@ func commonSetup(c *cli.Context) (*tracker.Tracker, error) {
 		log.Debug().Str("listen-url", listenUrl).Msg("With Listen")
 		p, err := handleSource(listenUrl, defaultTag, refLat, refLon, true)
 		if nil != err {
-			log.Error().Err(err).Str("url", listenUrl).Msgf("Failed to understand URL: %s", err)
+			log.Error().Err(err).Str("url", listenUrl).Str("what", "listen").Msg("Failed setup listen")
 			return nil, err
 		} else {
 			trk.AddProducer(p)

@@ -52,13 +52,13 @@ func runHttpServer(c *cli.Context) error {
 	var err error
 	var files fs.FS
 	if c.NArg() == 0 {
-		println("Using our embedded filesystem")
+		log.Info().Msg("Using our embedded filesystem")
 		files, err = fs.Sub(embeddedHtdocs, "htdocs")
 		if nil != err {
 			panic(err)
 		}
 	} else {
-		println("Using the files in dir:", htdocsPath)
+		log.Info().Str("path", htdocsPath).Msg("Serving HTTP Docs from")
 		htdocsPath = path.Clean(c.Args().First())
 		files = os.DirFS(htdocsPath)
 	}
@@ -122,7 +122,7 @@ func runHttpServer(c *cli.Context) error {
 	})
 
 	port := ":" + c.String("port")
-	log.Debug().Msgf("Listening on %s...", port)
+	log.Info().Msgf("Decode Listening on %s...", port)
 	if err := http.ListenAndServe(port, nil); nil != err {
 		log.Error().Err(err).Send()
 	}

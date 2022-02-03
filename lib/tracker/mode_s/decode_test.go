@@ -225,6 +225,9 @@ func TestCprDecode(t *testing.T) {
 		if nil != err {
 			t.Error(err)
 		}
+		if nil == frame {
+			t.FailNow()
+		}
 		if frame.IsEven() != d.isEven {
 			t.Errorf("Failed to decode %d DF17/11 CPR Even/Odd. Should be %t, but is %t", i, d.isEven, frame.IsEven())
 		}

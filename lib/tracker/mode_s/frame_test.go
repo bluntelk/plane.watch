@@ -93,3 +93,68 @@ func TestFrame_isNoOp(t *testing.T) {
 		})
 	}
 }
+
+func TestFrame_VerticalRate(t *testing.T) {
+	var f *Frame
+	if f.VerticalRateValid() {
+		t.Errorf("valid vertical rate on nil frame")
+	}
+	f = &Frame{
+		Position: Position{
+			verticalRate:      1,
+			validVerticalRate: false,
+		},
+	}
+	if f.VerticalRateValid() {
+		t.Errorf("valid vertical rate when not set")
+	}
+	v, err := f.VerticalRate()
+	if nil == err {
+		t.Errorf("did not get an error when I should have")
+	}
+	if 0 != v {
+		t.Errorf("Got invalid value for invalid vertical rate. expected 0, got :%d", v)
+	}
+
+	f.validVerticalRate = true
+
+	v, err = f.VerticalRate()
+	if nil != err {
+		t.Errorf("got an error when I should have not")
+	}
+	if 1 != v {
+		t.Errorf("Got wrong value for vertical rate")
+	}
+}
+
+func TestFrame_DecodeAuIcaoRegistration(t *testing.T) {
+	icao := uint32(0x7C0000)
+	//end := uint32(0x7C822D)
+	charset := "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	for char1 := 0; char1 < 36; char1++ {
+		for char2 := 0; char2 < 36; char2++ {
+			for char3 := 0; char3 < 36; char3++ {
+				expected := "VH-" + string(charset[char1]) + string(charset[char2]) + string(charset[char3])
+				f := Frame{icao: icao}
+
+				s, err := f.DecodeAuIcaoRegistration()
+				if icao > 0x7C822D {
+					// expect an error
+					if nil == err {
+						t.Errorf("Should not have decoded icao %X", icao)
+					}
+				} else {
+					if nil != err {
+						t.Error(err)
+					}
+					if *s != expected {
+						t.Errorf("Did not decode correctly. Expected %s, got: %s", expected, *s)
+					}
+				}
+				icao++
+			}
+		}
+	}
+
+}
