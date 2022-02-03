@@ -206,6 +206,7 @@ func (r *RabbitMqSink) sendLocationEventToExchange(routingKey string, le *tracke
 			TileLocation:    plane.GridTileLocation(),
 			LastMsg:         plane.LastSeen().UTC(),
 			TrackedSince:    plane.TrackedSince().UTC(),
+			SignalRssi:      plane.SignalLevel(),
 		}
 
 		var jsonBuf []byte

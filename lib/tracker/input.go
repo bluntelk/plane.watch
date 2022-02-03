@@ -121,7 +121,7 @@ func (t *Tracker) AddProducer(p Producer) {
 		return
 	}
 	monitoring.AddHealthCheck(p)
-	
+
 	t.debugMessage("Adding producer: %s", p)
 	t.producers = append(t.producers, p)
 	t.producerWaiter.Add(1)
@@ -211,8 +211,9 @@ func (t *Tracker) decodeQueue() {
 
 		switch frame.(type) {
 		case *beast.Frame:
-			plane.HandleModeSFrame(frame.(*beast.Frame).AvrFrame(), f.Source().RefLat, f.Source().RefLon)
-			// todo: include signal strength
+			b := frame.(*beast.Frame)
+			plane.HandleModeSFrame(b.AvrFrame(), f.Source().RefLat, f.Source().RefLon)
+			plane.setSignalLevel(b.SignalRssi())
 		case *mode_s.Frame:
 			plane.HandleModeSFrame(frame.(*mode_s.Frame), f.Source().RefLat, f.Source().RefLon)
 		case *sbs1.Frame:

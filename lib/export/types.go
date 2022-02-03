@@ -29,6 +29,8 @@ type (
 		TrackedSince      time.Time
 		LastMsg           time.Time
 
+		SignalRssi *float64
+
 		AircraftWidth  *float32 `json:",omitempty"`
 		AircraftLength *float32 `json:",omitempty"`
 
