@@ -208,6 +208,10 @@ func (p *Plane) Special() string {
 
 // setSignalLevel sets the receivers signal level for this frame
 func (p *Plane) setSignalLevel(rssi float64) bool {
+	if math.IsNaN(rssi) || math.IsInf(rssi, 0) {
+		return false
+	}
+
 	p.rwLock.Lock()
 	defer p.rwLock.Unlock()
 	hasChanged := true
