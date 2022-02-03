@@ -2,6 +2,10 @@ package sink
 
 import (
 	"encoding/json"
+	"fmt"
+	"regexp"
+	"strings"
+	"time"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
@@ -13,9 +17,6 @@ import (
 	"plane.watch/lib/tracker/beast"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
-	"regexp"
-	"strings"
-	"time"
 )
 
 const (
@@ -71,7 +72,7 @@ func stripAnsi(str string) string {
 func NewRabbitMqSink(opts ...Option) (*RabbitMqSink, error) {
 	r := &RabbitMqSink{
 		exchange: rabbitmq.PlaneWatchExchange,
-		fsm:      dedupe.NewForgetfulSyncMap(),
+		fsm:      dedupe.NewForgetfulSyncMap(10*time.Second, 60*time.Second),
 	}
 	r.queue = map[string]string{}
 	r.sendFrameAll = r.sendFrameEvent(QueueTypeAvrAll, QueueTypeBeastAll, QueueTypeSbs1All)

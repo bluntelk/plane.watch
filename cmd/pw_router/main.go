@@ -5,10 +5,12 @@ import (
 	"errors"
 	"net/url"
 	"os"
-	"plane.watch/lib/monitoring"
-	"plane.watch/lib/tile_grid"
 	"sync"
 	"time"
+
+	"plane.watch/lib/dedupe"
+	"plane.watch/lib/monitoring"
+	"plane.watch/lib/tile_grid"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -16,7 +18,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 
-	"plane.watch/lib/export"
 	"plane.watch/lib/logging"
 	"plane.watch/lib/rabbitmq"
 )
@@ -32,12 +33,7 @@ type (
 		rmq  *rabbitmq.RabbitMQ
 		conf *rabbitmq.Config
 
-		syncSamples sync.Map
-	}
-
-	planeLocationLast struct {
-		lastSignificantUpdate export.PlaneLocation
-		candidateUpdate       export.PlaneLocation
+		syncSamples *dedupe.ForgetfulSyncMap
 	}
 )
 
@@ -50,6 +46,10 @@ var (
 		Name: "pw_router_updates_significant_total",
 		Help: "The total number of messages determined to be significant.",
 	})
+	updatesInsignificant = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pw_router_updates_insignificant_total",
+		Help: "The total number of messages determined to be insignificant.",
+	})
 	updatesIgnored = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "pw_router_updates_ignored_total",
 		Help: "The total number of messages determined to be insignificant and thus ignored.",
@@ -61,6 +61,14 @@ var (
 	updatesError = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "pw_router_updates_error_total",
 		Help: "The total number of messages that could not be processed due to an error.",
+	})
+	cacheEntries = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "pw_router_cache_planes_count",
+		Help: "The number of planes in the reducer cache.",
+	})
+	cacheEvictions = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pw_router_cache_eviction_total",
+		Help: "The number of cache evictions made from the cache.",
 	})
 )
 
@@ -117,12 +125,24 @@ func main() {
 		},
 		&cli.BoolFlag{
 			Name:    "spread-updates",
-			Usage:   "publish location updates to their respective tileXX_high and tileXX_low routing keys as well",
-			EnvVars: []string{"DEBUG"},
+			Usage:   "publish location updates to their respective tileXX_high and tileXX_low routing keys as well.",
+			EnvVars: []string{"SPREAD"},
+		},
+		&cli.IntFlag{
+			Name:    "update-age",
+			Usage:   "seconds to keep an update before aging it out of the cache.",
+			Value:   30,
+			EnvVars: []string{"UPDATE_AGE"},
+		},
+		&cli.IntFlag{
+			Name:    "update-age-sweep-interval",
+			Usage:   "Seconds between cache age sweeps.",
+			Value:   5,
+			EnvVars: []string{"UPDATE_SWEEP"},
 		},
 		&cli.BoolFlag{
 			Name:  "register-test-queues",
-			Usage: "Subscribes a bunch of queues to our routing keys",
+			Usage: "Subscribes a bunch of queues to our routing keys.",
 		},
 	}
 	logging.IncludeVerbosityFlags(app)
@@ -189,8 +209,14 @@ func run(c *cli.Context) error {
 	var err error
 	// connect to rabbitmq, create ourselves 2 queues
 	r := pwRouter{
-		syncSamples: sync.Map{},
+		syncSamples: dedupe.NewForgetfulSyncMap(time.Duration(c.Int("update-age-sweep-interval"))*time.Second, time.Duration(c.Int("update-age"))*time.Second),
 	}
+
+	r.syncSamples.SetEvictionAction(func(key interface{}, value interface{}) {
+		cacheEvictions.Inc()
+		cacheEntries.Dec()
+		log.Debug().Msgf("Evicting cache entry Icao: %s", key)
+	})
 
 	if "" == c.String("rabbitmq") {
 		return errors.New("please specify the --rabbitmq parameter")
