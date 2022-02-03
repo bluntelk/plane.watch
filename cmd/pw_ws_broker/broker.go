@@ -15,17 +15,19 @@ type (
 	PwWsBroker struct {
 		PwWsBrokerRabbit
 		PwWsBrokerWeb
+		exitChan chan bool
 	}
 )
 
-func NewPlaneWatchWebSocketBroker(rabbitUrl, routeLow, routeHigh, httpAddr string, serveTestWeb bool) (*PwWsBroker, error) {
+func NewPlaneWatchWebSocketBroker(rabbitUrl, routeLow, routeHigh, httpAddr, cert, certKey string, serveTestWeb bool) (*PwWsBroker, error) {
 	rabbitCfg, err := rabbitmq.NewConfigFromUrl(rabbitUrl)
 	if nil != err {
 		return nil, err
 	}
 	prefix := "broker_" + randstr.RandString(10) + "_"
+
 	return &PwWsBroker{
-		PwWsBrokerRabbit{
+		PwWsBrokerRabbit: PwWsBrokerRabbit{
 			rabbit:      rabbitmq.New(rabbitCfg),
 			queuePrefix: prefix,
 			queueLow:    prefix + "low",
@@ -33,10 +35,13 @@ func NewPlaneWatchWebSocketBroker(rabbitUrl, routeLow, routeHigh, httpAddr strin
 			routeLow:    routeLow,
 			routeHigh:   routeHigh,
 		},
-		PwWsBrokerWeb{
+		PwWsBrokerWeb: PwWsBrokerWeb{
 			Addr:      httpAddr,
 			ServeTest: serveTestWeb,
+			cert:      cert,
+			certKey:   certKey,
 		},
+		exitChan: make(chan bool),
 	}, nil
 }
 
@@ -59,20 +64,19 @@ func (b *PwWsBroker) Setup() error {
 }
 
 func (b *PwWsBroker) Run() {
-	go b.consumeAll()
-
-	log.Info().Str("HttpAddr", b.httpServer.Addr).Msg("HTTP Listening on")
-	b.listening = true
-	if err := b.httpServer.ListenAndServe(); nil != err {
-		b.listening = false
-		log.Error().Err(err).Send()
-	}
+	go b.listenAndServe(b.exitChan)
+	go b.consumeAll(b.exitChan)
 }
 
 func (b *PwWsBroker) Wait() {
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
-	<-sc
+	select {
+	case <-b.exitChan:
+		log.Debug().Msg("We are exiting")
+	case <-sc:
+		log.Debug().Msg("Kill Signal Received")
+	}
 }
 
 func (b *PwWsBroker) Close() {

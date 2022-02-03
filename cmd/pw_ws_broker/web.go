@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -24,8 +26,11 @@ type (
 		Addr      string
 		ServeTest bool
 
-		serveMux   http.ServeMux
-		httpServer http.Server
+		serveMux      http.ServeMux
+		httpServer    http.Server
+		cert, certKey string
+
+		domainsToServe []string
 
 		clients   ClientList
 		listening bool
@@ -67,6 +72,28 @@ func (bw *PwWsBrokerWeb) configureWeb() error {
 		)
 	}
 
+	if "" != bw.certKey {
+		tlsCert, err := tls.LoadX509KeyPair(bw.cert, bw.certKey)
+		if nil != err {
+			return err
+		}
+		x509Cert, err := x509.ParseCertificate(tlsCert.Certificate[0])
+		if nil != err {
+			return err
+		}
+		for _, d := range x509Cert.DNSNames {
+			bw.domainsToServe = append(bw.domainsToServe, d)
+		}
+	} else {
+		bw.domainsToServe = []string{
+			"localhost",
+			"*plane.watch",
+		}
+	}
+	for _, d := range bw.domainsToServe {
+		log.Info().Str("domain", d).Msg("Serving For Domain")
+	}
+
 	bw.httpServer = http.Server{
 		Addr:         bw.Addr,
 		Handler:      &bw.serveMux,
@@ -74,6 +101,31 @@ func (bw *PwWsBrokerWeb) configureWeb() error {
 		WriteTimeout: time.Second * 10,
 	}
 	return nil
+}
+
+func (bw *PwWsBrokerWeb) listenAndServe(exitChan chan bool) {
+	log.Info().Str("HttpAddr", bw.Addr).Msg("HTTP Listening on")
+	bw.listening = true
+	var err error
+	isTls := false
+	if "" != bw.cert {
+		isTls = true
+		err = bw.httpServer.ListenAndServeTLS(bw.cert, bw.certKey)
+	} else {
+		err = bw.httpServer.ListenAndServe()
+	}
+	if nil != err {
+		bw.listening = false
+		if err != http.ErrServerClosed {
+			log.Error().
+				Err(err).
+				Bool("tls", isTls).
+				Str("cert", bw.cert).
+				Str("cert-key", bw.certKey).
+				Msg("web server error")
+		}
+	}
+	exitChan <- true
 }
 
 func (bw *PwWsBrokerWeb) logRequest(handler http.Handler) http.Handler {
@@ -106,12 +158,8 @@ func (bw *PwWsBrokerWeb) servePlanes(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		Subprotocols:       []string{ws_protocol.WsProtocolPlanes},
 		InsecureSkipVerify: false,
-		OriginPatterns: []string{
-			"*localhost*",
-			"*plane.watch*",
-		},
-		//		OriginPatterns:       nil, // TODO maybe set this for plane.watch?
-		CompressionMode: websocket.CompressionContextTakeover,
+		OriginPatterns:     bw.domainsToServe,
+		CompressionMode:    websocket.CompressionContextTakeover,
 	})
 	if nil != err {
 		log.Error().Err(err).Msg("Failed to setup websocket connection")
