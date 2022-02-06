@@ -358,6 +358,7 @@ func runSimple(c *cli.Context) error {
 	logging.ConfigureForCli()
 
 	trk, err := commonSetup(c)
+
 	if nil != err {
 		return err
 	}
@@ -367,6 +368,7 @@ func runSimple(c *cli.Context) error {
 	}
 	trk.AddSink(sink.NewLoggerSink(opts...))
 
+	go trk.StopOnCancel()
 	trk.Wait()
 	return nil
 }
@@ -430,6 +432,7 @@ func runDaemon(c *cli.Context) error {
 	opts = append(opts, sink.WithoutLoggingLocation())
 	trk.AddSink(sink.NewLoggerSink(opts...))
 
+	go trk.StopOnCancel()
 	trk.Wait()
 	return nil
 }

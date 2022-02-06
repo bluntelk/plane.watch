@@ -4,12 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog/log"
+	"os"
+	"os/signal"
 	"plane.watch/lib/monitoring"
 	"plane.watch/lib/tracker/beast"
 	"plane.watch/lib/tracker/mode_s"
 	"plane.watch/lib/tracker/sbs1"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -79,20 +83,31 @@ func WithPrometheusCounters(currentPlanes prometheus.Gauge) Option {
 
 // Finish begins the ending of the tracking by closing our decoding queue
 func (t *Tracker) Finish() {
+	if t.finishDone {
+		return
+	}
+	t.finishDone = true
+	log.Debug().Msg("Starting Finish()")
 	for _, p := range t.producers {
+		log.Debug().Str("producer", p.String()).Msg("Stopping Producer")
 		p.Stop()
 	}
 	for _, m := range t.middlewares {
+		log.Debug().Str("middleware", m.String()).Msg("Stopping middleware")
 		m.Stop()
 	}
+	log.Debug().Msg("Closing Decoding Queue")
 	close(t.decodingQueue)
 	t.pruneExitChan <- true
+	log.Debug().Msg("Stopping Events")
 	t.eventSync.Lock()
 	t.eventsOpen = false
 	t.eventSync.Unlock()
+	log.Debug().Msg("Closing Events Queue")
 
 	close(t.events)
 	for _, s := range t.sinks {
+		log.Debug().Str("sink", s.HealthCheckName()).Msg("Closing Sink")
 		s.Stop()
 	}
 }
@@ -162,14 +177,37 @@ func (t *Tracker) Stop() {
 	t.middlewareWaiter.Wait()
 }
 
+//StopOnCancel listens for SigInt etc and gracefully stops
+func (t *Tracker) StopOnCancel() {
+	ch := make(chan os.Signal)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	isStopping := false
+	for {
+		sig := <-ch
+		log.Info().Str("Signal", sig.String()).Msg("Received Interrupt, stopping")
+		if !isStopping {
+			isStopping = true
+			t.Stop()
+			log.Info().Msg("Done Stopping")
+		} else {
+			log.Info().Str("Signal", sig.String()).Msg("Second Interrupt, forcing exit")
+			os.Exit(1)
+		}
+	}
+}
+
 // Wait waits for all producers to stop producing input and then returns
 // use this method if you are processing a file
 func (t *Tracker) Wait() {
 	t.producerWaiter.Wait()
+	log.Debug().Msg("Producers finished")
 	time.Sleep(time.Millisecond * 50)
 	t.Finish()
+	log.Debug().Msg("Finish() done")
 	t.decodingQueueWaiter.Wait()
+	log.Debug().Msg("Decoding waiter done")
 	t.eventsWaiter.Wait()
+	log.Debug().Msg("events waiter done")
 }
 
 func (t *Tracker) handleError(err error) {
