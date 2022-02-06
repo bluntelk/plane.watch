@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/rs/zerolog/log"
@@ -31,7 +32,9 @@ func (br *PwWsBrokerRabbit) configureRabbitMq() error {
 	if nil == br.rabbit {
 		return errors.New("you need to configure the rabbit client")
 	}
-	if err := br.rabbit.ConnectAndWait(5 * time.Second); nil != err {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := br.rabbit.ConnectAndWait(ctx); nil != err {
 		return err
 	}
 

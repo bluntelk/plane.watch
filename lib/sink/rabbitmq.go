@@ -1,6 +1,7 @@
 package sink
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
@@ -319,7 +320,10 @@ func (r *RabbitMqSink) connect(timeout time.Duration) (*rabbitmq.RabbitMQ, error
 
 	log.Info().Str("host", rabbitConfig.String()).Msg("Connecting to RabbitMQ")
 	rabbit := rabbitmq.New(&rabbitConfig)
-	return rabbit, rabbit.ConnectAndWait(timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return rabbit, rabbit.ConnectAndWait(ctx)
 }
 
 func (r *RabbitMqSink) setup() error {
