@@ -170,7 +170,9 @@ func runCli(c *cli.Context) error {
 func (r *pwRouter) connect(config rabbitmq.Config, timeout time.Duration) error {
 	log.Info().Str("host", config.String()).Msg("Connecting to RabbitMQ")
 	r.rmq = rabbitmq.New(&config)
-	return r.rmq.ConnectAndWait(timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return r.rmq.ConnectAndWait(ctx)
 }
 
 func (r *pwRouter) makeQueue(name, bindRouteKey string) error {

@@ -1,14 +1,12 @@
 package rabbitmq
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
-	"net"
-	"net/url"
-	"strings"
 	"time"
 )
 
@@ -17,161 +15,89 @@ const rabbitmqRetryInterval = 2
 const rabbitmqRetryIntervalMax = 120
 const PlaneWatchExchange = "plane.watch.data"
 
-type RabbitMQ struct {
-	uri          string
-	conn         *amqp.Connection
-	channel      *amqp.Channel
-	disconnected chan *amqp.Error
-	connected    bool
-	log          zerolog.Logger
-}
+type (
+	rabbitMqConnection struct {
+		conn         *amqp.Connection
+		channel      *amqp.Channel
+		disconnected chan *amqp.Error
+		connected    bool
+		log          zerolog.Logger
+	}
 
-type ConfigSSL struct {
-	PrivateKeyFile string `json:"private_key_file"`
-	CertChainFile  string `json:"cert_chain_file"`
-}
-
-type Config struct {
-	Host     string    `json:"host"`
-	Port     string    `json:"port"`
-	Vhost    string    `json:"vhost"`
-	User     string    `json:"user"`
-	Password string    `json:"password"`
-	Ssl      ConfigSSL `json:"ssl"`
-}
+	RabbitMQ struct {
+		uri           string
+		receive, send rabbitMqConnection
+		log           zerolog.Logger
+	}
+)
 
 var (
 	ErrNilChannel = errors.New("trying to use a nil channel")
 )
 
-func NewConfigFromUrl(connectUrl string) (*Config, error) {
-	rabbitUrl, err := url.Parse(connectUrl)
-	if err != nil {
-		return nil, err
-	}
-
-	rabbitPassword, _ := rabbitUrl.User.Password()
-
-	rabbitConfig := Config{
-		Host:     rabbitUrl.Hostname(),
-		Port:     rabbitUrl.Port(),
-		User:     rabbitUrl.User.Username(),
-		Password: rabbitPassword,
-		Vhost:    rabbitUrl.Path,
-		Ssl:      ConfigSSL{},
-	}
-
-	return &rabbitConfig, nil
-}
-
-func (cfg Config) String() string {
-	u := url.URL{
-		Scheme: "amqp",
-		Host:   net.JoinHostPort(cfg.Host, cfg.Port),
-		Path:   strings.TrimLeft(fmt.Sprintf("/%s", cfg.Vhost), "/"),
-		User:   url.UserPassword(cfg.User, cfg.Password),
-	}
-	return u.String()
-}
-
 func New(cfg *Config) *RabbitMQ {
 	if nil == cfg {
 		return nil
 	}
-	return &RabbitMQ{
+	rmq := &RabbitMQ{
 		uri: cfg.String(),
 		log: log.With().Str("Service", "RabbitMQ").Logger(),
 	}
+
+	rmq.send.log = rmq.log.With().Str("conn", "send").Logger()
+	rmq.receive.log = rmq.log.With().Str("conn", "receive").Logger()
+
+	return rmq
 }
 
-func (r *RabbitMQ) Connect(connected chan bool) {
-	reset := make(chan bool)
-	connectedChan := make(chan bool)
-	timer := time.AfterFunc(0, func() {
-		err := r.connect(r.uri)
-		if nil == err {
-			connectedChan <- true
-			reset <- true
-		} else {
-			r.log.Error().Err(err).Msg("Could not establish connection")
-		}
-	})
-	defer timer.Stop()
-
-	var backoffIntervalCounter, backoffInterval int64
-
+// ConnectAndWait connects to our RabbitMQ server and sets up our connections.
+// it waits until the timeout for the connection to come up and returns an error if anything went wrong
+func (r *RabbitMQ) ConnectAndWait(ctx context.Context) error {
+	t, ok := ctx.Deadline()
+	r.log.Info().Str("Url", r.uri).Time("Timeout", t).Bool("reached", ok).Msg("Connecting")
+	connectedSend := make(chan bool)
+	connectedReceive := make(chan bool)
+	var isConnectedSend, isConnectedReceive bool
+	go r.send.handleConnect(r.uri, connectedSend)
+	go r.receive.handleConnect(r.uri, connectedReceive)
 	for {
 		select {
-		case <-connectedChan:
-			r.log.Debug().Msg("RabbitMQ connected and channel established")
-			r.connected = true
-			connected <- true
-			backoffIntervalCounter = 0
-			backoffInterval = 0
-			return
-		case <-reset:
-			r.connected = false
-			backoffIntervalCounter++
-			if 0 == backoffInterval {
-				backoffInterval = rabbitmqRetryInterval
-			} else {
-				backoffInterval = backoffInterval * rabbitmqRetryInterval
+		case <-connectedSend:
+			r.log.Info().Msg("Connected")
+			isConnectedSend = true
+			if isConnectedSend && isConnectedReceive {
+				return nil
 			}
-
-			if backoffInterval > rabbitmqRetryIntervalMax {
-				backoffInterval = rabbitmqRetryIntervalMax
+		case <-connectedReceive:
+			isConnectedReceive = true
+			if isConnectedSend && isConnectedReceive {
+				return nil
 			}
-
-			r.log.Error().
-				Int64("backoff (s)", backoffInterval).
-				Int64("attempt", backoffIntervalCounter).
-				Msgf("Failed to connect, attempt %d, Retrying in %d seconds", backoffIntervalCounter, backoffInterval)
-
-			timer.Reset(time.Duration(backoffInterval) * time.Second)
+		case <-ctx.Done():
+			r.log.Error().Err(ctx.Err()).Msg("Connect Timeout")
+			return fmt.Errorf("failed to connect to rabbit in a timely manner")
 		}
-	}
-}
-
-func (r *RabbitMQ) ConnectAndWait(timeout time.Duration) error {
-	r.log.Info().Str("Url", r.uri).Dur("Timeout MS", timeout).Msg("Connecting")
-	connected := make(chan bool)
-	go r.Connect(connected)
-	select {
-	case <-connected:
-		r.log.Info().Str("Service", "RabbitMQ").Msg("Connected")
-		return nil
-	case <-time.After(timeout):
-		return fmt.Errorf("failed to connect to rabbit in a timely manner")
 	}
 }
 
 func (r *RabbitMQ) Disconnect() {
 	r.log.Info().Msg("Disconnecting")
-	if r.connected {
-		_ = r.conn.Close()
-	}
-	r.connected = false
-}
 
-func (r *RabbitMQ) handleDisconnect() {
-	for msg := range r.disconnected {
-		r.log.Info().
-			Str("connection", "disconnected").
-			Str("error", msg.Error()).
-			Bool("server", msg.Server).
-			Str("reason", msg.Reason).
-			Int("code", msg.Code).
-			Bool("recover", msg.Recover).
-			Send()
-		r.connected = false
-		r.channel = nil
+	if r.send.connected {
+		_ = r.send.conn.Close()
 	}
+	r.send.connected = false
+
+	if r.receive.connected {
+		_ = r.receive.conn.Close()
+	}
+	r.receive.connected = false
 }
 
 func (r *RabbitMQ) ExchangeDeclare(name, kind string) error {
 	r.log.Debug().Str("Exchange", name).Str("type", kind).Msg("Declaring Exchange")
-	if nil != r.channel {
-		return r.channel.ExchangeDeclare(
+	if r.send.isHealthy() {
+		return r.send.channel.ExchangeDeclare(
 			name,
 			kind,
 			true,  // All exchanges are not declared durable
@@ -190,8 +116,8 @@ func (r *RabbitMQ) ExchangeDeclare(name, kind string) error {
 // ttlMs is the number of seconds we will wait before expiring a message, in MilliSeconds
 func (r *RabbitMQ) QueueDeclare(name string, ttlMs int) (amqp.Queue, error) {
 	r.log.Debug().Str("Queue", name).Int("TTL (ms)", ttlMs).Msg("Declaring Queue")
-	if nil != r.channel {
-		return r.channel.QueueDeclare(
+	if r.receive.isHealthy() {
+		return r.receive.channel.QueueDeclare(
 			name,
 			false,
 			true,
@@ -212,8 +138,8 @@ func (r *RabbitMQ) QueueBind(name, routingKey, sourceExchange string) error {
 		Str("Routing Key", routingKey).
 		Str("Exchange", sourceExchange).
 		Msg("Binding Queue")
-	if nil != r.channel {
-		return r.channel.QueueBind(
+	if r.receive.isHealthy() {
+		return r.receive.channel.QueueBind(
 			name,
 			routingKey,
 			sourceExchange,
@@ -229,8 +155,8 @@ func (r *RabbitMQ) QueueRemove(name string) error {
 	r.log.Debug().
 		Str("Queue", name).
 		Msg("Removing Queue")
-	if nil != r.channel {
-		n, err := r.channel.QueueDelete(
+	if r.receive.isHealthy() {
+		n, err := r.receive.channel.QueueDelete(
 			name,
 			false,
 			false,
@@ -248,8 +174,8 @@ func (r *RabbitMQ) Consume(name, consumer string) (<-chan amqp.Delivery, error) 
 		Str("Queue", name).
 		Str("Consumer", consumer).
 		Msg("Consuming Queue Messages")
-	if nil != r.channel {
-		return r.channel.Consume(
+	if r.receive.isHealthy() {
+		return r.receive.channel.Consume(
 			name,
 			consumer,
 			true,
@@ -264,8 +190,8 @@ func (r *RabbitMQ) Consume(name, consumer string) (<-chan amqp.Delivery, error) 
 }
 
 func (r *RabbitMQ) Publish(exchange, key string, msg amqp.Publishing) error {
-	if nil != r.channel {
-		return r.channel.Publish(
+	if nil != r.send.channel {
+		return r.send.channel.Publish(
 			exchange,
 			key,
 			false,
@@ -277,42 +203,109 @@ func (r *RabbitMQ) Publish(exchange, key string, msg amqp.Publishing) error {
 	return ErrNilChannel
 }
 
-func (r *RabbitMQ) connect(uri string) error {
-	var err error
-
-	r.log.Debug().Str("Url", uri).Msg("Dialing")
-	r.conn, err = amqp.Dial(uri)
-	if err != nil {
-		r.log.Error().Err(err).Msg("Cannot Connect")
-		return err
-	}
-
-	r.log.Debug().Msg("Config established, getting Channel")
-	r.channel, err = r.conn.Channel()
-	if err != nil {
-		log.Error().Err(err).Msg("Channel Error")
-		return err
-	}
-
-	// Notify disconnect channel when disconnected
-	r.disconnected = make(chan *amqp.Error)
-	r.channel.NotifyClose(r.disconnected)
-	go r.handleDisconnect()
-	return nil
-}
-
 func (r *RabbitMQ) HealthCheck() bool {
 	log.Debug().Msg("RabbitMQ Health Check")
-	if nil == r || nil == r.conn || nil == r.channel {
+	if nil == r || !r.send.isHealthy() || !r.receive.isHealthy() {
 		log.Error().Msg("Rabbit Healthcheck Bad")
 		return false
 	}
-	if nil != r.conn {
-		return !r.conn.IsClosed()
-	}
-	return false
+	return true
 }
 
 func (r *RabbitMQ) HealthCheckName() string {
 	return "RabbitMQ"
+}
+
+func (rc *rabbitMqConnection) handleConnect(uri string, connected chan bool) {
+	reset := make(chan bool)
+	connectedChan := make(chan bool)
+	timer := time.AfterFunc(0, func() {
+		err := rc.doConnect(uri)
+		if nil == err {
+			connectedChan <- true
+			reset <- true
+		} else {
+			rc.log.Error().Err(err).Msg("Could not establish connection")
+		}
+	})
+	defer timer.Stop()
+
+	var backoffIntervalCounter, backoffInterval int64
+
+	for {
+		select {
+		case <-connectedChan:
+			rc.log.Debug().Msg("RabbitMQ connected and channel established")
+			rc.connected = true
+			connected <- true
+			backoffIntervalCounter = 0
+			backoffInterval = 0
+			return
+		case <-reset:
+			rc.connected = false
+			backoffIntervalCounter++
+			if 0 == backoffInterval {
+				backoffInterval = rabbitmqRetryInterval
+			} else {
+				backoffInterval = backoffInterval * rabbitmqRetryInterval
+			}
+
+			if backoffInterval > rabbitmqRetryIntervalMax {
+				backoffInterval = rabbitmqRetryIntervalMax
+			}
+
+			rc.log.Error().
+				Int64("backoff (s)", backoffInterval).
+				Int64("attempt", backoffIntervalCounter).
+				Msgf("Failed to connect, attempt %d, Retrying in %d seconds", backoffIntervalCounter, backoffInterval)
+
+			timer.Reset(time.Duration(backoffInterval) * time.Second)
+		}
+	}
+}
+
+func (rc *rabbitMqConnection) handleDisconnect() {
+	for msg := range rc.disconnected {
+		rc.log.Info().
+			Str("connection", "disconnected").
+			Str("error", msg.Error()).
+			Bool("server", msg.Server).
+			Str("reason", msg.Reason).
+			Int("code", msg.Code).
+			Bool("recover", msg.Recover).
+			Send()
+		rc.connected = false
+		rc.channel = nil
+	}
+}
+
+func (rc *rabbitMqConnection) doConnect(uri string) error {
+	var err error
+
+	rc.log.Debug().Str("Url", uri).Msg("Dialing")
+	rc.conn, err = amqp.Dial(uri)
+	if err != nil {
+		rc.log.Error().Err(err).Msg("Cannot Connect")
+		return err
+	}
+
+	rc.log.Debug().Msg("Connection established, getting Channels")
+	rc.channel, err = rc.conn.Channel()
+	if err != nil {
+		log.Error().Err(err).Str("which", "receive").Msg("Channel Error")
+		return err
+	}
+
+	// Notify disconnect channel when disconnected
+	rc.disconnected = make(chan *amqp.Error)
+	rc.channel.NotifyClose(rc.disconnected)
+	go rc.handleDisconnect()
+	return nil
+}
+
+func (rc *rabbitMqConnection) isHealthy() bool {
+	if nil == rc.conn || nil == rc.channel {
+		return false
+	}
+	return rc.connected
 }

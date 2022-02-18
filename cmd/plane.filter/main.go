@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -61,7 +62,9 @@ func (r *rabbit) connect(timeout time.Duration) error {
 
 	log.Info().Str("host", rabbitConfig.String()).Msg("Connecting to RabbitMQ")
 	r.rmq = rabbitmq.New(&rabbitConfig)
-	return r.rmq.ConnectAndWait(timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return r.rmq.ConnectAndWait(ctx)
 }
 
 func (r *rabbit) makeQueue(name string) error {
