@@ -34,6 +34,7 @@ type (
 
 		eventSync    sync.RWMutex
 		eventsOpen   bool
+		finishDone   bool
 		events       chan Event
 		eventsWaiter sync.WaitGroup
 
