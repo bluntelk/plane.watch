@@ -88,6 +88,7 @@ func (bw *PwWsBrokerWeb) configureWeb() error {
 		bw.domainsToServe = []string{
 			"localhost",
 			"*plane.watch",
+			"*plane.watch:3000",
 		}
 	}
 	for _, d := range bw.domainsToServe {
@@ -146,6 +147,9 @@ func (bw *PwWsBrokerWeb) indexPage(w http.ResponseWriter, r *http.Request) {
 
 func (bw *PwWsBrokerWeb) jsonGrid(w http.ResponseWriter, r *http.Request) {
 	grid := tile_grid.GetGrid()
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	buf, err := json.MarshalIndent(grid, "", "  ")
 	if nil != err {
 		w.WriteHeader(500)
@@ -243,10 +247,10 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 		for {
 			mt, frame, err := conn.Read(ctx)
 			if nil != err {
-				if errors.Is(err, io.EOF) || websocket.CloseStatus(err) >= 0 {
-					return
+				if !(errors.Is(err, io.EOF) || websocket.CloseStatus(err) >= 0) {
+					log.Debug().Err(err).Int("Close Status", int(websocket.CloseStatus(err))).Msg("Error from reading")
 				}
-				log.Debug().Err(err).Int("Close Status", int(websocket.CloseStatus(err))).Msg("Error from reading")
+				c.cmdChan <- WsCmd{action: "exit"}
 				return
 			}
 			switch mt {
@@ -279,6 +283,12 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 	// write a stream of location information
 	subs := make(map[string]bool)
 
+	grid := make(map[string]bool)
+	for k := range tile_grid.GetGrid() {
+		grid[k+"_low"] = true
+		grid[k+"_high"] = true
+	}
+
 	for {
 		var err error
 		select {
@@ -287,8 +297,12 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 			case "exit":
 				return nil
 			case ws_protocol.RequestTypeSubscribe:
-				subs[cmdMsg.what] = true
-				err = c.sendAck(ctx, ws_protocol.ResponseTypeAckSub, cmdMsg.what)
+				if _, ok := grid[cmdMsg.what]; ok {
+					subs[cmdMsg.what] = true
+					err = c.sendAck(ctx, ws_protocol.ResponseTypeAckSub, cmdMsg.what)
+				} else {
+					err = c.sendError(ctx, "Unknown Tile: "+cmdMsg.what)
+				}
 			case ws_protocol.RequestTypeUnsubscribe:
 				delete(subs, cmdMsg.what)
 				err = c.sendAck(ctx, ws_protocol.ResponseTypeAckUnsub, cmdMsg.what)
@@ -307,7 +321,7 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 			}
 		case planeMsg := <-c.outChan:
 			// if we have a subscription to this planes tile or all tiles
-			log.Debug().Str("tile", planeMsg.tile).Str("highlow", planeMsg.highLow).Msg("info")
+			//log.Debug().Str("tile", planeMsg.tile).Str("highlow", planeMsg.highLow).Msg("info")
 			tileSub, tileOk := subs[planeMsg.tile]
 			allSub, allOk := subs["all"+planeMsg.highLow]
 			if (tileSub && tileOk) || (allSub && allOk) {

@@ -9,6 +9,10 @@ ENV GO111MODULE=on \
 WORKDIR /app
 
 # Copy the code into the container
+COPY go.mod /app
+COPY go.sum /app
+RUN go mod verify && go mod download
+
 COPY . /app
 
 # Build the application
