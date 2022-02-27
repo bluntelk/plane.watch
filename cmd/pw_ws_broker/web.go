@@ -284,6 +284,8 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 	subs := make(map[string]bool)
 
 	grid := make(map[string]bool)
+	grid["all_low"] = true
+	grid["all_high"] = true
 	for k := range tile_grid.GetGrid() {
 		grid[k+"_low"] = true
 		grid[k+"_high"] = true
