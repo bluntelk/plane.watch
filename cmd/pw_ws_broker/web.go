@@ -7,15 +7,16 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
-	"github.com/rs/zerolog/log"
 	"io"
 	"net/http"
+	"sync"
+	"time"
+
+	"github.com/rs/zerolog/log"
 	"nhooyr.io/websocket"
 	"plane.watch/lib/export"
 	"plane.watch/lib/tile_grid"
 	"plane.watch/lib/ws_protocol"
-	"sync"
-	"time"
 )
 
 //go:embed test-web
@@ -87,6 +88,7 @@ func (bw *PwWsBrokerWeb) configureWeb() error {
 	} else {
 		bw.domainsToServe = []string{
 			"localhost",
+			"localhost:3000",
 			"*plane.watch",
 			"*plane.watch:3000",
 		}
