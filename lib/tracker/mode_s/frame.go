@@ -387,7 +387,7 @@ var (
 		"TCAS sensitivity level 7.",
 	}
 
-	aisCharset = "?ABCDEFGHIJKLMNOPQRSTUVWXYZ????? ???????????????0123456789??????"
+	aisCharset = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ !\"#$%&'()*+,-./0123456789:;<=>?"
 
 	downlinkRequestField = []string{
 		0:  "No downlink request.",
