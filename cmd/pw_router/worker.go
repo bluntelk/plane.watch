@@ -77,16 +77,6 @@ func (w *worker) isSignificant(last export.PlaneLocation, candidate export.Plane
 		return true
 	}
 
-	if candidate.CallSign != last.CallSign && nil != candidate.CallSign {
-		log.Debug().
-			Str("aircraft", candidate.Icao).
-			Str("last", unptr(last.CallSign)).
-			Str("current", unptr(candidate.CallSign)).
-			Int64("diff_time", int64(candidate.LastMsg.Sub(last.LastMsg))).
-			Msg("Significant FlightNumber change.")
-		return true
-	}
-
 	if candidate.FlightStatus != last.FlightStatus {
 		log.Debug().
 			Str("aircraft", candidate.Icao).
@@ -210,8 +200,6 @@ func (w *worker) handleMsg(msg []byte) error {
 		w.handleInsignificantUpdate(update, msg)
 		return nil
 	}
-
-	updatesIgnored.Inc() // we didn't handle the update.
 
 	return ErrUnhandledMessage
 }
