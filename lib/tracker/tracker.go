@@ -312,10 +312,6 @@ func (p *Plane) HandleModeSFrame(frame *mode_s.Frame, refLat, refLon *float64) {
 
 				headingStr := "unknown heading"
 				if p.HasHeading() {
-					log.Debug().
-						Str("icao", frame.IcaoStr()).
-						Float64("heading", p.Heading()).
-						Msg("HAS HEADING")
 					headingStr = fmt.Sprintf("heading %0.2f", p.Heading())
 				}
 				debugMessage(" has %s and is travelling at %0.2f knots\033[0m", headingStr, p.Velocity())
