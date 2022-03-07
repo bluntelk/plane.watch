@@ -47,7 +47,7 @@ func RunWebServer(c *cli.Context) {
 }
 
 func AddHealthCheck(f HealthCheck) {
-	log.Debug().Msg("Adding Health Check")
+	log.Debug().Str("name", f.HealthCheckName()).Msg("Adding Health Check")
 	healthChecksLock.Lock()
 	defer healthChecksLock.Unlock()
 	healthChecks = append(healthChecks, f)

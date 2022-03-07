@@ -5,7 +5,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
-	"net/url"
 	"os"
 	"plane.watch/lib/dedupe"
 	"plane.watch/lib/example_finder"
@@ -83,16 +82,6 @@ func main() {
 		log.Error().Err(err).Msg("Finishing with an error")
 		os.Exit(1)
 	}
-}
-
-func getTag(parsedUrl *url.URL, defaultTag string) string {
-	if nil == parsedUrl {
-		return ""
-	}
-	if parsedUrl.Query().Has("tag") {
-		return parsedUrl.Query().Get("tag")
-	}
-	return defaultTag
 }
 
 func commonSetup(c *cli.Context) (*tracker.Tracker, error) {

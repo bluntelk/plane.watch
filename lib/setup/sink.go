@@ -78,40 +78,45 @@ func handleSink(urlSink, defaultTag string, defaultTtl int, defaultQueues []stri
 	if nil != err {
 		return nil, err
 	}
-	switch strings.ToLower(parsedUrl.Scheme) {
-	case "redis":
-		redisHost := parsedUrl.Hostname()
-		redisPort := parsedUrl.Port()
-		return sink.NewRedisSink(sink.WithHost(redisHost, redisPort), sink.WithSourceTag(getTag(parsedUrl, defaultTag))), nil
-	case "amqp", "rabbitmq":
-		rabbitPass, _ := parsedUrl.User.Password()
-		messageTtl := defaultTtl
-		if parsedUrl.Query().Has("ttl") {
-			var requestedTtl int64
-			requestedTtl, err = strconv.ParseInt(parsedUrl.Query().Get("ttl"), 10, 32)
-			if requestedTtl > 0 && requestedTtl < math.MaxInt32 {
-				messageTtl = int(requestedTtl)
-			}
-		}
+	messageTtl := defaultTtl
 
+	urlPass, _ := parsedUrl.User.Password()
+	if parsedUrl.Query().Has("ttl") {
+		var requestedTtl int64
+		requestedTtl, err = strconv.ParseInt(parsedUrl.Query().Get("ttl"), 10, 32)
+		if requestedTtl > 0 && requestedTtl < math.MaxInt32 {
+			messageTtl = int(requestedTtl)
+		}
+	}
+
+	commonOpts := []sink.Option{
+		sink.WithHost(parsedUrl.Hostname(), parsedUrl.Port()),
+		sink.WithUserPass(parsedUrl.User.Username(), urlPass),
+		sink.WithSourceTag(getTag(parsedUrl, defaultTag)),
+		sink.WithMessageTtl(messageTtl),
+		sink.WithPrometheusCounters(prometheusOutputFrame, prometheusOutputFrameDedupe, prometheusOutputPlaneLocation),
+	}
+
+	switch strings.ToLower(parsedUrl.Scheme) {
+	case "nats", "nats.io":
+		return sink.NewNatsSink(commonOpts...)
+	case "redis":
+		return sink.NewRedisSink(commonOpts...)
+	case "amqp", "rabbitmq":
 		rabbitQueues := defaultQueues
 		if parsedUrl.Query().Has("queues") {
 			rabbitQueues = strings.Split(parsedUrl.Query().Get("queues"), ",")
 		}
 
-		return sink.NewRabbitMqSink(
-			sink.WithHost(parsedUrl.Hostname(), parsedUrl.Port()),
-			sink.WithUserPass(parsedUrl.User.Username(), rabbitPass),
+		return sink.NewRabbitMqSink(append(commonOpts,
 			sink.WithRabbitVhost(parsedUrl.Path),
-			sink.WithRabbitQueues(rabbitQueues),
-			sink.WithSourceTag(getTag(parsedUrl, defaultTag)),
-			sink.WithMessageTtl(messageTtl),
+			sink.WithQueues(rabbitQueues),
 			sink.WithRabbitTestQueues(rabbitmqTestQueues),
-			sink.WithPrometheusCounters(prometheusOutputFrame, prometheusOutputFrameDedupe, prometheusOutputPlaneLocation),
-		)
+		)...)
 
 	default:
-		return nil, fmt.Errorf("unknown scheme: %s, expected one of [redis|amqp|rabbitmq]", parsedUrl.Scheme)
+		return nil, fmt.Errorf("unknown scheme: %s, expected one of [nats|redis|amqp]", parsedUrl.Scheme)
+		return nil, fmt.Errorf("unknown scheme: %s, expected one of [nats|redis|amqp]", parsedUrl.Scheme)
 	}
 
 }

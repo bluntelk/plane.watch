@@ -1,39 +1,35 @@
 package sink
 
-import "plane.watch/lib/tracker"
+import (
+	"plane.watch/lib/tracker"
+)
 
 type (
 	RedisSink struct {
 		Config
-		events chan tracker.Event
 	}
 )
 
-func NewRedisSink(opts ...Option) *RedisSink {
-	r := &RedisSink{
-		events: make(chan tracker.Event),
-	}
-	for _, opt := range opts {
-		opt(&r.Config)
-	}
-	return r
+func NewRedisSink(opts ...Option) (tracker.Sink, error) {
+	r := &RedisSink{}
+	r.setupConfig(opts)
+
+	// TODO: Connect to redis
+
+	return NewSink(&r.Config, r), nil
 }
 
-func (r *RedisSink) OnEvent(e tracker.Event) {
-	panic("Implement REDIS")
+func (r *RedisSink) PublishJson(queue string, msg []byte) error {
+	panic("IMPLEMENT ME")
 }
-
-func (r *RedisSink) Listen() chan tracker.Event {
-	return r.events
-}
-
-func (r *RedisSink) Stop() {
-	close(r.events)
+func (r *RedisSink) PublishText(queue string, msg []byte) error {
+	panic("IMPLEMENT ME")
 }
 
 func (r *RedisSink) HealthCheck() bool {
 	return false
 }
+func (r *RedisSink) Stop() {}
 
 func (r *RedisSink) HealthCheckName() string {
 	return "Redis"

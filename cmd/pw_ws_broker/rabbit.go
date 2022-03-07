@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"plane.watch/lib/export"
 	"plane.watch/lib/rabbitmq"
+	"plane.watch/lib/randstr"
 	"time"
 )
 
@@ -20,7 +21,7 @@ type (
 		routeLow    string
 		routeHigh   string
 
-		processMessage func(highLow string, loc *export.PlaneLocation)
+		processMessage processMessage
 	}
 )
 
@@ -28,7 +29,29 @@ func init() {
 	rand.Seed(time.Now().Unix())
 }
 
-func (br *PwWsBrokerRabbit) configureRabbitMq() error {
+func NewPwWsBrokerRabbit(rabbitUrl, routeLow, routeHigh string) (*PwWsBrokerRabbit, error) {
+	var err error
+	rabbitCfg, err := rabbitmq.NewConfigFromUrl(rabbitUrl)
+	if nil != err {
+		return nil, err
+	}
+	prefix := "broker_" + randstr.RandString(10) + "_"
+
+	return &PwWsBrokerRabbit{
+		rabbit:      rabbitmq.New(rabbitCfg),
+		queuePrefix: prefix,
+		queueLow:    prefix + "low",
+		queueHigh:   prefix + "high",
+		routeLow:    routeLow,
+		routeHigh:   routeHigh,
+	}, nil
+}
+
+func (br *PwWsBrokerRabbit) setProcessMessage(f processMessage) {
+	br.processMessage = f
+}
+
+func (br *PwWsBrokerRabbit) configure() error {
 	if nil == br.rabbit {
 		return errors.New("you need to configure the rabbit client")
 	}
@@ -84,7 +107,29 @@ func (br *PwWsBrokerRabbit) consume(exitChan chan bool, queue, what string) {
 		Msg("Finished Consuming")
 	exitChan <- true
 }
+
 func (br *PwWsBrokerRabbit) consumeAll(exitChan chan bool) {
 	go br.consume(exitChan, br.queueLow, "_low")
 	go br.consume(exitChan, br.queueHigh, "_high")
+}
+
+func (br *PwWsBrokerRabbit) close() {
+	if err := br.rabbit.QueueRemove(br.queueLow); nil != err {
+		log.Error().Err(err).Str("Queue", br.queueLow).Msg("Removing Queue")
+	}
+	if err := br.rabbit.QueueRemove(br.queueHigh); nil != err {
+		log.Error().Err(err).Str("Queue", br.queueHigh).Msg("Removing Queue")
+	}
+
+	if nil != br.rabbit {
+		br.rabbit.Disconnect()
+	}
+}
+
+func (br *PwWsBrokerRabbit) HealthCheckName() string {
+	return br.rabbit.HealthCheckName()
+}
+
+func (br *PwWsBrokerRabbit) HealthCheck() bool {
+	return br.rabbit.HealthCheck()
 }

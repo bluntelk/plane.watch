@@ -50,6 +50,12 @@ func main() {
 			EnvVars: []string{"SOURCE"},
 		},
 		&cli.StringFlag{
+			Name:    "nats",
+			Usage:   "Nats.io URL for fetching and publishing updates.",
+			Value:   "nats://guest:guest@nats:4222/",
+			EnvVars: []string{"NATS"},
+		},
+		&cli.StringFlag{
 			Name:    "route-key-low",
 			Usage:   "The routing key that has only the significant flight update events",
 			Value:   "location-updates-enriched-reduced",
@@ -120,13 +126,25 @@ func run(c *cli.Context) error {
 		return c.Set("http-addr", ":443")
 	}
 
+	var hasRabbit bool
+	var hasNats bool
+	for _, v := range c.FlagNames() {
+		if "source" == v || "rabbitmq" == v {
+			hasRabbit = true
+		}
+		if "nats" == v {
+			hasNats = true
+		}
+	}
 	monitoring.RunWebServer(c)
-	source := c.String("source")
+
+	rabbitmq := c.String("source")
+	nats := c.String("nats")
 	lowRoute := c.String("route-key-low")
 	highRoute := c.String("route-key-high")
 
 	isValid := true
-	if "" == source {
+	if !hasRabbit && !hasNats {
 		log.Info().Msg("Please provide rabbitmq connection details. (--source)")
 		isValid = false
 	}
@@ -142,10 +160,16 @@ func run(c *cli.Context) error {
 		return errors.New("invalid configuration. You need rabbitmq, route low and, route high configured")
 	}
 
+	var input source
+	var err error
+	if hasRabbit && "" != rabbitmq {
+		input, err = NewPwWsBrokerRabbit(rabbitmq, lowRoute, highRoute)
+	} else if hasNats && "" != nats {
+		input, err = NewPsWsBrokerNats(nats, lowRoute, highRoute)
+	}
+
 	broker, err := NewPlaneWatchWebSocketBroker(
-		source,
-		lowRoute,
-		highRoute,
+		input,
 		c.String("http-addr"),
 		c.String("tls-cert"),
 		c.String("tls-cert-key"),
