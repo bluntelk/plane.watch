@@ -201,7 +201,7 @@ func NewWsClient(conn *websocket.Conn) *WsClient {
 	client := WsClient{
 		conn:    conn,
 		cmdChan: make(chan WsCmd),
-		outChan: make(chan loadedResponse),
+		outChan: make(chan loadedResponse, 500),
 	}
 	return &client
 }
