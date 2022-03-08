@@ -265,10 +265,10 @@ type (
 	rawFields struct {
 		// fields named what they are. see describe.go for what they mean
 
-		df, vs, ca, cc, sl, ri, dr, um, fs byte
-		ac, ap, id, aa, pi                 uint32
-		mv, me, mb                         uint64
-		md                                 [10]byte
+		vs, ca, cc, sl, ri, dr, um, fs byte
+		ac, ap, id, aa, pi             uint32
+		mv, me, mb                     uint64
+		md                             [10]byte
 
 		// altitude decoding
 		acQ, acM bool
@@ -778,7 +778,7 @@ func (f *Frame) MessageSubType() byte {
 	return f.messageSubType
 }
 
-// Whether or not this frame is even or odd, for CPR location
+// IsEven Whether this frame is even or odd, for CPR location
 func (f *Frame) IsEven() bool {
 	return f.cprFlagOddEven == 0
 }
@@ -816,13 +816,11 @@ func (f *Frame) isNoOp() bool {
 	return noopRw.MatchString(f.raw)
 }
 
-/**
- * horizontal containment radius limit in meters.
- * Set NIC supplement A from Operational status Message for better precision.
- * Otherwise, we'll be pessimistic.
- * Note: For ADS-B versions < 2, this is inaccurate for NIC class 6, since there was
- * no NIC supplement B in earlier versions.
- */
+// ContainmentRadiusLimit calculates the horizontal containment radius limit in meters.
+// Set NIC supplement A from Operational status Message for better precision.
+// Otherwise, we'll be pessimistic.
+// Note: For ADS-B versions < 2, this is inaccurate for NIC class 6, since there was
+// no NIC supplement B in earlier versions.
 func (f *Frame) ContainmentRadiusLimit(nicSupplA bool) (float64, error) {
 	var radius float64
 	var err error

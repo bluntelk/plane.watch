@@ -293,6 +293,10 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 		grid[k+"_high"] = true
 	}
 
+	locationMessages := make([]*export.PlaneLocation, 0, 1000)
+	sendTick := time.NewTicker(100 * time.Millisecond)
+	defer sendTick.Stop()
+
 	for {
 		var err error
 		select {
@@ -329,7 +333,16 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 			tileSub, tileOk := subs[planeMsg.tile]
 			allSub, allOk := subs["all"+planeMsg.highLow]
 			if (tileSub && tileOk) || (allSub && allOk) {
-				err = c.sendPlaneMessage(ctx, &planeMsg.out)
+				locationMessages = append(locationMessages, planeMsg.out.Location)
+			}
+		case <-sendTick.C:
+			if len(locationMessages) > 0 {
+				err = c.sendPlaneMessageList(ctx, &ws_protocol.WsResponse{
+					Type:      ws_protocol.ResponseTypePlaneLocations,
+					Locations: locationMessages,
+				})
+				// reset the slice
+				locationMessages = make([]*export.PlaneLocation, 0, 1000)
 			}
 		}
 
@@ -337,6 +350,7 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 			return err
 		}
 	}
+
 }
 
 func (c *WsClient) sendAck(ctx context.Context, ackType, tile string) error {
@@ -356,6 +370,21 @@ func (c *WsClient) sendError(ctx context.Context, msg string) error {
 }
 
 func (c *WsClient) sendPlaneMessage(ctx context.Context, planeMsg *ws_protocol.WsResponse) error {
+	buf, err := json.MarshalIndent(planeMsg, "", "  ")
+	if nil != err {
+		log.Debug().Err(err).Str("type", planeMsg.Type).Msg("Failed to marshal plane msg to send to client")
+		return err
+	}
+	if err = c.writeTimeout(ctx, 3*time.Second, buf); nil != err {
+		log.Debug().
+			Err(err).
+			Str("type", planeMsg.Type).
+			Msgf("Failed to send message to client. %+v", err)
+		return err
+	}
+	return nil
+}
+func (c *WsClient) sendPlaneMessageList(ctx context.Context, planeMsg *ws_protocol.WsResponse) error {
 	buf, err := json.MarshalIndent(planeMsg, "", "  ")
 	if nil != err {
 		log.Debug().Err(err).Str("type", planeMsg.Type).Msg("Failed to marshal plane msg to send to client")
