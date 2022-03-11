@@ -15,7 +15,7 @@ type (
 	}
 )
 
-func NewPsWsBrokerNats(url, routeLow, routeHigh string) (*PwWsBrokerNats, error) {
+func NewPwWsBrokerNats(url, routeLow, routeHigh string) (*PwWsBrokerNats, error) {
 	svr, err := nats_io.NewServer(url)
 	if nil != err {
 		return nil, err

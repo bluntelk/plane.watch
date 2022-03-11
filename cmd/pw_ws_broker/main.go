@@ -56,6 +56,12 @@ func main() {
 			EnvVars: []string{"NATS"},
 		},
 		&cli.StringFlag{
+			Name:    "redis",
+			Usage:   "redis URL for fetching updates.",
+			Value:   "redis://guest:guest@redis:6379/",
+			EnvVars: []string{"REDIS"},
+		},
+		&cli.StringFlag{
 			Name:    "route-key-low",
 			Usage:   "The routing key that has only the significant flight update events",
 			Value:   "location-updates-enriched-reduced",
@@ -128,6 +134,7 @@ func run(c *cli.Context) error {
 
 	var hasRabbit bool
 	var hasNats bool
+	var hasRedis bool
 	for _, v := range c.FlagNames() {
 		if "source" == v || "rabbitmq" == v {
 			hasRabbit = true
@@ -135,17 +142,21 @@ func run(c *cli.Context) error {
 		if "nats" == v {
 			hasNats = true
 		}
+		if "redis" == v {
+			hasRedis = true
+		}
 	}
 	monitoring.RunWebServer(c)
 
 	rabbitmq := c.String("source")
 	nats := c.String("nats")
+	redis := c.String("redis")
 	lowRoute := c.String("route-key-low")
 	highRoute := c.String("route-key-high")
 
 	isValid := true
-	if !hasRabbit && !hasNats {
-		log.Info().Msg("Please provide rabbitmq connection details. (--source)")
+	if !hasRabbit && !hasNats && !hasRedis {
+		log.Info().Msg("Please provide rabbitmq (or nats, redis) connection details. (--source)")
 		isValid = false
 	}
 	if "" == lowRoute {
@@ -165,7 +176,9 @@ func run(c *cli.Context) error {
 	if hasRabbit && "" != rabbitmq {
 		input, err = NewPwWsBrokerRabbit(rabbitmq, lowRoute, highRoute)
 	} else if hasNats && "" != nats {
-		input, err = NewPsWsBrokerNats(nats, lowRoute, highRoute)
+		input, err = NewPwWsBrokerNats(nats, lowRoute, highRoute)
+	} else if hasRedis && "" != redis {
+		input, err = NewPwWsBrokerRedis(redis, lowRoute, highRoute)
 	}
 
 	broker, err := NewPlaneWatchWebSocketBroker(

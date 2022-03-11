@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"plane.watch/lib/nats_io"
+	"plane.watch/lib/redismq"
 	"sync"
 	"syscall"
 	"time"
@@ -30,9 +31,13 @@ const (
 )
 
 type (
+	mqSource interface {
+	}
+
 	pwRouter struct {
-		rmq  *rabbitmq.RabbitMQ
-		nats *nats_io.Server
+		rmq   *rabbitmq.RabbitMQ
+		nats  *nats_io.Server
+		redis *redismq.Server
 
 		syncSamples *dedupe.ForgetfulSyncMap
 
@@ -117,6 +122,12 @@ func main() {
 			EnvVars: []string{"NATS"},
 		},
 		&cli.StringFlag{
+			Name:  "redis",
+			Usage: "redis server URL for fetching and publishing updates.",
+			//Value:   "redis://guest:guest@redis:6379/",
+			EnvVars: []string{"NATS"},
+		},
+		&cli.StringFlag{
 			Name:    "source-route-key",
 			Usage:   "Name of the routing key to read location updates from.",
 			Value:   "location-updates-enriched",
@@ -178,15 +189,7 @@ func runCli(c *cli.Context) error {
 	return run(c)
 }
 
-func (r *pwRouter) connect(config rabbitmq.Config, timeout time.Duration) error {
-	log.Info().Str("host", config.String()).Msg("Connecting to RabbitMQ")
-	r.rmq = rabbitmq.New(&config)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	return r.rmq.ConnectAndWait(ctx)
-}
-
-func (r *pwRouter) makeQueue(name, bindRouteKey string) error {
+func (r *pwRouter) rabbitMqMakeQueue(name, bindRouteKey string) error {
 	if nil != r.rmq {
 		_, err := r.rmq.QueueDeclare(name, 60000) // 60sec TTL
 		if nil != err {
@@ -206,21 +209,26 @@ func (r *pwRouter) makeQueue(name, bindRouteKey string) error {
 	}
 	return nil
 }
-
-func (r *pwRouter) setupTestQueues() error {
+func (r *pwRouter) rabbitMqSetupTestQueues() error {
 	log.Info().Msg("Setting up test queues")
 	// we need a _low and a _high for each tile
 	suffixes := []string{qSuffixLow, qSuffixHigh}
 	for _, name := range tile_grid.GridLocationNames() {
 		for _, suffix := range suffixes {
-			if err := r.makeQueue(name+suffix, name+suffix); nil != err {
+			if err := r.rabbitMqMakeQueue(name+suffix, name+suffix); nil != err {
 				return err
 			}
 		}
 	}
 	return nil
 }
-
+func (r *pwRouter) connect(config rabbitmq.Config, timeout time.Duration) error {
+	log.Info().Str("host", config.String()).Msg("Connecting to RabbitMQ")
+	r.rmq = rabbitmq.New(&config)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return r.rmq.ConnectAndWait(ctx)
+}
 func (r *pwRouter) connectRabbit(c *cli.Context, done context.Context) error {
 	if "" == c.String("rabbitmq") {
 		return nil
@@ -237,12 +245,12 @@ func (r *pwRouter) connectRabbit(c *cli.Context, done context.Context) error {
 	}
 
 	if c.Bool("register-test-queues") {
-		if err = r.setupTestQueues(); nil != err {
+		if err = r.rabbitMqSetupTestQueues(); nil != err {
 			return err
 		}
 	}
 
-	if err = r.makeQueue("reducer-in", c.String("source-route-key")); nil != err {
+	if err = r.rabbitMqMakeQueue("reducer-in", c.String("source-route-key")); nil != err {
 		return err
 	}
 
@@ -280,7 +288,7 @@ func (r *pwRouter) connectNatsIo(c *cli.Context, done context.Context) error {
 	r.nats, err = nats_io.NewServer(c.String("nats"))
 
 	if nil == err {
-		monitoring.AddHealthCheck(r.rmq)
+		monitoring.AddHealthCheck(r.nats)
 		r.haveSourceSinkConnection = true
 	} else {
 		log.Error().Err(err).Msg("Unable to understand nats url")
@@ -293,13 +301,47 @@ func (r *pwRouter) connectNatsIo(c *cli.Context, done context.Context) error {
 			select {
 			case msg, ok := <-ch:
 				if !ok {
-					log.Error().Msg("failed to get message from rabbit nicely")
+					log.Error().Msg("failed to get message from nats.io nicely")
 					return
 				}
 
 				r.incomingMessages <- msg.Data
 			case <-done.Done():
 				close(ch)
+				return
+			}
+		}
+	}()
+	return nil
+}
+
+func (r *pwRouter) connectRedis(c *cli.Context, done context.Context) error {
+	if "" == c.String("redis") {
+		return nil
+	}
+	var err error
+	r.redis, err = redismq.NewServer(c.String("redis"))
+
+	if nil == err {
+		monitoring.AddHealthCheck(r.redis)
+		r.haveSourceSinkConnection = true
+	} else {
+		log.Error().Err(err).Msg("Unable to understand redis url")
+		return err
+	}
+
+	ch, err := r.redis.Subscribe(c.String("source-route-key"))
+	go func() {
+		for {
+			select {
+			case msg, ok := <-ch:
+				if !ok {
+					log.Error().Msg("failed to get message from redis nicely")
+					return
+				}
+
+				r.incomingMessages <- []byte(msg.Payload)
+			case <-done.Done():
 				return
 			}
 		}
@@ -329,11 +371,16 @@ func run(c *cli.Context) error {
 	defer rabbitCancel()
 	doneNats, natsCancel := context.WithCancel(context.Background())
 	defer natsCancel()
+	doneRedis, redisCancel := context.WithCancel(context.Background())
+	defer redisCancel()
 
 	if err = r.connectRabbit(c, doneRabbit); nil != err {
 		log.Error().Err(err).Msg("Failed to connect to rabbitmq")
 	}
 	if err = r.connectNatsIo(c, doneNats); nil != err {
+		log.Error().Err(err).Msg("Failed to connect to nats.io")
+	}
+	if err = r.connectRedis(c, doneRedis); nil != err {
 		log.Error().Err(err).Msg("Failed to connect to nats.io")
 	}
 	if !r.haveSourceSinkConnection {

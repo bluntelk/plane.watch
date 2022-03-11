@@ -289,6 +289,15 @@ func (w *worker) publishLocationUpdate(routingKey string, msg []byte) {
 		}
 	}
 
+	if nil != w.router.redis {
+		err := w.router.redis.Publish(routingKey, msg)
+		if nil != err {
+			log.Warn().Err(err).Msg("Failed to send update to redis")
+			sent = true
+			return
+		}
+	}
+
 	if sent {
 		log.Trace().Str("routingKey", routingKey).Msg("Sent msg")
 		updatesPublished.Inc()
