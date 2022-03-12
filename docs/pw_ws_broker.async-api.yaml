@@ -1,0 +1,240 @@
+asyncapi: 2.3.0
+info:
+  title: PlaneWatch Websocket Protocol
+  version: 0.1.0
+  description: Get a stream of aircraft from planewatch
+servers:
+  plane.watch:
+    description: The production plane.watch websocket broker
+    url: plane.watch
+    protocol: wss
+    bindings:
+      ws:
+        method: GET
+
+channels:
+  sub-list:
+    subscribe:
+      description: Requests the list of currently subscribed tiles
+      message:
+        $ref: '#/components/messages/CmdSubList'
+    publish:
+      description: The list of currently subscribed tiles
+      message:
+        $ref: '#/components/messages/TileListResponse'
+  sub:
+    subscribe:
+      description: Subscribes our client to the requested tile feed
+      message:
+        $ref: '#/components/messages/CmdSubTile'
+  unsub:
+    subscribe:
+      description: asks the ws broker to stop sending us updated for this tile
+      message:
+        $ref: '#/components/messages/CmdUnSubTile'
+
+  location-update:
+    description: Plane information that comes from a subscription
+    publish:
+      description: a single plane location update
+      message:
+        $ref: '#/components/messages/PlaneLocation'
+  location-update-list:
+    description: Plane information that comes from a subscription
+    publish:
+      description: a list of plane location updates
+      message:
+        $ref: '#/components/messages/PlaneLocationList'
+
+components:
+  messages:
+    CmdSubList:
+      contentType: application/json
+      payload:
+        required:
+          - type
+        type: object
+        properties:
+          type:
+            type: string
+            description: sub-list
+      examples:
+        - name: List of subscribed Tiles
+          payload:
+            type: sub-list
+
+    CmdSubTile:
+      contentType: application/json
+      payload:
+        type: object
+        properties:
+          type:
+            type: string
+            description: sub
+          gridTile:
+            type: string
+            description: the tile to subscribe to
+      examples:
+        - name: subscribe to tile updates
+          payload:
+            type: sub
+            gridTile: tile38_low
+
+    CmdUnSubTile:
+      contentType: application/json
+      payload:
+        type: object
+        required:
+          - type
+        properties:
+          type:
+            type: string
+            description: unsub
+          tile:
+            type: string
+            description: the tile to unsubscribe to
+      examples:
+        - name: unsubscribe from tile updates
+          payload:
+            type: unsub
+            gridTile: tile38_low
+
+    TileListResponse:
+      contentType: application/json
+      description: The response type
+      payload:
+        type: object
+        required:
+          - type
+        properties:
+          type:
+            type: string
+            description: sub-list, sub-ack, unsub-ack
+          tiles:
+            description: the list of tile names
+            type: array
+      examples:
+        - name: sub-list
+          payload:
+            type: sub-list
+            tiles:
+              - tile38_low
+              - tile39_low
+              - tile40_low
+        - name: sub-ack
+          payload:
+            type: sub-ack
+            tiles:
+              - tile38_low
+        - name: unsub-ack
+          payload:
+            type: sub-ack
+            tiles:
+              - tile38_low
+
+
+    PlaneLocationList:
+      contentType: application/json
+      description: a list of PlaneLocations, sent in bulk to save on postage
+      payload:
+        type: object
+        required:
+          - type
+          - locations
+        properties:
+          type:
+            type: string
+            description: denotes the payload type. in this instance 'plane-location-list'
+          locations:
+            type: array
+            items:
+              $ref: '#/components/messages/PlaneLocation'
+
+    PlaneLocation:
+      contentType: application/json
+      description: A single location event
+      payload:
+        type: object
+        properties:
+          New:
+            type: boolean
+          Removed:
+            type: boolean
+          Icao:
+            type: string
+          Lat:
+            type: number
+          Lon:
+            type: number
+          Heading:
+            type: number
+          Velocity:
+            type: number
+          Altitude:
+            type: number
+          VerticalRate:
+            type: number
+          AltitudeUnits:
+            type: string
+          FlightStatus:
+            type: string
+          OnGround:
+            type: boolean
+          Airframe:
+            type: string
+          AirframeType:
+            type: string
+          HasLocation:
+            type: boolean
+          HasHeading:
+            type: boolean
+          HasVerticalRate:
+            type: boolean
+          HasVelocity:
+            type: boolean
+          SourceTag:
+            type: string
+          Squawk:
+            type: string
+          Special:
+            type: string
+          TileLocation:
+            type: string
+          TrackedSince:
+            type: string
+          LastMsg:
+            type: string
+          SignalRssi:
+            type: number
+          CallSign:
+            type: string
+      examples:
+        - name: Example Payload
+          payload:
+            New: false
+            Removed: false
+            Icao: "48415F"
+            Lat: 48.02207817465572
+            Lon: 9.765648475060095
+            Heading: 151.57095116691386
+            Velocity: 455.0703242357163
+            Altitude: 39000
+            VerticalRate: -64
+            AltitudeUnits: ""
+            FlightStatus: "ALERT, special Position Identification. Airborne or Ground"
+            OnGround: false
+            Airframe: "No ADS-B Emitter Category Information"
+            AirframeType: "0/0"
+            HasLocation: true
+            HasHeading: true
+            HasVerticalRate: true
+            HasVelocity: true
+            SourceTag: "boxie"
+            Squawk: "6523"
+            Special: "Alert"
+            TileLocation: "tile3"
+            TrackedSince: "2022-03-12T09:01:02.069707133Z"
+            LastMsg: "2022-03-12T09:47:22.141293262Z"
+            SignalRssi: 7.781512503836437
+            CallSign: "KLM81K"
+
