@@ -44,10 +44,23 @@ func main() {
 	}
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
-			Name:    "source",
+			Name:    "rabbitmq",
+			Aliases: []string{"source"},
 			Usage:   "A place to fetch data from. amqp://user:pass@host:port/vhost?ttl=60",
 			Value:   "amqp://guest:guest@rabbitmq:5672/pw",
-			EnvVars: []string{"SOURCE"},
+			EnvVars: []string{"RABBITMQ", "SOURCE"},
+		},
+		&cli.StringFlag{
+			Name:    "nats",
+			Usage:   "Nats.io URL for fetching and publishing updates.",
+			Value:   "nats://guest:guest@nats:4222/",
+			EnvVars: []string{"NATS"},
+		},
+		&cli.StringFlag{
+			Name:    "redis",
+			Usage:   "redis URL for fetching updates.",
+			Value:   "redis://guest:guest@redis:6379/",
+			EnvVars: []string{"REDIS"},
 		},
 		&cli.StringFlag{
 			Name:    "route-key-low",
@@ -85,6 +98,12 @@ func main() {
 			Usage:   "Serve up a test website for websocket testing",
 			EnvVars: []string{"TEST_WEB"},
 		},
+		&cli.DurationFlag{
+			Name:    "send-tick",
+			Usage:   "When > 0, how long to collect messages before sending them in one batch",
+			EnvVars: []string{"SEND_TICK"},
+			Value:   0,
+		},
 	}
 
 	logging.IncludeVerbosityFlags(app)
@@ -120,14 +139,31 @@ func run(c *cli.Context) error {
 		return c.Set("http-addr", ":443")
 	}
 
+	var hasRabbit bool
+	var hasNats bool
+	var hasRedis bool
+	for _, v := range c.FlagNames() {
+		if "rabbitmq" == v {
+			hasRabbit = true
+		}
+		if "nats" == v {
+			hasNats = true
+		}
+		if "redis" == v {
+			hasRedis = true
+		}
+	}
 	monitoring.RunWebServer(c)
-	source := c.String("source")
+
+	rabbitmq := c.String("rabbitmq")
+	nats := c.String("nats")
+	redis := c.String("redis")
 	lowRoute := c.String("route-key-low")
 	highRoute := c.String("route-key-high")
 
 	isValid := true
-	if "" == source {
-		log.Info().Msg("Please provide rabbitmq connection details. (--source)")
+	if !hasRabbit && !hasNats && !hasRedis {
+		log.Info().Msg("Please provide rabbitmq (or nats, redis) connection details. (--rabbitmq)")
 		isValid = false
 	}
 	if "" == lowRoute {
@@ -142,14 +178,23 @@ func run(c *cli.Context) error {
 		return errors.New("invalid configuration. You need rabbitmq, route low and, route high configured")
 	}
 
+	var input source
+	var err error
+	if hasRabbit && "" != rabbitmq {
+		input, err = NewPwWsBrokerRabbit(rabbitmq, lowRoute, highRoute)
+	} else if hasNats && "" != nats {
+		input, err = NewPwWsBrokerNats(nats, lowRoute, highRoute)
+	} else if hasRedis && "" != redis {
+		input, err = NewPwWsBrokerRedis(redis, lowRoute, highRoute)
+	}
+
 	broker, err := NewPlaneWatchWebSocketBroker(
-		source,
-		lowRoute,
-		highRoute,
+		input,
 		c.String("http-addr"),
 		c.String("tls-cert"),
 		c.String("tls-cert-key"),
 		c.Bool("serve-test-web"),
+		c.Duration("send-tick"),
 	)
 	if nil != err {
 		return err

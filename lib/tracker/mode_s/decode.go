@@ -282,6 +282,16 @@ func (f *Frame) decodeCrossLinkCapability() {
 	f.cc = f.message[0] & 0x2 >> 1
 }
 
+//Flight status (FS): 3 bits, shows status of alert, special position pulse (SPI, in Mode A only) and aircraft status (airborne or on-ground). The field is interpreted as:
+//
+//    000: no alert, no SPI, aircraft is airborne
+//    001: no alert, no SPI, aircraft is on-ground
+//    010: alert, no SPI, aircraft is airborne
+//    011: alert, no SPI, aircraft is on-ground
+//    100: alert, SPI, aircraft is airborne or on-ground
+//    101: no alert, SPI, aircraft is airborne or on-ground
+//    110: reserved
+//    111: not assigned
 func (f *Frame) decodeFlightStatus() {
 	// first 5 bits are the downlink format
 	// bits 5,6,7 are the flight status
@@ -297,7 +307,7 @@ func (f *Frame) decodeFlightStatus() {
 	}
 	if f.fs == 4 || f.fs == 5 {
 		// special pos
-		f.validVerticalStatus = true
+		f.validVerticalStatus = false
 		f.onGround = false // assume in the air
 		if f.fs <= 7 {
 			f.special += flightStatusTable[f.fs]

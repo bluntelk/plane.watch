@@ -1,38 +1,50 @@
 package sink
 
-import "plane.watch/lib/tracker"
+import (
+	"net"
+	"net/url"
+	"plane.watch/lib/redismq"
+	"plane.watch/lib/tracker"
+)
 
 type (
 	RedisSink struct {
 		Config
-		events chan tracker.Event
+		rc *redismq.Server
 	}
 )
 
-func NewRedisSink(opts ...Option) *RedisSink {
-	r := &RedisSink{
-		events: make(chan tracker.Event),
+func NewRedisSink(opts ...Option) (tracker.Sink, error) {
+	r := &RedisSink{}
+	r.setupConfig(opts)
+
+	serverUrl := url.URL{
+		Scheme:  "redis", // tls for secure
+		User:    url.UserPassword(r.user, r.pass),
+		Host:    net.JoinHostPort(r.host, r.port),
+		Path:    "",
+		RawPath: "",
 	}
-	for _, opt := range opts {
-		opt(&r.Config)
-	}
-	return r
+
+	var err error
+	r.rc, err = redismq.NewServer(serverUrl.String())
+
+	return NewSink(&r.Config, r), err
 }
 
-func (r *RedisSink) OnEvent(e tracker.Event) {
-	panic("Implement REDIS")
+func (r *RedisSink) PublishJson(queue string, msg []byte) error {
+	return r.rc.Publish(queue, msg)
 }
 
-func (r *RedisSink) Listen() chan tracker.Event {
-	return r.events
-}
-
-func (r *RedisSink) Stop() {
-	close(r.events)
+func (r *RedisSink) PublishText(queue string, msg []byte) error {
+	return r.rc.Publish(queue, msg)
 }
 
 func (r *RedisSink) HealthCheck() bool {
-	return false
+	return r.rc != nil
+}
+func (r *RedisSink) Stop() {
+	r.rc.Close()
 }
 
 func (r *RedisSink) HealthCheckName() string {

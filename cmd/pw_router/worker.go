@@ -4,19 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"math"
-	"time"
-
-	"plane.watch/lib/rabbitmq"
-
 	"github.com/rs/zerolog/log"
-	"github.com/streadway/amqp"
+	"math"
 	"plane.watch/lib/export"
 )
 
 type (
 	worker struct {
-		rabbit         *pwRouter
+		router         *pwRouter
 		destRoutingKey string
 		spreadUpdates  bool
 	}
@@ -134,7 +129,7 @@ func (w *worker) isSignificant(last export.PlaneLocation, candidate export.Plane
 	return false
 }
 
-func (w *worker) run(ctx context.Context, ch <-chan amqp.Delivery) {
+func (w *worker) run(ctx context.Context, ch <-chan []byte) {
 	for {
 		select {
 		case msg, ok := <-ch:
@@ -144,7 +139,7 @@ func (w *worker) run(ctx context.Context, ch <-chan amqp.Delivery) {
 			}
 
 			var gErr error
-			if gErr = w.handleMsg(msg.Body); nil != gErr {
+			if gErr = w.handleMsg(msg); nil != gErr {
 				log.Error().Err(gErr).Send()
 			}
 		case <-ctx.Done():
@@ -177,7 +172,7 @@ func (w *worker) handleMsg(msg []byte) error {
 	}
 
 	// lookup what we know about this plane.
-	item, ok := w.rabbit.syncSamples.Load(update.Icao)
+	item, ok := w.router.syncSamples.Load(update.Icao)
 
 	// if this Icao is not in the cache, it's new.
 	if !ok {
@@ -208,7 +203,7 @@ func (w *worker) handleRemovedUpdate(update export.PlaneLocation, msg []byte) {
 	//check if this is a removed record and purge it from the cache and emit an event
 	// this ensures downstream pipeline components always know about a removed record.
 	// we get the removed flag from pw_ingest - this shortcuts our cache expiry for efficiency.
-	w.rabbit.syncSamples.Delete(update.Icao)
+	w.router.syncSamples.Delete(update.Icao)
 	cacheEntries.Dec()
 	cacheEvictions.Inc()
 
@@ -223,7 +218,7 @@ func (w *worker) handleRemovedUpdate(update export.PlaneLocation, msg []byte) {
 
 func (w *worker) handleSignificantUpdate(update export.PlaneLocation, msg []byte) {
 	// store the new update in-place of the old one
-	w.rabbit.syncSamples.Store(update.Icao, update)
+	w.router.syncSamples.Store(update.Icao, update)
 	updatesSignificant.Inc()
 
 	// emit the new lastSignificant
@@ -236,7 +231,7 @@ func (w *worker) handleSignificantUpdate(update export.PlaneLocation, msg []byte
 
 func (w *worker) handleNewUpdate(update export.PlaneLocation, msg []byte) {
 	// store the new update
-	w.rabbit.syncSamples.Store(update.Icao, update)
+	w.router.syncSamples.Store(update.Icao, update)
 	cacheEntries.Inc()
 
 	log.Debug().
@@ -263,25 +258,19 @@ func (w *worker) handleInsignificantUpdate(update export.PlaneLocation, msg []by
 }
 
 func (w *worker) publishLocationUpdate(routingKey string, msg []byte) {
-	log.Debug().Str("routing-key", routingKey).Bytes("Location", msg).Msg("Publish")
+	log.Trace().Str("routing-key", routingKey).Bytes("Location", msg).Msg("Publish")
+	var sent bool
 
-	err := w.rabbit.rmq.Publish(rabbitmq.PlaneWatchExchange, routingKey, amqp.Publishing{
-		ContentType:     "application/json",
-		ContentEncoding: "utf-8",
-		Timestamp:       time.Now(),
-		Body:            msg,
-	})
-	if nil != err {
-		log.Warn().Err(err).Msg("Failed to send update to rabbit")
-	} else {
-		log.Debug().Msgf("Sent msg to routing key %s", routingKey)
+	for _, theMq := range w.router.mqs {
+		if err := theMq.publish(routingKey, msg); nil != err {
+			log.Warn().Err(err).Msg("Failed to send update")
+			continue
+		}
+		sent = true
+	}
+
+	if sent {
+		log.Trace().Str("routingKey", routingKey).Msg("Sent msg")
 		updatesPublished.Inc()
 	}
-}
-
-func unptr(s *string) string {
-	if nil == s {
-		return ""
-	}
-	return *s
 }

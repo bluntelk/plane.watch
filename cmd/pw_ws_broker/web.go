@@ -35,6 +35,8 @@ type (
 
 		clients   ClientList
 		listening bool
+
+		sendTickDuration time.Duration
 	}
 
 	loadedResponse struct {
@@ -179,10 +181,10 @@ func (bw *PwWsBrokerWeb) servePlanes(w http.ResponseWriter, r *http.Request) {
 	case ws_protocol.WsProtocolPlanes:
 		client := NewWsClient(conn)
 		bw.clients.addClient(client)
-		client.Handle(r.Context())
+		client.Handle(r.Context(), bw.sendTickDuration)
 		bw.clients.removeClient(client)
 	default:
-		_ = conn.Close(websocket.StatusPolicyViolation, "Unknown Subprotocol")
+		_ = conn.Close(websocket.StatusPolicyViolation, "Unknown Sub Protocol")
 		log.Debug().Str("proto", conn.Subprotocol()).Msg("Bad connection, could not speak protocol")
 		return
 	}
@@ -201,13 +203,13 @@ func NewWsClient(conn *websocket.Conn) *WsClient {
 	client := WsClient{
 		conn:    conn,
 		cmdChan: make(chan WsCmd),
-		outChan: make(chan loadedResponse),
+		outChan: make(chan loadedResponse, 500),
 	}
 	return &client
 }
 
-func (c *WsClient) Handle(ctx context.Context) {
-	err := c.planeProtocolHandler(ctx, c.conn)
+func (c *WsClient) Handle(ctx context.Context, sendTickDuration time.Duration) {
+	err := c.planeProtocolHandler(ctx, c.conn, sendTickDuration)
 	if websocket.CloseStatus(err) == websocket.StatusNormalClosure || websocket.CloseStatus(err) == websocket.StatusGoingAway {
 		return
 	}
@@ -243,7 +245,7 @@ func (c *WsClient) SendTiles() {
 	log.Debug().Msg("Unsub done")
 }
 
-func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Conn) error {
+func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Conn, sendTickDuration time.Duration) error {
 	// read from the connection for commands
 	go func() {
 		for {
@@ -293,6 +295,15 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 		grid[k+"_high"] = true
 	}
 
+	locationMessages := make([]*export.PlaneLocation, 0, 1000)
+
+	d := sendTickDuration
+	if 0 == d {
+		d = 10 * time.Second // something long enough that it is not much of an overhead
+	}
+	sendTick := time.NewTicker(d)
+	defer sendTick.Stop()
+
 	for {
 		var err error
 		select {
@@ -329,7 +340,23 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 			tileSub, tileOk := subs[planeMsg.tile]
 			allSub, allOk := subs["all"+planeMsg.highLow]
 			if (tileSub && tileOk) || (allSub && allOk) {
-				err = c.sendPlaneMessage(ctx, &planeMsg.out)
+				if sendTickDuration > 0 {
+					locationMessages = append(locationMessages, planeMsg.out.Location)
+				} else {
+					err = c.sendPlaneMessage(ctx, &ws_protocol.WsResponse{
+						Type:     ws_protocol.ResponseTypePlaneLocation,
+						Location: planeMsg.out.Location,
+					})
+				}
+			}
+		case <-sendTick.C:
+			if len(locationMessages) > 0 {
+				err = c.sendPlaneMessageList(ctx, &ws_protocol.WsResponse{
+					Type:      ws_protocol.ResponseTypePlaneLocations,
+					Locations: locationMessages,
+				})
+				// reset the slice
+				locationMessages = make([]*export.PlaneLocation, 0, 1000)
 			}
 		}
 
@@ -337,6 +364,7 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 			return err
 		}
 	}
+
 }
 
 func (c *WsClient) sendAck(ctx context.Context, ackType, tile string) error {
@@ -356,6 +384,21 @@ func (c *WsClient) sendError(ctx context.Context, msg string) error {
 }
 
 func (c *WsClient) sendPlaneMessage(ctx context.Context, planeMsg *ws_protocol.WsResponse) error {
+	buf, err := json.MarshalIndent(planeMsg, "", "  ")
+	if nil != err {
+		log.Debug().Err(err).Str("type", planeMsg.Type).Msg("Failed to marshal plane msg to send to client")
+		return err
+	}
+	if err = c.writeTimeout(ctx, 3*time.Second, buf); nil != err {
+		log.Debug().
+			Err(err).
+			Str("type", planeMsg.Type).
+			Msgf("Failed to send message to client. %+v", err)
+		return err
+	}
+	return nil
+}
+func (c *WsClient) sendPlaneMessageList(ctx context.Context, planeMsg *ws_protocol.WsResponse) error {
 	buf, err := json.MarshalIndent(planeMsg, "", "  ")
 	if nil != err {
 		log.Debug().Err(err).Str("type", planeMsg.Type).Msg("Failed to marshal plane msg to send to client")

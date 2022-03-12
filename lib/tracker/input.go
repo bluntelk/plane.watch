@@ -160,6 +160,7 @@ func (t *Tracker) AddMiddleware(m Middleware) {
 
 // AddSink wires up a Sink in the tracker. Whenever an event happens it gets sent to each Sink
 func (t *Tracker) AddSink(s Sink) {
+	t.debugMessage("Add Sink %s", s.HealthCheckName())
 	if nil == s {
 		return
 	}

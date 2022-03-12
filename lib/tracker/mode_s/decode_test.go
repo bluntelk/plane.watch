@@ -269,3 +269,221 @@ func TestBadFuzz(t *testing.T) {
 		}
 	}
 }
+
+// make sure we can decode a full byte without it causing a problem
+func TestDecodeFlightStatusErr(t *testing.T) {
+
+	// make sure values 0-255 work, we only need 0-7
+	for i := 0; i < 256; i++ {
+		f := Frame{
+			message: []byte{byte(i), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		}
+		f.decodeFlightStatus()
+	}
+}
+
+//Flight status (FS): 3 bits, shows status of alert, special position pulse (SPI, in Mode A only) and aircraft status (airborne or on-ground). The field is interpreted as:
+//
+//    000: no alert, no SPI, aircraft is airborne
+//    001: no alert, no SPI, aircraft is on-ground
+//    010: alert, no SPI, aircraft is airborne
+//    011: alert, no SPI, aircraft is on-ground
+//    100: alert, SPI, aircraft is airborne or on-ground
+//    101: no alert, SPI, aircraft is airborne or on-ground
+//    110: reserved
+//    111: not assigned
+func TestFrame_decodeFlightStatus(t *testing.T) {
+	type fields struct {
+		fs    byte
+		alert bool
+		// spi?
+		onGround            bool
+		validVerticalStatus bool
+		special             string
+		message             []byte
+	}
+	tests := []struct {
+		name   string
+		fields fields
+	}{
+		{
+			name: "000: no alert, no SPI, aircraft is airborne",
+			fields: fields{
+				fs:                  0,
+				alert:               false,
+				onGround:            false,
+				validVerticalStatus: true,
+				special:             "",
+				message:             []byte{0},
+			},
+		},
+		{
+			name: "001: no alert, no SPI, aircraft is on-ground",
+			fields: fields{
+				fs:                  1,
+				alert:               false,
+				onGround:            true,
+				validVerticalStatus: true,
+				special:             "",
+				message:             []byte{1},
+			},
+		},
+		{
+			name: "010: alert, no SPI, aircraft is airborne",
+			fields: fields{
+				fs:                  2,
+				alert:               true,
+				onGround:            false,
+				validVerticalStatus: true,
+				special:             "",
+				message:             []byte{2},
+			},
+		},
+		{
+			name: "011: alert, no SPI, aircraft is on-ground",
+			fields: fields{
+				fs:                  3,
+				alert:               true,
+				onGround:            true,
+				validVerticalStatus: true,
+				special:             "",
+				message:             []byte{3},
+			},
+		},
+		{
+			name: "100: alert, SPI, aircraft is airborne or on-ground",
+			fields: fields{
+				fs:                  4,
+				alert:               true,
+				onGround:            false,
+				validVerticalStatus: false,
+				special:             flightStatusTable[4],
+				message:             []byte{4},
+			},
+		},
+		{
+			name: "101: no alert, SPI, aircraft is airborne or on-ground",
+			fields: fields{
+				fs:                  5,
+				alert:               false,
+				onGround:            false,
+				validVerticalStatus: false,
+				special:             flightStatusTable[5],
+				message:             []byte{5},
+			},
+		},
+		{
+			name: "110: reserved",
+			fields: fields{
+				fs:                  6,
+				alert:               false,
+				onGround:            false,
+				validVerticalStatus: false,
+				special:             "",
+				message:             []byte{6},
+			},
+		},
+		{
+			name: "111: not assigned",
+			fields: fields{
+				fs:                  7,
+				alert:               false,
+				onGround:            false,
+				validVerticalStatus: false,
+				special:             "",
+				message:             []byte{7},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &Frame{
+				message: tt.fields.message,
+			}
+			f.decodeFlightStatus()
+
+			if f.fs != tt.fields.fs {
+				t.Errorf("Expected flight status field %d, got %d", tt.fields.fs, f.fs)
+			}
+			if f.alert != tt.fields.alert {
+				t.Errorf("Expected alert field %t, got %t", tt.fields.alert, f.alert)
+			}
+			if f.onGround != tt.fields.onGround {
+				t.Errorf("Expected onGround field %t, got %t", tt.fields.onGround, f.onGround)
+			}
+			if f.validVerticalStatus != tt.fields.validVerticalStatus {
+				t.Errorf("Expected validVerticalStatus field %t, got %t", tt.fields.validVerticalStatus, f.validVerticalStatus)
+			}
+			if f.special != tt.fields.special {
+				t.Errorf("Expected special field `%s`, got `%s`", tt.fields.special, f.special)
+			}
+
+			if _, ok := flightStatusTable[f.fs]; !ok {
+				t.Errorf("Expected to have a flight status lookup for value %d", f.fs)
+			}
+		})
+	}
+}
+
+func TestFrame_decodeDownLinkFormat(t *testing.T) {
+	type fields struct {
+		message        []byte
+		downLinkFormat byte
+	}
+	tests := []struct {
+		name   string
+		fields fields
+	}{
+		{name: "DF0", fields: fields{message: []byte{0}, downLinkFormat: 0}},
+		{name: "DF1", fields: fields{message: []byte{1 << 3}, downLinkFormat: 1}},
+		{name: "DF2", fields: fields{message: []byte{2 << 3}, downLinkFormat: 2}},
+		{name: "DF3", fields: fields{message: []byte{3 << 3}, downLinkFormat: 3}},
+		{name: "DF4", fields: fields{message: []byte{4 << 3}, downLinkFormat: 4}},
+		{name: "DF5", fields: fields{message: []byte{5 << 3}, downLinkFormat: 5}},
+		{name: "DF6", fields: fields{message: []byte{6 << 3}, downLinkFormat: 6}},
+		{name: "DF7", fields: fields{message: []byte{7 << 3}, downLinkFormat: 7}},
+		{name: "DF8", fields: fields{message: []byte{8 << 3}, downLinkFormat: 8}},
+		{name: "DF9", fields: fields{message: []byte{9 << 3}, downLinkFormat: 9}},
+
+		{name: "DF10", fields: fields{message: []byte{10 << 3}, downLinkFormat: 10}},
+		{name: "DF11", fields: fields{message: []byte{11 << 3}, downLinkFormat: 11}},
+		{name: "DF12", fields: fields{message: []byte{12 << 3}, downLinkFormat: 12}},
+		{name: "DF13", fields: fields{message: []byte{13 << 3}, downLinkFormat: 13}},
+		{name: "DF14", fields: fields{message: []byte{14 << 3}, downLinkFormat: 14}},
+		{name: "DF15", fields: fields{message: []byte{15 << 3}, downLinkFormat: 15}},
+		{name: "DF16", fields: fields{message: []byte{16 << 3}, downLinkFormat: 16}},
+		{name: "DF17", fields: fields{message: []byte{17 << 3}, downLinkFormat: 17}},
+		{name: "DF18", fields: fields{message: []byte{18 << 3}, downLinkFormat: 18}},
+		{name: "DF19", fields: fields{message: []byte{19 << 3}, downLinkFormat: 19}},
+
+		{name: "DF20", fields: fields{message: []byte{20 << 3}, downLinkFormat: 20}},
+		{name: "DF21", fields: fields{message: []byte{21 << 3}, downLinkFormat: 21}},
+		{name: "DF22", fields: fields{message: []byte{22 << 3}, downLinkFormat: 22}},
+		{name: "DF23", fields: fields{message: []byte{23 << 3}, downLinkFormat: 23}},
+		{name: "DF24", fields: fields{message: []byte{24 << 3}, downLinkFormat: 24}},
+		{name: "DF24", fields: fields{message: []byte{25 << 3}, downLinkFormat: 24}},
+		{name: "DF24", fields: fields{message: []byte{26 << 3}, downLinkFormat: 24}},
+		{name: "DF24", fields: fields{message: []byte{27 << 3}, downLinkFormat: 24}},
+		{name: "DF24", fields: fields{message: []byte{28 << 3}, downLinkFormat: 24}},
+		{name: "DF24", fields: fields{message: []byte{29 << 3}, downLinkFormat: 24}},
+
+		{name: "DF24", fields: fields{message: []byte{30 << 3}, downLinkFormat: 24}},
+		{name: "DF24", fields: fields{message: []byte{31 << 3}, downLinkFormat: 24}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &Frame{
+				message: tt.fields.message,
+			}
+			f.decodeDownLinkFormat()
+			if tt.fields.downLinkFormat != f.downLinkFormat {
+				t.Errorf(
+					"Expected 0x%X to decode DF %d, got DF %d",
+					tt.fields.message[0],
+					tt.fields.downLinkFormat,
+					f.downLinkFormat,
+				)
+			}
+		})
+	}
+}

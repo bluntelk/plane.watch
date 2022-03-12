@@ -106,15 +106,6 @@ func HandleSourceFlags(c *cli.Context) ([]tracker.Producer, error) {
 	return out, nil
 }
 
-func getTag(parsedUrl *url.URL, defaultTag string) string {
-	if nil == parsedUrl {
-		return ""
-	}
-	if parsedUrl.Query().Has("tag") {
-		return parsedUrl.Query().Get("tag")
-	}
-	return defaultTag
-}
 func getRef(parsedUrl *url.URL, what string, defaultRef float64) float64 {
 	if nil == parsedUrl {
 		return 0
