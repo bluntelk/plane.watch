@@ -44,10 +44,11 @@ func main() {
 	}
 	app.Flags = []cli.Flag{
 		&cli.StringFlag{
-			Name:    "source",
+			Name:    "rabbitmq",
+			Aliases: []string{"source"},
 			Usage:   "A place to fetch data from. amqp://user:pass@host:port/vhost?ttl=60",
 			Value:   "amqp://guest:guest@rabbitmq:5672/pw",
-			EnvVars: []string{"SOURCE"},
+			EnvVars: []string{"RABBITMQ", "SOURCE"},
 		},
 		&cli.StringFlag{
 			Name:    "nats",
