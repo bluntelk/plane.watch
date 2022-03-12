@@ -137,7 +137,7 @@ func run(c *cli.Context) error {
 	var hasNats bool
 	var hasRedis bool
 	for _, v := range c.FlagNames() {
-		if "source" == v || "rabbitmq" == v {
+		if "rabbitmq" == v {
 			hasRabbit = true
 		}
 		if "nats" == v {
@@ -149,7 +149,7 @@ func run(c *cli.Context) error {
 	}
 	monitoring.RunWebServer(c)
 
-	rabbitmq := c.String("source")
+	rabbitmq := c.String("rabbitmq")
 	nats := c.String("nats")
 	redis := c.String("redis")
 	lowRoute := c.String("route-key-low")
@@ -157,7 +157,7 @@ func run(c *cli.Context) error {
 
 	isValid := true
 	if !hasRabbit && !hasNats && !hasRedis {
-		log.Info().Msg("Please provide rabbitmq (or nats, redis) connection details. (--source)")
+		log.Info().Msg("Please provide rabbitmq (or nats, redis) connection details. (--rabbitmq)")
 		isValid = false
 	}
 	if "" == lowRoute {
