@@ -3,6 +3,8 @@ package nats_io
 import (
 	"github.com/nats-io/nats.go"
 	"github.com/rs/zerolog/log"
+	"net"
+	"net/url"
 )
 
 type Server struct {
@@ -21,7 +23,15 @@ func NewServer(serverUrl string) (*Server, error) {
 }
 
 func (n *Server) SetUrl(serverUrl string) {
-	n.url = serverUrl
+	serverUrlParts, err := url.Parse(serverUrl)
+	if nil == err {
+		if "" == serverUrlParts.Port() {
+			serverUrlParts.Host = net.JoinHostPort(serverUrlParts.Hostname(), "4222")
+		}
+	} else {
+		log.Error().Err(err).Msg("invalid url")
+	}
+	n.url = serverUrlParts.String()
 }
 
 func (n *Server) Connect() error {

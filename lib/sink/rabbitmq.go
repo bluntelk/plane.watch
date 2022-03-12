@@ -29,8 +29,6 @@ func NewRabbitMqSink(opts ...Option) (tracker.Sink, error) {
 	}
 	r.setupConfig(opts)
 
-	r.queue = map[string]string{}
-
 	for _, opt := range opts {
 		opt(&r.Config)
 	}

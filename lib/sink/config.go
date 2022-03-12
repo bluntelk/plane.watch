@@ -60,6 +60,7 @@ type (
 )
 
 func (c *Config) setupConfig(opts []Option) {
+	c.queue = map[string]string{}
 	for _, opt := range opts {
 		opt(c)
 	}
