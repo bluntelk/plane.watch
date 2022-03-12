@@ -31,9 +31,6 @@ const (
 )
 
 type (
-	mqSource interface {
-	}
-
 	pwRouter struct {
 		rmq   *rabbitmq.RabbitMQ
 		nats  *nats_io.Server
