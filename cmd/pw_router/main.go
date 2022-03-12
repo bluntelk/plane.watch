@@ -230,13 +230,18 @@ func (r *pwRouter) connect(config rabbitmq.Config, timeout time.Duration) error 
 	return r.rmq.ConnectAndWait(ctx)
 }
 func (r *pwRouter) connectRabbit(c *cli.Context, done context.Context) error {
-	if "" == c.String("rabbitmq") {
+	url := c.String("rabbitmq")
+	if "" == url {
 		return nil
 	}
 
-	conf, err := rabbitmq.NewConfigFromUrl(c.String("rabbitmq"))
+	conf, err := rabbitmq.NewConfigFromUrl(url)
 	if nil != err {
-		log.Error().Err(err).Msg("Unable to understand rabbitmq url")
+		log.Error().
+			Err(err).
+			Str("url", url).
+			Str("MQ", "rabbitmq").
+			Msg("Unable to determine configuration from URL")
 	}
 
 	// connect to Rabbit
@@ -281,17 +286,22 @@ func (r *pwRouter) connectRabbit(c *cli.Context, done context.Context) error {
 }
 
 func (r *pwRouter) connectNatsIo(c *cli.Context, done context.Context) error {
-	if "" == c.String("nats") {
+	var err error
+	url := c.String("nats")
+	if "" == url {
 		return nil
 	}
-	var err error
-	r.nats, err = nats_io.NewServer(c.String("nats"))
 
+	r.nats, err = nats_io.NewServer(url)
 	if nil == err {
 		monitoring.AddHealthCheck(r.nats)
 		r.haveSourceSinkConnection = true
 	} else {
-		log.Error().Err(err).Msg("Unable to understand nats url")
+		log.Error().
+			Err(err).
+			Str("url", url).
+			Str("MQ", "nats.io").
+			Msg("Unable to determine configuration from URL")
 		return err
 	}
 
@@ -316,17 +326,22 @@ func (r *pwRouter) connectNatsIo(c *cli.Context, done context.Context) error {
 }
 
 func (r *pwRouter) connectRedis(c *cli.Context, done context.Context) error {
-	if "" == c.String("redis") {
+	url := c.String("redis")
+	if "" == url {
 		return nil
 	}
 	var err error
-	r.redis, err = redismq.NewServer(c.String("redis"))
+	r.redis, err = redismq.NewServer(url)
 
 	if nil == err {
 		monitoring.AddHealthCheck(r.redis)
 		r.haveSourceSinkConnection = true
 	} else {
-		log.Error().Err(err).Msg("Unable to understand redis url")
+		log.Error().
+			Err(err).
+			Str("url", url).
+			Str("MQ", "redis").
+			Msg("Unable to determine configuration from URL")
 		return err
 	}
 
