@@ -122,7 +122,7 @@ func main() {
 			Name:  "redis",
 			Usage: "redis server URL for fetching and publishing updates.",
 			//Value:   "redis://guest:guest@redis:6379/",
-			EnvVars: []string{"NATS"},
+			EnvVars: []string{"REDIS"},
 		},
 		&cli.StringFlag{
 			Name:    "source-route-key",
