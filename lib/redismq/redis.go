@@ -17,13 +17,16 @@ type Server struct {
 }
 
 func NewServer(serverUrl string) (*Server, error) {
-	n := &Server{
-		url: serverUrl,
-	}
-	if err := n.Connect(); nil != err {
+	r := &Server{}
+	r.SetUrl(serverUrl)
+	if err := r.Connect(); nil != err {
 		return nil, err
 	}
-	return n, nil
+	return r, nil
+}
+
+func (r *Server) SetUrl(serverUrl string) {
+	r.url = serverUrl
 }
 
 func (r *Server) Connect() error {

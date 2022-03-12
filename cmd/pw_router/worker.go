@@ -4,13 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"math"
-	"time"
-
-	"plane.watch/lib/rabbitmq"
-
 	"github.com/rs/zerolog/log"
-	"github.com/streadway/amqp"
+	"math"
 	"plane.watch/lib/export"
 )
 
@@ -264,38 +259,14 @@ func (w *worker) handleInsignificantUpdate(update export.PlaneLocation, msg []by
 
 func (w *worker) publishLocationUpdate(routingKey string, msg []byte) {
 	log.Trace().Str("routing-key", routingKey).Bytes("Location", msg).Msg("Publish")
-
 	var sent bool
-	if nil != w.router.rmq {
-		err := w.router.rmq.Publish(rabbitmq.PlaneWatchExchange, routingKey, amqp.Publishing{
-			ContentType:     "application/json",
-			ContentEncoding: "utf-8",
-			Timestamp:       time.Now(),
-			Body:            msg,
-		})
-		if nil != err {
-			log.Warn().Err(err).Msg("Failed to send update to rabbit")
-			sent = true
-			return
-		}
-	}
 
-	if nil != w.router.nats {
-		err := w.router.nats.Publish(routingKey, msg)
-		if nil != err {
-			log.Warn().Err(err).Msg("Failed to send update to nats")
-			sent = true
-			return
+	for _, theMq := range w.router.mqs {
+		if err := theMq.publish(routingKey, msg); nil != err {
+			log.Warn().Err(err).Msg("Failed to send update")
+			continue
 		}
-	}
-
-	if nil != w.router.redis {
-		err := w.router.redis.Publish(routingKey, msg)
-		if nil != err {
-			log.Warn().Err(err).Msg("Failed to send update to redis")
-			sent = true
-			return
-		}
+		sent = true
 	}
 
 	if sent {

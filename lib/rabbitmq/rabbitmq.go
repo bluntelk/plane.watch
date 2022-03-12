@@ -39,15 +39,22 @@ func New(cfg *Config) *RabbitMQ {
 	if nil == cfg {
 		return nil
 	}
-	rmq := &RabbitMQ{
-		uri: cfg.String(),
-		log: log.With().Str("Service", "RabbitMQ").Logger(),
-	}
-
-	rmq.send.log = rmq.log.With().Str("conn", "send").Logger()
-	rmq.receive.log = rmq.log.With().Str("conn", "receive").Logger()
+	rmq := &RabbitMQ{}
+	rmq.SetUrl(cfg.String())
+	rmq.Setup()
 
 	return rmq
+}
+
+func (r *RabbitMQ) Setup() {
+	r.log = log.With().Str("Service", "RabbitMQ").Logger()
+	r.send.log = r.log.With().Str("conn", "send").Logger()
+	r.receive.log = r.log.With().Str("conn", "receive").Logger()
+
+}
+
+func (r *RabbitMQ) SetUrl(serverUrl string) {
+	r.uri = serverUrl
 }
 
 // ConnectAndWait connects to our RabbitMQ server and sets up our connections.

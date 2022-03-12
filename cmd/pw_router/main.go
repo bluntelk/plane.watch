@@ -4,24 +4,19 @@ import (
 	"context"
 	"os"
 	"os/signal"
-	"plane.watch/lib/nats_io"
-	"plane.watch/lib/redismq"
 	"sync"
 	"syscall"
 	"time"
-
-	"plane.watch/lib/dedupe"
-	"plane.watch/lib/monitoring"
-	"plane.watch/lib/tile_grid"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
+	"plane.watch/lib/dedupe"
+	"plane.watch/lib/monitoring"
 
 	"plane.watch/lib/logging"
-	"plane.watch/lib/rabbitmq"
 )
 
 // queue suffixes for a low (only significant) and high (every message) tile queues
@@ -31,10 +26,16 @@ const (
 )
 
 type (
+	mq interface {
+		connect() error
+		listen(subject string, incomingMessages chan []byte) error
+		publish(subject string, msg []byte) error
+		close()
+		monitoring.HealthCheck
+	}
+
 	pwRouter struct {
-		rmq   *rabbitmq.RabbitMQ
-		nats  *nats_io.Server
-		redis *redismq.Server
+		mqs []mq
 
 		syncSamples *dedupe.ForgetfulSyncMap
 
@@ -186,181 +187,6 @@ func runCli(c *cli.Context) error {
 	return run(c)
 }
 
-func (r *pwRouter) rabbitMqMakeQueue(name, bindRouteKey string) error {
-	if nil != r.rmq {
-		_, err := r.rmq.QueueDeclare(name, 60000) // 60sec TTL
-		if nil != err {
-			log.Error().Err(err).Msgf("Failed to create queue '%s'", name)
-			return err
-		}
-
-		if err = r.rmq.QueueBind(name, bindRouteKey, rabbitmq.PlaneWatchExchange); nil != err {
-			log.Error().Err(err).Msgf("Failed to QueueBind to route-key:%s to queue %s", bindRouteKey, name)
-			return err
-		}
-		log.Debug().Str("queue", name).Str("route-key", bindRouteKey).Msg("Setup Queue")
-	}
-
-	if nil != r.nats {
-
-	}
-	return nil
-}
-func (r *pwRouter) rabbitMqSetupTestQueues() error {
-	log.Info().Msg("Setting up test queues")
-	// we need a _low and a _high for each tile
-	suffixes := []string{qSuffixLow, qSuffixHigh}
-	for _, name := range tile_grid.GridLocationNames() {
-		for _, suffix := range suffixes {
-			if err := r.rabbitMqMakeQueue(name+suffix, name+suffix); nil != err {
-				return err
-			}
-		}
-	}
-	return nil
-}
-func (r *pwRouter) connect(config rabbitmq.Config, timeout time.Duration) error {
-	log.Info().Str("host", config.String()).Msg("Connecting to RabbitMQ")
-	r.rmq = rabbitmq.New(&config)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	return r.rmq.ConnectAndWait(ctx)
-}
-func (r *pwRouter) connectRabbit(c *cli.Context, done context.Context) error {
-	url := c.String("rabbitmq")
-	if "" == url {
-		return nil
-	}
-
-	conf, err := rabbitmq.NewConfigFromUrl(url)
-	if nil != err {
-		log.Error().
-			Err(err).
-			Str("url", url).
-			Str("MQ", "rabbitmq").
-			Msg("Unable to determine configuration from URL")
-	}
-
-	// connect to Rabbit
-	if err = r.connect(*conf, time.Second*5); nil != err {
-		return err
-	}
-
-	if c.Bool("register-test-queues") {
-		if err = r.rabbitMqSetupTestQueues(); nil != err {
-			return err
-		}
-	}
-
-	if err = r.rabbitMqMakeQueue("reducer-in", c.String("source-route-key")); nil != err {
-		return err
-	}
-
-	ch, err := r.rmq.Consume("reducer-in", "pw-router")
-	if nil != err {
-		log.Info().Msg("Failed to consume reducer-in")
-		return err
-	}
-	go func() {
-		for {
-			select {
-			case msg, ok := <-ch:
-				if !ok {
-					log.Error().Msg("failed to get message from rabbit nicely")
-					return
-				}
-
-				r.incomingMessages <- msg.Body
-			case <-done.Done():
-				return
-			}
-		}
-	}()
-
-	monitoring.AddHealthCheck(r.rmq)
-	r.haveSourceSinkConnection = true
-	return nil
-}
-
-func (r *pwRouter) connectNatsIo(c *cli.Context, done context.Context) error {
-	var err error
-	url := c.String("nats")
-	if "" == url {
-		return nil
-	}
-
-	r.nats, err = nats_io.NewServer(url)
-	if nil == err {
-		monitoring.AddHealthCheck(r.nats)
-		r.haveSourceSinkConnection = true
-	} else {
-		log.Error().
-			Err(err).
-			Str("url", url).
-			Str("MQ", "nats.io").
-			Msg("Unable to determine configuration from URL")
-		return err
-	}
-
-	ch, err := r.nats.Subscribe(c.String("source-route-key"))
-	go func() {
-		for {
-			select {
-			case msg, ok := <-ch:
-				if !ok {
-					log.Error().Msg("failed to get message from nats.io nicely")
-					return
-				}
-
-				r.incomingMessages <- msg.Data
-			case <-done.Done():
-				close(ch)
-				return
-			}
-		}
-	}()
-	return nil
-}
-
-func (r *pwRouter) connectRedis(c *cli.Context, done context.Context) error {
-	url := c.String("redis")
-	if "" == url {
-		return nil
-	}
-	var err error
-	r.redis, err = redismq.NewServer(url)
-
-	if nil == err {
-		monitoring.AddHealthCheck(r.redis)
-		r.haveSourceSinkConnection = true
-	} else {
-		log.Error().
-			Err(err).
-			Str("url", url).
-			Str("MQ", "redis").
-			Msg("Unable to determine configuration from URL")
-		return err
-	}
-
-	ch, err := r.redis.Subscribe(c.String("source-route-key"))
-	go func() {
-		for {
-			select {
-			case msg, ok := <-ch:
-				if !ok {
-					log.Error().Msg("failed to get message from redis nicely")
-					return
-				}
-
-				r.incomingMessages <- []byte(msg.Payload)
-			case <-done.Done():
-				return
-			}
-		}
-	}()
-	return nil
-}
-
 func run(c *cli.Context) error {
 	// setup and start the prom exporter
 	monitoring.RunWebServer(c)
@@ -379,22 +205,36 @@ func run(c *cli.Context) error {
 
 	r.incomingMessages = make(chan []byte, 300)
 
-	doneRabbit, rabbitCancel := context.WithCancel(context.Background())
-	defer rabbitCancel()
-	doneNats, natsCancel := context.WithCancel(context.Background())
-	defer natsCancel()
-	doneRedis, redisCancel := context.WithCancel(context.Background())
-	defer redisCancel()
+	if rr := NewRabbitMqRouter(c.String("rabbitmq")); nil != rr {
+		if c.Bool("register-test-queues") {
+			if err = rr.rabbitMqSetupTestQueues(); nil != err {
+				return err
+			}
+		}
+		r.mqs = append(r.mqs, rr)
+	}
 
-	if err = r.connectRabbit(c, doneRabbit); nil != err {
-		log.Error().Err(err).Msg("Failed to connect to rabbitmq")
+	if nr := NewNatsIoRouter(c.String("nats")); nil != nr {
+		r.mqs = append(r.mqs, nr)
 	}
-	if err = r.connectNatsIo(c, doneNats); nil != err {
-		log.Error().Err(err).Msg("Failed to connect to nats.io")
+
+	if rr := NewRedisRouter(c.String("redis")); nil != rr {
+		r.mqs = append(r.mqs, rr)
 	}
-	if err = r.connectRedis(c, doneRedis); nil != err {
-		log.Error().Err(err).Msg("Failed to connect to nats.io")
+
+	incomingSubject := c.String("source-route-key")
+	for _, theMq := range r.mqs {
+		if err = theMq.connect(); nil != err {
+			continue
+		}
+		if err = theMq.listen(incomingSubject, r.incomingMessages); nil != err {
+			continue
+		}
+		monitoring.AddHealthCheck(theMq)
+
+		r.haveSourceSinkConnection = true
 	}
+
 	if !r.haveSourceSinkConnection {
 		cli.ShowAppHelpAndExit(c, 1)
 	}
@@ -409,18 +249,23 @@ func run(c *cli.Context) error {
 	go func() {
 		<-chSignal // wait for our cancel signal
 		log.Info().Msg("Shutting Down")
+		for _, theMq := range r.mqs {
+			theMq.close()
+		}
 		// and then close all the things
-		rabbitCancel()
-		natsCancel()
 		cancel()
 	}()
 
-	log.Info().Msgf("Starting with %d workers...", c.Int("num-workers"))
-	for i := 0; i < c.Int("num-workers"); i++ {
+	numWorkers := c.Int("num-workers")
+	destRouteKey := c.String("destination-route-key")
+	spreadUpdates := c.Bool("spread-updates")
+
+	log.Info().Msgf("Starting with %d workers...", numWorkers)
+	for i := 0; i < numWorkers; i++ {
 		wkr := worker{
 			router:         &r,
-			destRoutingKey: c.String("destination-route-key"),
-			spreadUpdates:  c.Bool("spread-updates"),
+			destRoutingKey: destRouteKey,
+			spreadUpdates:  spreadUpdates,
 		}
 		wg.Add(1)
 		go func() {
