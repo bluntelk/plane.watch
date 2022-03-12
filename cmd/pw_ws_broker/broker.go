@@ -7,6 +7,7 @@ import (
 	"plane.watch/lib/export"
 	"plane.watch/lib/monitoring"
 	"syscall"
+	"time"
 )
 
 type (
@@ -26,15 +27,16 @@ type (
 	processMessage func(highLow string, loc *export.PlaneLocation)
 )
 
-func NewPlaneWatchWebSocketBroker(input source, httpAddr, cert, certKey string, serveTestWeb bool) (*PwWsBroker, error) {
+func NewPlaneWatchWebSocketBroker(input source, httpAddr, cert, certKey string, serveTestWeb bool, sendTickDuration time.Duration) (*PwWsBroker, error) {
 
 	return &PwWsBroker{
 		input: input,
 		PwWsBrokerWeb: PwWsBrokerWeb{
-			Addr:      httpAddr,
-			ServeTest: serveTestWeb,
-			cert:      cert,
-			certKey:   certKey,
+			Addr:             httpAddr,
+			ServeTest:        serveTestWeb,
+			cert:             cert,
+			certKey:          certKey,
+			sendTickDuration: sendTickDuration,
 		},
 		exitChan: make(chan bool),
 	}, nil

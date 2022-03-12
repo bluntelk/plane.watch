@@ -98,6 +98,12 @@ func main() {
 			Usage:   "Serve up a test website for websocket testing",
 			EnvVars: []string{"TEST_WEB"},
 		},
+		&cli.DurationFlag{
+			Name:    "send-tick",
+			Usage:   "When > 0, how long to collect messages before sending them in one batch",
+			EnvVars: []string{"SEND_TICK"},
+			Value:   0,
+		},
 	}
 
 	logging.IncludeVerbosityFlags(app)
@@ -188,6 +194,7 @@ func run(c *cli.Context) error {
 		c.String("tls-cert"),
 		c.String("tls-cert-key"),
 		c.Bool("serve-test-web"),
+		c.Duration("send-tick"),
 	)
 	if nil != err {
 		return err
