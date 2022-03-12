@@ -25,7 +25,22 @@
                     return
                 }
 
-                console.info(ev.data)
+                const payload = JSON.parse(ev.data)
+
+                if ('type' in payload) {
+                    console.info(payload.type)
+                    console.debug(payload)
+                    switch (payload.type) {
+                        case 'plane-location':
+                            break;
+                        case 'plane-location-list':
+                            if ('locations' in payload) {
+                                console.info(payload.locations.length)
+                            }
+                            break;
+
+                    }
+                }
             })
         },
         tiles: function() {

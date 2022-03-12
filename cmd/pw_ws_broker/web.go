@@ -296,6 +296,7 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 	}
 
 	locationMessages := make([]*export.PlaneLocation, 0, 1000)
+	icaoIdLookup := make(map[string]int, 1000)
 
 	d := sendTickDuration
 	if 0 == d {
@@ -341,7 +342,13 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 			allSub, allOk := subs["all"+planeMsg.highLow]
 			if (tileSub && tileOk) || (allSub && allOk) {
 				if sendTickDuration > 0 {
-					locationMessages = append(locationMessages, planeMsg.out.Location)
+					// limit our updates to only 1 per icao
+					if id, ok := icaoIdLookup[planeMsg.out.Location.Icao]; ok {
+						locationMessages[id] = planeMsg.out.Location
+					} else {
+						locationMessages = append(locationMessages, planeMsg.out.Location)
+						icaoIdLookup[planeMsg.out.Location.Icao] = len(locationMessages) - 1
+					}
 				} else {
 					err = c.sendPlaneMessage(ctx, &ws_protocol.WsResponse{
 						Type:     ws_protocol.ResponseTypePlaneLocation,
@@ -355,8 +362,9 @@ func (c *WsClient) planeProtocolHandler(ctx context.Context, conn *websocket.Con
 					Type:      ws_protocol.ResponseTypePlaneLocations,
 					Locations: locationMessages,
 				})
-				// reset the slice
+				// reset the slice and lookup map
 				locationMessages = make([]*export.PlaneLocation, 0, 1000)
+				icaoIdLookup = make(map[string]int, 1000)
 			}
 		}
 
@@ -389,13 +397,14 @@ func (c *WsClient) sendPlaneMessage(ctx context.Context, planeMsg *ws_protocol.W
 		log.Debug().Err(err).Str("type", planeMsg.Type).Msg("Failed to marshal plane msg to send to client")
 		return err
 	}
-	if err = c.writeTimeout(ctx, 3*time.Second, buf); nil != err {
-		log.Debug().
-			Err(err).
-			Str("type", planeMsg.Type).
-			Msgf("Failed to send message to client. %+v", err)
-		return err
-	}
+	go func() {
+		if err = c.writeTimeout(ctx, 3*time.Second, buf); nil != err {
+			log.Debug().
+				Err(err).
+				Str("type", planeMsg.Type).
+				Msgf("Failed to send message to client. %+v", err)
+		}
+	}()
 	return nil
 }
 func (c *WsClient) sendPlaneMessageList(ctx context.Context, planeMsg *ws_protocol.WsResponse) error {
