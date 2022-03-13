@@ -1,5 +1,7 @@
 # Plane.Watch
 
+Development is now continued over at https://github.com/plane-watch/pw-pipeline/
+
 This repo has a few of the things I have done around plane.watch.
 
 There are some tools (in cmd/) for dealing with various things
